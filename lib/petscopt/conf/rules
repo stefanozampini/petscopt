@@ -1,0 +1,8 @@
+# -*- makefile-gmake -*-
+include $(PETSC_DIR)/lib/petsc/conf/rules
+
+.SUFFIXES: .PETSCOPT
+.c.PETSCOPT .cpp.PETSCOPT .cxx.PETSCOPT .cc.PETSCOPT .C.PETSCOPT:
+	@$(OMAKE) $*.o
+	$(CLINKER) -o $* $*.o $(PETSCOPT_LIB)
+	$(RM) $*.o

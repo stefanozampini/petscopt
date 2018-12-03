@@ -1,0 +1,27 @@
+# -*- mode: makefile-gmake -*-
+
+fc_version  := $(if $(FC),$(shell $(FC) --version))
+fc_is_gnu   := $(if $(findstring GNU Fortran,$(fc_version)),1)
+fc_is_intel := $(if $(findstring IFORT,$(fc_version)),1)
+
+ifeq ($(fc_is_gnu),1)
+FFLAGS += $(if $(findstring __float128,$(PETSC_PRECISION)),,-std=f2003)
+FFLAGS += -Wall -Wextra -pedantic
+FFLAGS += -Wunused-dummy-argument
+FFLAGS += -Wimplicit-procedure
+FFLAGS += -Wimplicit-interface
+FFLAGS += -Warray-temporaries
+FFLAGS += -Wuse-without-only
+FFLAGS += -Wintrinsic-shadow
+FFLAGS += -Wintrinsics-std
+FFLAGS += -Wconversion
+FFLAGS += -Wsurprising
+FFLAGS += -Waliasing
+FFLAGS += -Wshadow
+endif
+
+ifeq ($(fc_is_intel),1)
+FFLAGS += -Wall -Wextra -pedantic
+FFLAGS += -Wcheck -Wremarks
+FFLAGS += -Winline
+endif

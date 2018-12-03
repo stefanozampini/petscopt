@@ -1,0 +1,8 @@
+arch-*/*
+src/ts/examples/tests/ex?
+src/ts/examples/tests/petsc/ex16opt_p
+src/ts/examples/tests/petsc/ex16opt_ic
+src/ts/examples/tests/petsc/ex20opt_p
+src/ts/examples/tests/petsc/advection-diffusion-reaction/ex5adj
+src/tao/examples/tests/petsc/burgers_spectral
+src/tao/examples/tests/petsc/spectraladjointassimilation

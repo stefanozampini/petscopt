@@ -1,0 +1,59 @@
+# -*- mode: makefile-gmake -*-
+
+cc_version  := $(shell $(PCC) --version)
+cc_is_gnu   := $(if $(findstring GCC,$(cc_version)),1)
+cc_is_clang := $(if $(findstring clang,$(cc_version)),1)
+cc_is_intel := $(if $(findstring ICC,$(cc_version)),1)
+
+ifeq ($(cc_is_gnu),1)
+CFLAGS += -Wall -Wextra
+CFLAGS += $(if $(findstring __float128,$(PETSC_PRECISION)),,-pedantic)
+CFLAGS += $(if $(findstring CONLY,$(PETSC_LANGUAGE)),-Wdeclaration-after-statement)
+CFLAGS += $(if $(findstring CONLY,$(PETSC_LANGUAGE)),-Wmissing-prototypes)
+CFLAGS += $(if $(findstring CONLY,$(PETSC_LANGUAGE)),-Wc++-compat)
+#CFLAGS += -std=c89 -Wno-long-long -Dinline=__inline__
+CFLAGS += -Wsign-conversion
+CFLAGS += -Wsign-compare
+CFLAGS += -Wfloat-equal
+CFLAGS += -Wconversion
+CFLAGS += -Wunused
+CFLAGS += -Wshadow
+CFLAGS += -Wundef
+CFLAGS += -Wvla
+endif
+
+ifeq ($(cc_is_clang),1)
+CFLAGS += -Weverything
+CFLAGS += $(if $(findstring __float128,$(PETSC_PRECISION)),,-pedantic)
+CFLAGS += $(if $(findstring CONLY,$(PETSC_LANGUAGE)),-Wdeclaration-after-statement)
+CFLAGS += $(if $(findstring CONLY,$(PETSC_LANGUAGE)),-Wmissing-prototypes)
+CFLAGS += $(if $(findstring CONLY,$(PETSC_LANGUAGE)),-Wc++-compat)
+CFLAGS += $(if $(findstring CXXONLY,$(PETSC_LANGUAGE)),-Wno-c++11-long-long)
+CFLAGS += $(if $(findstring CXXONLY,$(PETSC_LANGUAGE)),-Wno-old-style-cast)
+CFLAGS += $(if $(findstring CXXONLY,$(PETSC_LANGUAGE)),-Wno-deprecated)
+#CFLAGS += -std=c89 -Wno-long-long -Dinline=__inline__
+CFLAGS += -Wno-disabled-macro-expansion
+CFLAGS += -Wno-return-type-c-linkage
+CFLAGS += -Wno-source-uses-openmp
+CFLAGS += -Wno-reserved-id-macro
+CFLAGS += -Wno-cast-qual
+CFLAGS += -Wno-padded
+CFLAGS += -Wno-comma
+CFLAGS += -Wvla
+endif
+
+ifeq ($(cc_is_intel),1)
+CFLAGS += -Wall -Wextra
+CFLAGS += -Wcheck -Wremarks
+CFLAGS += -wd1419
+CFLAGS += -wd2547
+CFLAGS += -wd3180
+CFLAGS += -wd11074
+CFLAGS += -wd11076
+endif
+
+CXXFLAGS = $(filter-out \
+-Wdeclaration-after-statement \
+-Wmissing-prototypes \
+-Wc++-compat, \
+$(CFLAGS))

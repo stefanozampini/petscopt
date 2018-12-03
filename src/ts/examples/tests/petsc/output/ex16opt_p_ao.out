@@ -1,0 +1,50 @@
+mu 1., steps 0, ftime 0.5
+mu 1., steps 7, ftime 0.5
+WARNING: Variable bounds have been set but will be ignored by cg algorithm
+  0 TAO,  Function value: 0.0708569,  Residual: 0.00975176 
+  1 TAO,  Function value: 0.000139769,  Residual: 0.00227634 
+  2 TAO,  Function value: 5.1463e-05,  Residual: 0.00136342 
+  3 TAO,  Function value: 1.99374e-05,  Residual: 0.000843447 
+  4 TAO,  Function value: 7.83613e-06,  Residual: 0.000525139 
+  5 TAO,  Function value: 3.12005e-06,  Residual: 0.000329844 
+  6 TAO,  Function value: 1.2529e-06,  Residual: 0.000208992 
+  7 TAO,  Function value: 5.04234e-07,  Residual: 0.000132522 
+  8 TAO,  Function value: 2.0331e-07,  Residual: 8.40651e-05 
+  9 TAO,  Function value: 8.214e-08,  Residual: 5.33035e-05 
+ 10 TAO,  Function value: 3.32965e-08,  Residual: 3.39752e-05 
+ 11 TAO,  Function value: 1.34847e-08,  Residual: 2.15704e-05 
+ 12 TAO,  Function value: 5.47713e-09,  Residual: 1.38033e-05 
+ 13 TAO,  Function value: 2.21466e-09,  Residual: 8.78536e-06 
+ 14 TAO,  Function value: 8.94622e-10,  Residual: 5.58799e-06 
+ 15 TAO,  Function value: 3.61094e-10,  Residual: 3.5559e-06 
+ 16 TAO,  Function value: 1.45481e-10,  Residual: 2.26219e-06 
+ 17 TAO,  Function value: 5.84613e-11,  Residual: 1.44176e-06 
+ 18 TAO,  Function value: 2.33469e-11,  Residual: 9.16907e-07 
+ 19 TAO,  Function value: 9.25494e-12,  Residual: 5.79354e-07 
+ 20 TAO,  Function value: 3.65339e-12,  Residual: 3.67736e-07 
+ 21 TAO,  Function value: 1.42473e-12,  Residual: 2.30777e-07 
+ 22 TAO,  Function value: 5.52321e-13,  Residual: 1.46079e-07 
+ 23 TAO,  Function value: 2.09821e-13,  Residual: 9.13774e-08 
+Tao Object: 1 MPI processes
+  type: cg
+    CG Type: prp
+    Gradient steps: 0
+    Reset steps: 0
+  TaoLineSearch Object: 1 MPI processes
+    type: more-thuente
+    maximum function evaluations=30
+    tolerances: ftol=0.0001, rtol=1e-10, gtol=0.9
+    total number of function evaluations=0
+    total number of gradient evaluations=0
+    total number of function/gradient evaluations=3
+    Termination reason: 1
+  Active Set subset type: subvec
+  convergence tolerances: gatol=1e-13,   steptol=0.,   gttol=1e-05
+  Residual in Function/Gradient:=9.13774e-08
+  Objective value=2.09821e-13
+  total number of iterations=23,                          (max: 2000)
+  total number of function/gradient evaluations=69,      (max: 4000)
+  Solution converged:    ||g(X)||/||g(X0)|| <= gttol
+Vec Object: 1 MPI processes
+  type: seq
+1.

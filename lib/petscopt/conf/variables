@@ -1,0 +1,68 @@
+# -*- makefile-gmake -*-
+
+#--------------------------------------------------------------------#
+
+ifeq ($(PETSCOPT_DIR),)
+  $(error PETSCOPT_DIR not defined)
+endif
+ifeq ($(wildcard $(PETSCOPT_DIR)/include/petscopt.h),)
+  $(error Incorrect PETSCOPT_DIR: $(PETSCOPT_DIR))
+endif
+
+ifneq ($(wildcard $(PETSCOPT_DIR)/lib/petscopt/conf/arch),)
+  include $(PETSCOPT_DIR)/lib/petscopt/conf/arch
+else ifeq ($(PETSCOPT_ARCH),)
+  override PETSCOPT_ARCH := $(if $(PETSC_ARCH),$(PETSC_ARCH),arch-default)
+endif
+
+-include $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib/petscopt/conf/config-petsc
+-include $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib/petscopt/conf/config-petscopt
+
+#--------------------------------------------------------------------#
+
+ifeq ($(PETSC_DIR),)
+  $(error PETSC_DIR not defined)
+endif
+ifeq ($(wildcard $(PETSC_DIR)/include/petsc.h),)
+  $(error Incorrect PETSC_DIR: $(PETSC_DIR))
+endif
+ifeq ($(wildcard $(PETSC_DIR)/include/petscconf.h),)
+  ifeq ($(PETSC_ARCH),)
+    $(error PETSC_ARCH not defined)
+  endif
+  ifeq ($(wildcard $(PETSC_DIR)/$(PETSC_ARCH)/include/petscconf.h),)
+    $(error Incorrect PETSC_ARCH: $(PETSC_ARCH))
+  endif
+endif
+include $(PETSC_DIR)/lib/petsc/conf/variables
+
+#--------------------------------------------------------------------#
+
+PETSCOPT_INCLUDE = -I$(PETSCOPT_DIR)/include
+PETSCOPT_LIB_DIR = $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib
+PETSCOPT_RPATH = $(CC_LINKER_SLFLAG)$(PETSCOPT_LIB_DIR)
+PETSCOPT_LPATH = -L$(PETSCOPT_LIB_DIR)
+PETSCOPT_LIB = $(PETSCOPT_RPATH) $(PETSCOPT_LPATH) -lpetscopt $(PETSC_LIB)
+
+PETSCOPT_CCPPFLAGS = $(PETSCOPT_INCLUDE)
+PETSCOPT_FCPPFLAGS = $(PETSCOPT_INCLUDE)
+CCPPFLAGS += $(PETSCOPT_CCPPFLAGS)
+FCPPFLAGS += $(PETSCOPT_FCPPFLAGS)
+
+#--------------------------------------------------------------------#
+
+fast ?= 0
+ifeq ($(fast),1)
+override CFLAGS   += -Ofast
+override FFLAGS   += -Ofast
+override CXXFLAGS += -Ofast
+endif
+
+debug ?= 0
+ifeq ($(debug),1)
+override CFLAGS   += -g3
+override FFLAGS   += -g3
+override CXXFLAGS += -g3
+endif
+
+#--------------------------------------------------------------------#

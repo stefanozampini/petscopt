@@ -1,0 +1,42 @@
+# -*- mode: makefile-gmake -*-
+
+fortran = gfortran ifort
+
+FC := $(firstword \
+      $(foreach fc,$(fortran), \
+      $(if $(shell command -v $(fc) 2>/dev/null),$(fc))))
+
+ifeq ($(FC),)
+$(error Fortran compiler not found: $(fortran))
+endif
+
+fc_version  := $(if $(FC),$(shell $(FC) --version))
+fc_is_gnu   := $(if $(findstring GNU Fortran,$(fc_version)),1)
+fc_is_intel := $(if $(findstring IFORT,$(fc_version)),1)
+
+ifeq ($(fc_is_gnu),1)
+FC_DEFINE_FLAG = -D
+FC_MODULE_FLAG = -I
+FC_MODULE_OUTPUT_FLAG = -J
+FC_DEPFLAGS = -MMD -MP
+FC_FLAGS := $(if $(filter-out no,$(BUILDSHAREDLIB)),-fPIC)
+FC_LIB_DIR := $(shell $(FC) -print-file-name=)
+fc_liblist := gfortran quadmath
+endif
+
+ifeq ($(fc_is_intel),1)
+FC_DEFINE_FLAG = -D
+FC_MODULE_FLAG = -I
+FC_MODULE_OUTPUT_FLAG = -module #
+FC_DEPFLAGS = -gen-dep=$(patsubst %.o,%.d,$@)
+FC_FLAGS :=  $(if $(filter-out no,$(BUILDSHAREDLIB)),-fPIC)
+FC_LIB_DIR := $(subst bin/$(FC),lib/intel64,$(shell command -v $(FC)))
+fc_liblist := ifport ifcoremt imf svml m intlc
+endif
+
+FPP_FLAGS = -I$(PETSC_DIR)/$(PETSC_ARCH)/include
+FC_RPATH = $(if $(FC_LIB_DIR),$(CC_LINKER_SLFLAG)$(FC_LIB_DIR))
+FC_LPATH = $(if $(FC_LIB_DIR),-L$(FC_LIB_DIR))
+FC_LIB = $(FC_RPATH) $(FC_LPATH) $(fc_liblist:%=-l%)
+
+PETSC_WITH_EXTERNAL_LIB += $(FC_LIB)

@@ -1,0 +1,5 @@
+# -*- makefile -*-
+include $(PETSC_DIR)/lib/petsc/conf/test
+
+# only for the purpose of running tests, we override these variables
+PETSC_LIB := $(PETSCOPT_LIB)
