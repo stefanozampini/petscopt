@@ -578,8 +578,6 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     }
   } while (PetscAbsReal(tfup - tf) > PETSC_SMALL && !stop);
 
-  //if (direction) ts->funchead = NULL;
-
   /* zero contexts for quadrature */
   qeval_ctx->seval_ctx = NULL;
   qeval_ctx->veval_ctx = NULL;

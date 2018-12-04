@@ -1,7 +1,6 @@
 #ifndef __PETSCOPT_TSPDECONSTRAINEDUTILSIMPL_H
 #define __PETSCOPT_TSPDECONSTRAINEDUTILSIMPL_H
 
-//#include <petscopt/private/tsobjimpl.h>
 #include <petscts.h>
 
 /* prototypes for cost integral evaluation */

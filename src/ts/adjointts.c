@@ -346,10 +346,6 @@ PetscErrorCode TSCreateAdjointTS(TS ts, TS* adjts)
 
   /* TODO: this needs a better sharing mechanism */
   ierr = TSGetTSObj(ts,&adj->tsobj);CHKERRQ(ierr);
-  //ierr = PetscObjectQuery((PetscObject)ts,"_ts_obj_ctx",(PetscObject*)&container);CHKERRQ(ierr);
-  //if (container) {
-  //  ierr = PetscContainerGetPointer(container,(void**)&adj->tsobj);CHKERRQ(ierr);
-  //}
 
   /* invalidate time limits, that need to be set by AdjointTSSetTimeLimits */
   adj->t0 = adj->tf = PETSC_MAX_REAL;
