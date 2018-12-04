@@ -58,6 +58,7 @@ $(config-petsc) : | $$(@D)/.DIR
 	$(call write-variable,$@,PETSC_DIR)
 	$(call write-variable,$@,PETSC_ARCH)
 $(config-petscopt) : | $$(@D)/.DIR
+	$(call write-variable,$@,CFLAGS)
 	$(call write-variable,$@,fast)
 	$(call write-variable,$@,debug)
 config-clean :
