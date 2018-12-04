@@ -131,6 +131,7 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   } else { /* follow trajectory -> fix number of time steps */
     PetscInt nsteps;
 
+    ierr = TSAdaptHistorySetTSHistory(adapt,tshess->modeltj->tsh,PETSC_TRUE);CHKERRQ(ierr);
     ierr = TSTrajectoryGetNumSteps(tshess->modeltj,&nsteps);CHKERRQ(ierr);
     ierr = TSSetMaxSteps(tshess->soats,nsteps-1);CHKERRQ(ierr);
     ierr = TSSetExactFinalTime(tshess->soats,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
@@ -300,8 +301,9 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
   TSHessian      *tshess;
   Vec            U;
   TSTrajectory   otrj;
+  TSAdapt        adapt;
   PetscInt       n,N;
-  PetscBool      has;
+  PetscBool      has,istr;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -451,6 +453,16 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
   ierr = TSSetTimeStep(tshess->foats,dt);CHKERRQ(ierr);
   ierr = AdjointTSSetTimeLimits(tshess->foats,tshess->t0,tshess->tf);CHKERRQ(ierr);
   ierr = AdjointTSComputeInitialConditions(tshess->foats,NULL,PETSC_TRUE,PETSC_FALSE);CHKERRQ(ierr);
+  ierr = TSGetAdapt(tshess->foats,&adapt);CHKERRQ(ierr);
+  ierr = PetscObjectTypeCompare((PetscObject)adapt,TSADAPTHISTORY,&istr);CHKERRQ(ierr);
+  if (istr) {
+    PetscInt nsteps;
+
+    ierr = TSAdaptHistorySetTSHistory(adapt,tshess->modeltj->tsh,PETSC_TRUE);CHKERRQ(ierr);
+    ierr = TSTrajectoryGetNumSteps(tshess->modeltj,&nsteps);CHKERRQ(ierr);
+    ierr = TSSetMaxSteps(tshess->foats,nsteps-1);CHKERRQ(ierr);
+    ierr = TSSetExactFinalTime(tshess->foats,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
+  }
   ierr = TSSolve(tshess->foats,NULL);CHKERRQ(ierr);
 
   /* restore old TSTrajectory (if any) */
