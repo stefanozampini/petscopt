@@ -250,6 +250,58 @@ static PetscErrorCode AdjointTSPostStep(TS adjts)
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode AdjointTSOptionsHandler(PetscOptionItems *PetscOptionsObject,PetscObject obj,void *ctx)
+{
+  TS             adjts = (TS)obj;
+  AdjointCtx     *adj_ctx;
+  PetscContainer container;
+  PetscBool      jcon,rksp;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
+  ierr = PetscOptionsHead(PetscOptionsObject,"AdjointTS options");CHKERRQ(ierr);
+  jcon = PETSC_FALSE;
+  ierr = PetscOptionsBool("-constjacobians","Whether or not the DAE Jacobians are constant",NULL,jcon,&jcon,NULL);CHKERRQ(ierr);
+  rksp = PETSC_FALSE;
+  ierr = PetscOptionsBool("-reuseksp","Reuse the KSP solver from the nonlinear model",NULL,rksp,&rksp,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsTail();CHKERRQ(ierr);
+  ierr = PetscObjectQuery((PetscObject)adj_ctx->fwdts,"_ts_splitJac",(PetscObject*)&container);CHKERRQ(ierr);
+  if (container) {
+    TSSplitJacobians *splitJ;
+
+    ierr = PetscContainerGetPointer(container,(void**)&splitJ);CHKERRQ(ierr);
+    splitJ->jacconsts = jcon;
+  }
+  if (jcon) {
+    TSRHSFunction rhsfunc;
+
+    ierr = TSGetRHSFunction(adjts,NULL,&rhsfunc,NULL);CHKERRQ(ierr);
+    if (rhsfunc) { /* just to make sure we have a correct Jacobian */
+      DM  dm;
+      Mat A,B;
+      Vec U;
+
+      ierr = TSGetRHSMats_Private(adj_ctx->fwdts,&A,&B);CHKERRQ(ierr);
+      ierr = TSGetDM(adj_ctx->fwdts,&dm);CHKERRQ(ierr);
+      ierr = DMGetGlobalVector(dm,&U);CHKERRQ(ierr);
+      ierr = TSComputeRHSJacobian(adj_ctx->fwdts,PETSC_MIN_REAL,U,A,B);CHKERRQ(ierr);
+      ierr = DMRestoreGlobalVector(dm,&U);CHKERRQ(ierr);
+      ierr = TSSetRHSJacobian(adjts,A,B,TSComputeRHSJacobianConstant,NULL);CHKERRQ(ierr);
+    }
+  }
+  if (rksp) { /* reuse the same KSP */
+    SNES snes;
+    KSP  ksp;
+
+    ierr = TSGetSNES(adj_ctx->fwdts,&snes);CHKERRQ(ierr);
+    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+    ierr = TSGetSNES(adjts,&snes);CHKERRQ(ierr);
+    ierr = SNESSetKSP(snes,ksp);CHKERRQ(ierr);
+  }
+  PetscFunctionReturn(0);
+}
+
 /*@C
    TSCreateAdjointTS - Creates a TS object that can be used to solve the adjoint DAE.
 
@@ -316,9 +368,9 @@ PetscErrorCode TSCreateAdjointTS(TS ts, TS* adjts)
   TSType           type;
   TSEquationType   eqtype;
   const char       *prefix;
-  PetscReal        atol,rtol;
+  KSPType          ksptype;
+  PetscReal        atol,rtol,dtol;
   PetscInt         maxits;
-  PetscBool        jcon,rksp;
   PetscErrorCode   ierr;
 
   PetscFunctionBegin;
@@ -362,15 +414,6 @@ PetscErrorCode TSCreateAdjointTS(TS ts, TS* adjts)
   ierr = TSSetOptionsPrefix(*adjts,"adjoint_");CHKERRQ(ierr);
   ierr = TSAppendOptionsPrefix(*adjts,prefix);CHKERRQ(ierr);
 
-  /* options specific to AdjointTS */
-  ierr = TSGetOptionsPrefix(*adjts,&prefix);CHKERRQ(ierr);
-  ierr = PetscOptionsBegin(PetscObjectComm((PetscObject)*adjts),prefix,"Adjoint options","TS");CHKERRQ(ierr);
-  jcon = PETSC_FALSE;
-  ierr = PetscOptionsBool("-constjacobians","Whether or not the DAE Jacobians are constant",NULL,jcon,&jcon,NULL);CHKERRQ(ierr);
-  rksp = PETSC_FALSE;
-  ierr = PetscOptionsBool("-reuseksp","Reuse the KSP solver from the nonlinear model",NULL,rksp,&rksp,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsEnd();CHKERRQ(ierr);
-
   /* setup callbacks for adjoint DAE: we reuse the same jacobian matrices of the forward solve */
   ierr = TSGetIFunction(ts,NULL,&ifunc,NULL);CHKERRQ(ierr);
   ierr = TSGetRHSFunction(ts,NULL,&rhsfunc,NULL);CHKERRQ(ierr);
@@ -396,7 +439,6 @@ PetscErrorCode TSCreateAdjointTS(TS ts, TS* adjts)
       ierr = PetscContainerDestroy(&container);CHKERRQ(ierr);
     }
     splitJ->splitdone = PETSC_FALSE;
-    splitJ->jacconsts = jcon;
   } else {
     TSRHSJacobian rhsjacfunc;
 
@@ -405,15 +447,6 @@ PetscErrorCode TSCreateAdjointTS(TS ts, TS* adjts)
     ierr = TSGetRHSJacobian(ts,NULL,NULL,&rhsjacfunc,NULL);CHKERRQ(ierr);
     ierr = TSGetRHSMats_Private(ts,&A,&B);CHKERRQ(ierr);
     if (rhsjacfunc == TSComputeRHSJacobianConstant) {
-      ierr = TSSetRHSJacobian(*adjts,A,B,TSComputeRHSJacobianConstant,NULL);CHKERRQ(ierr);
-    } else if (jcon) { /* just to make sure we have a correct Jacobian */
-      DM  dm;
-      Vec U;
-
-      ierr = TSGetDM(ts,&dm);CHKERRQ(ierr);
-      ierr = DMGetGlobalVector(dm,&U);CHKERRQ(ierr);
-      ierr = TSComputeRHSJacobian(ts,PETSC_MIN_REAL,U,A,B);CHKERRQ(ierr);
-      ierr = DMRestoreGlobalVector(dm,&U);CHKERRQ(ierr);
       ierr = TSSetRHSJacobian(*adjts,A,B,TSComputeRHSJacobianConstant,NULL);CHKERRQ(ierr);
     } else {
       ierr = TSSetRHSJacobian(*adjts,A,B,AdjointTSRHSJacobian,NULL);CHKERRQ(ierr);
@@ -433,22 +466,18 @@ PetscErrorCode TSCreateAdjointTS(TS ts, TS* adjts)
   /* adjointTS linear solver */
   ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
   ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-  if (!rksp) { /* propagate KSP info of the forward model but use a different object */
-    KSPType   ksptype;
-    PetscReal atol,rtol,dtol;
+  ierr = KSPGetType(ksp,&ksptype);CHKERRQ(ierr);
+  ierr = KSPGetTolerances(ksp,&rtol,&atol,&dtol,&maxits);CHKERRQ(ierr);
+  ierr = TSGetSNES(*adjts,&snes);CHKERRQ(ierr);
+  ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+  if (ksptype) { ierr = KSPSetType(ksp,ksptype);CHKERRQ(ierr); }
+  ierr = KSPSetTolerances(ksp,rtol,atol,dtol,maxits);CHKERRQ(ierr);
 
-    ierr = KSPGetType(ksp,&ksptype);CHKERRQ(ierr);
-    ierr = KSPGetTolerances(ksp,&rtol,&atol,&dtol,&maxits);CHKERRQ(ierr);
-    ierr = TSGetSNES(*adjts,&snes);CHKERRQ(ierr);
-    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-    if (ksptype) { ierr = KSPSetType(ksp,ksptype);CHKERRQ(ierr); }
-    ierr = KSPSetTolerances(ksp,rtol,atol,dtol,maxits);CHKERRQ(ierr);
-  } else { /* reuse the same KSP */
-    ierr = TSGetSNES(*adjts,&snes);CHKERRQ(ierr);
-    ierr = SNESSetKSP(snes,ksp);CHKERRQ(ierr);
-  }
   /* set special purpose post step method for handling of discontinuities */
   ierr = TSSetPostStep(*adjts,AdjointTSPostStep);CHKERRQ(ierr);
+
+  /* handle specific AdjointTS options */
+  ierr = PetscObjectAddOptionsHandler((PetscObject)(*adjts),AdjointTSOptionsHandler,NULL,NULL);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 

@@ -141,6 +141,59 @@ static PetscErrorCode TLMTSRHSJacobian(TS lts, PetscReal time, Vec U, Mat A, Mat
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode TLMTSOptionsHandler(PetscOptionItems *PetscOptionsObject,PetscObject obj,PETSC_UNUSED void *ctx)
+{
+  TS             lts = (TS)obj;
+  TLMTS_Ctx      *tlm_ctx;
+  PetscContainer container;
+  PetscBool      jcon,rksp;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TSGetApplicationContext(lts,(void*)&tlm_ctx);CHKERRQ(ierr);
+  ierr = PetscOptionsHead(PetscOptionsObject,"TLMTS options");CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-userijacobian","Use the user-provided IJacobian routine, instead of the splits, to compute the Jacobian",NULL,tlm_ctx->userijac,&tlm_ctx->userijac,NULL);CHKERRQ(ierr);
+  jcon = PETSC_FALSE;
+  ierr = PetscOptionsBool("-constjacobians","Whether or not the DAE Jacobians are constant",NULL,jcon,&jcon,NULL);CHKERRQ(ierr);
+  rksp = PETSC_FALSE;
+  ierr = PetscOptionsBool("-reuseksp","Reuse the KSP solver from the nonlinear model",NULL,rksp,&rksp,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsTail();CHKERRQ(ierr);
+  ierr = PetscObjectQuery((PetscObject)tlm_ctx->model,"_ts_splitJac",(PetscObject*)&container);CHKERRQ(ierr);
+  if (container) {
+    TSSplitJacobians *splitJ;
+
+    ierr = PetscContainerGetPointer(container,(void**)&splitJ);CHKERRQ(ierr);
+    splitJ->jacconsts = jcon;
+  }
+  if (jcon) {
+    TSRHSFunction rhsfunc;
+
+    ierr = TSGetRHSFunction(lts,NULL,&rhsfunc,NULL);CHKERRQ(ierr);
+    if (rhsfunc) { /* just to make sure we have a correct Jacobian */
+      DM  dm;
+      Mat A,B;
+      Vec U;
+
+      ierr = TSGetRHSMats_Private(tlm_ctx->model,&A,&B);CHKERRQ(ierr);
+      ierr = TSGetDM(tlm_ctx->model,&dm);CHKERRQ(ierr);
+      ierr = DMGetGlobalVector(dm,&U);CHKERRQ(ierr);
+      ierr = TSComputeRHSJacobian(tlm_ctx->model,PETSC_MIN_REAL,U,A,B);CHKERRQ(ierr);
+      ierr = DMRestoreGlobalVector(dm,&U);CHKERRQ(ierr);
+      ierr = TSSetRHSJacobian(lts,A,B,TSComputeRHSJacobianConstant,NULL);CHKERRQ(ierr);
+    }
+  }
+  if (rksp) { /* reuse the same KSP */
+    SNES snes;
+    KSP  ksp;
+
+    ierr = TSGetSNES(tlm_ctx->model,&snes);CHKERRQ(ierr);
+    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+    ierr = TSGetSNES(lts,&snes);CHKERRQ(ierr);
+    ierr = SNESSetKSP(snes,ksp);CHKERRQ(ierr);
+  }
+  PetscFunctionReturn(0);
+}
+
 /*@C
    TLMTSGetRHSVec - Gets the vector used to compute the forcing term for the Tangent Linear Model.
 
@@ -440,10 +493,10 @@ PetscErrorCode TSCreateTLMTS(TS ts, TS* lts)
   TSI2Function     i2func;
   TSType           type;
   TSEquationType   eqtype;
+  KSPType          ksptype;
   const char       *prefix;
-  PetscReal        atol,rtol;
+  PetscReal        atol,rtol,dtol;
   PetscInt         maxits;
-  PetscBool        jcon,rksp;
   PetscErrorCode   ierr;
 
   PetscFunctionBegin;
@@ -479,16 +532,6 @@ PetscErrorCode TSCreateTLMTS(TS ts, TS* lts)
   ierr = TSSetOptionsPrefix(*lts,"tlm_");CHKERRQ(ierr);
   ierr = TSAppendOptionsPrefix(*lts,prefix);CHKERRQ(ierr);
 
-  /* options specific to TLMTS */
-  ierr = TSGetOptionsPrefix(*lts,&prefix);CHKERRQ(ierr);
-  ierr = PetscOptionsBegin(PetscObjectComm((PetscObject)*lts),prefix,"Tangent Linear Model options","TS");CHKERRQ(ierr);
-  ierr = PetscOptionsBool("-userijacobian","Use the user-provided IJacobian routine, instead of the splits, to compute the Jacobian",NULL,tlm_ctx->userijac,&tlm_ctx->userijac,NULL);CHKERRQ(ierr);
-  jcon = PETSC_FALSE;
-  ierr = PetscOptionsBool("-constjacobians","Whether or not the DAE Jacobians are constant",NULL,jcon,&jcon,NULL);CHKERRQ(ierr);
-  rksp = PETSC_FALSE;
-  ierr = PetscOptionsBool("-reuseksp","Reuse the KSP solver from the nonlinear model",NULL,rksp,&rksp,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsEnd();CHKERRQ(ierr);
-
   /* setup callbacks for the tangent linear model DAE: we reuse the same jacobian matrices of the forward model */
   ierr = TSGetIFunction(ts,NULL,&ifunc,NULL);CHKERRQ(ierr);
   ierr = TSGetRHSFunction(ts,NULL,&rhsfunc,NULL);CHKERRQ(ierr);
@@ -516,7 +559,6 @@ PetscErrorCode TSCreateTLMTS(TS ts, TS* lts)
       ierr = PetscContainerDestroy(&container);CHKERRQ(ierr);
     }
     splitJ->splitdone = PETSC_FALSE;
-    splitJ->jacconsts = jcon;
   } else {
     TSRHSJacobian rhsjacfunc;
 
@@ -525,15 +567,6 @@ PetscErrorCode TSCreateTLMTS(TS ts, TS* lts)
     ierr = TSGetRHSJacobian(ts,NULL,NULL,&rhsjacfunc,NULL);CHKERRQ(ierr);
     ierr = TSGetRHSMats_Private(ts,&A,&B);CHKERRQ(ierr);
     if (rhsjacfunc == TSComputeRHSJacobianConstant) {
-      ierr = TSSetRHSJacobian(*lts,A,B,TSComputeRHSJacobianConstant,NULL);CHKERRQ(ierr);
-    } else if (jcon) { /* just to make sure we have a correct Jacobian */
-      DM  dm;
-      Vec U;
-
-      ierr = TSGetDM(ts,&dm);CHKERRQ(ierr);
-      ierr = DMGetGlobalVector(dm,&U);CHKERRQ(ierr);
-      ierr = TSComputeRHSJacobian(ts,PETSC_MIN_REAL,U,A,B);CHKERRQ(ierr);
-      ierr = DMRestoreGlobalVector(dm,&U);CHKERRQ(ierr);
       ierr = TSSetRHSJacobian(*lts,A,B,TSComputeRHSJacobianConstant,NULL);CHKERRQ(ierr);
     } else {
       ierr = TSSetRHSJacobian(*lts,A,B,TLMTSRHSJacobian,NULL);CHKERRQ(ierr);
@@ -547,22 +580,17 @@ PetscErrorCode TSCreateTLMTS(TS ts, TS* lts)
   /* tangent linear model DAE is linear */
   ierr = TSSetProblemType(*lts,TS_LINEAR);CHKERRQ(ierr);
 
-  /* tangent linear model linear solver */
+  /* tangent linear model linear solver -> propagate KSP info of the forward model but use a different object */
   ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
   ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-  if (!rksp) { /* propagate KSP info of the forward model but use a different object */
-    KSPType   ksptype;
-    PetscReal atol,rtol,dtol;
+  ierr = KSPGetType(ksp,&ksptype);CHKERRQ(ierr);
+  ierr = KSPGetTolerances(ksp,&rtol,&atol,&dtol,&maxits);CHKERRQ(ierr);
+  ierr = TSGetSNES(*lts,&snes);CHKERRQ(ierr);
+  ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+  if (ksptype) { ierr = KSPSetType(ksp,ksptype);CHKERRQ(ierr); }
+  ierr = KSPSetTolerances(ksp,rtol,atol,dtol,maxits);CHKERRQ(ierr);
 
-    ierr = KSPGetType(ksp,&ksptype);CHKERRQ(ierr);
-    ierr = KSPGetTolerances(ksp,&rtol,&atol,&dtol,&maxits);CHKERRQ(ierr);
-    ierr = TSGetSNES(*lts,&snes);CHKERRQ(ierr);
-    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-    if (ksptype) { ierr = KSPSetType(ksp,ksptype);CHKERRQ(ierr); }
-    ierr = KSPSetTolerances(ksp,rtol,atol,dtol,maxits);CHKERRQ(ierr);
-  } else { /* reuse the same KSP */
-    ierr = TSGetSNES(*lts,&snes);CHKERRQ(ierr);
-    ierr = SNESSetKSP(snes,ksp);CHKERRQ(ierr);
-  }
+  /* handle specific TLMTS options */
+  ierr = PetscObjectAddOptionsHandler((PetscObject)(*lts),TLMTSOptionsHandler,NULL,NULL);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
