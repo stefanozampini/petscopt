@@ -73,7 +73,7 @@ config : config-petsc config-petscopt
 .PHONY:  config-petsc config-petscopt config
 
 $(generated) : | $$(@D)/.DIR
-	$(PYTHON) $(PETSC_DIR)/config/gmakegen.py --petsc-arch=$(PETSC_ARCH) --pkg-dir=$(PETSCOPT_DIR)
+	$(PYTHON) $(PETSC_DIR)/config/gmakegen.py --petsc-arch=$(PETSC_ARCH) --pkg-dir=$(PETSCOPT_DIR) --pkg-name=petscopt --pkg-arch=$(PETSCOPT_ARCH)
 
 -include $(generated)
 
