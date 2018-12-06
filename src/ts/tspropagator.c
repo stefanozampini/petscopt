@@ -36,12 +36,14 @@ static PetscErrorCode MatDestroy_Propagator(Mat A)
 }
 
 /* Dummy objective function to not have TSAddObjective complaining about a null objective */
+/* LCOV_EXCL_START */
 static PetscErrorCode TLMTS_dummyOBJ(Vec U, Vec M, PetscReal time, PetscReal *f, void *ctx)
 {
   PetscFunctionBegin;
   *f = 0.0;
   PetscFunctionReturn(0);
 }
+/* LCOV_EXCL_STOP */
 
 /* Just a silly function to pass information to initialize the adjoint variables */
 static PetscErrorCode TLMTS_dummyRHS(Vec U, Vec M, PetscReal time, Vec grad, void *ctx)
@@ -274,8 +276,11 @@ static PetscErrorCode TSCreatePropagatorMat_Private(TS ts, PetscReal t0, PetscRe
   ierr = TLMTSSetDesignVec(prop->lts,design);CHKERRQ(ierr);
   ierr = PetscObjectDereference((PetscObject)design);CHKERRQ(ierr);
   ierr = TSSetFromOptions(prop->lts);CHKERRQ(ierr);
+  ierr = TSResetObjective(prop->lts);CHKERRQ(ierr);
   ierr = TSAddObjective(prop->lts,prop->tf,TLMTS_dummyOBJ,TLMTS_dummyRHS,NULL,
                         NULL,NULL,NULL,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
+  /* XXX coverage */
+  ierr = TSSetGradientIC(prop->lts,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
   /* we need to call this since we will then compute the adjoint of the TLM */
   ierr = TSSetGradientDAE(prop->lts,tsopt->F_m,tsopt->F_m_f,tsopt->F_m_ctx);CHKERRQ(ierr);
   if (tsopt->G_m) {

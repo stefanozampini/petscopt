@@ -719,6 +719,12 @@ static PetscErrorCode TestTSPostEvent(TS adjts, PetscInt nevents, PetscInt event
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode DummyPostStep(TS ts)
+{
+  PetscFunctionBegin;
+  PetscFunctionReturn(0);
+}
+
 int main(int argc, char* argv[])
 {
   TS             ts;
@@ -747,6 +753,7 @@ int main(int argc, char* argv[])
   PetscBool      testgeneral = PETSC_FALSE;
   PetscBool      testfwdevent = PETSC_FALSE;
   PetscBool      testtlmgrad = PETSC_FALSE;
+  PetscBool      testps = PETSC_TRUE;
   PetscBool      userobjective = PETSC_TRUE;
   PetscBool      usefd = PETSC_FALSE, usetaylor = PETSC_FALSE;
   PetscBool      analytic = PETSC_FALSE;
@@ -788,6 +795,7 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsBool("-test_general","Test general functional","",testgeneral,&testgeneral,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_forward_event","Test event handling in forward solve","",testfwdevent,&testfwdevent,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_tlm_gradient","Test TLM for gradient computation","",testtlmgrad,&testtlmgrad,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-test_poststep","Test with TS having a poststep method","",testps,&testps,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-use_analytic","Use analytic solution to test gradient evaluation","",analytic,&analytic,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-use_fd","Use finite differencing to test gradient evaluation","",usefd,&usefd,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-use_taylor","Use Taylor remainders to check gradient evaluation","",usetaylor,&usetaylor,NULL);CHKERRQ(ierr);
@@ -916,6 +924,11 @@ int main(int argc, char* argv[])
     ierr = TSSetEventHandler(ts,1,&dir,&term,TestTSEventFunction,TestTSPostEvent,&testfwdeventctx);CHKERRQ(ierr);
   }
   ierr = TSSetSetUpFromDesign(ts,MyTSSetUpFromDesign,&userdae);CHKERRQ(ierr);
+
+  if (testps) {
+    ierr = TSSetPostStep(ts,DummyPostStep);CHKERRQ(ierr);
+  }
+
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
 
   /* Set cost functionals: many can be added, by simply calling TSAddObjective multiple times */
@@ -1296,7 +1309,7 @@ int main(int argc, char* argv[])
   test:
     requires: !single
     suffix: 5
-    args: -t0 0.7 -tf 0.8 -dt 0.01 -ts_type cn -test_event_constant -p 0.8 -test_ifunc -ts_trajectory_reconstruction_order 2 -test_pjac 0
+    args: -t0 0.7 -tf 0.8 -dt 0.01 -ts_type cn -test_event_constant -p 0.8 -test_ifunc -ts_trajectory_reconstruction_order 2 -test_pjac 0 -tsgradient_adjoint_ts_adapt_type history -tshessian_tlm_ts_adapt_type history -tshessian_foadjoint_ts_adapt_type history -tshessian_soadjoint_ts_adapt_type {{none history}} -tshessian_tlm_userijacobian
 
   test:
     requires: !single

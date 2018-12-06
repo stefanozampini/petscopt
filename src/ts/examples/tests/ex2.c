@@ -164,7 +164,7 @@ static PetscErrorCode FormIJacobian_Lorentz(TS ts,PetscReal time, Vec U, Vec Udo
 int main(int argc, char* argv[])
 {
   TS             ts;
-  Mat            J,Phi,PhiExpl,PhiT,PhiTExpl,H;
+  Mat            J,Phi,PhiExpl,PhiT,PhiTExpl,H,P = NULL;
   Vec            U,U0;
   User_Lorentz   luser;
   User_Osc       ouser;
@@ -172,7 +172,7 @@ int main(int argc, char* argv[])
   PetscReal      t0 = 0.0, tf = 0.1, dt = 0.001;
   PetscInt       N = 3;
   PetscReal      err,params[3],normPhi,omega = 0.1,gamma = 0.0;
-  PetscBool      use_lorentz = PETSC_FALSE;
+  PetscBool      use_lorentz = PETSC_FALSE, testP = PETSC_FALSE;
   TSProblemType  ptype;
   PetscErrorCode ierr;
 
@@ -189,6 +189,7 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsReal("-dt","Initial time step","",dt,&dt,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-tf","Final time","",tf,&tf,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-ifunc","Use ifunction","",ifunc,&ifunc,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-testp","Test projector argument","",testP,&testP,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsEnd();CHKERRQ(ierr);
   if (use_lorentz) {
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Using Lorentz parameters: %g %g %g\n",(double)params[0],(double)params[1],(double)params[2]);CHKERRQ(ierr);
@@ -247,8 +248,20 @@ int main(int argc, char* argv[])
   }
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
 
+  /* just test the code path */
+  if (testP) {
+    ierr = MatCreate(PETSC_COMM_WORLD,&P);CHKERRQ(ierr);
+    ierr = MatSetSizes(P,N,N,PETSC_DECIDE,PETSC_DECIDE);CHKERRQ(ierr);
+    ierr = MatSetType(P,MATAIJ);CHKERRQ(ierr);
+    ierr = MatSetUp(P);CHKERRQ(ierr);
+    ierr = MatAssemblyBegin(P,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+    ierr = MatAssemblyEnd(P,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+    ierr = VecSetRandom(U0,NULL);CHKERRQ(ierr);
+    ierr = MatDiagonalSet(P,U0,INSERT_VALUES);CHKERRQ(ierr);
+  }
+
   ierr = VecSetRandom(U0,NULL);CHKERRQ(ierr);
-  ierr = TSCreatePropagatorMat(ts,t0,dt,tf,U0,NULL,NULL,&Phi);CHKERRQ(ierr);
+  ierr = TSCreatePropagatorMat(ts,t0,dt,tf,U0,NULL,P,&Phi);CHKERRQ(ierr);
   ierr = TSGetProblemType(ts,&ptype);CHKERRQ(ierr);
   if (ptype == TS_LINEAR) { /* For linear problems Phi should give the ODE itself */
     Vec W,sol;
@@ -256,6 +269,14 @@ int main(int argc, char* argv[])
     ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
     ierr = VecDuplicate(sol,&W);CHKERRQ(ierr);
     ierr = MatMult(Phi,U0,W);CHKERRQ(ierr);
+    if (P) { /* MatMult output should be P*sol */
+      Vec y;
+
+      ierr = VecDuplicate(sol,&y);CHKERRQ(ierr);
+      ierr = VecCopy(sol,y);CHKERRQ(ierr);
+      ierr = MatMult(P,y,sol);CHKERRQ(ierr);
+      ierr = VecDestroy(&y);CHKERRQ(ierr);
+    }
     ierr = VecAXPY(W,-1.0,sol);CHKERRQ(ierr);
     ierr = VecNorm(W,NORM_INFINITY,&err);CHKERRQ(ierr);
     if (err > PETSC_SMALL) {
@@ -265,10 +286,20 @@ int main(int argc, char* argv[])
   }
   ierr = MatComputeExplicitOperator(Phi,&PhiExpl);CHKERRQ(ierr);
   ierr = MatNorm(PhiExpl,NORM_INFINITY,&normPhi);CHKERRQ(ierr);
+  if (P) {
+    ierr = MatGetDiagonal(P,U0);CHKERRQ(ierr);
+    ierr = VecReciprocal(U0);CHKERRQ(ierr);
+    ierr = MatDiagonalScale(PhiExpl,U0,NULL);CHKERRQ(ierr);
+  }
   ierr = PetscObjectSetName((PetscObject)PhiExpl,"Phi");CHKERRQ(ierr);
   ierr = MatViewFromOptions(PhiExpl,NULL,"-prop_view");CHKERRQ(ierr);
   ierr = MatCreateTranspose(Phi,&PhiT);CHKERRQ(ierr);
   ierr = MatComputeExplicitOperator(PhiT,&PhiTExpl);CHKERRQ(ierr);
+  if (P) {
+    ierr = MatGetDiagonal(P,U0);CHKERRQ(ierr);
+    ierr = VecReciprocal(U0);CHKERRQ(ierr);
+    ierr = MatDiagonalScale(PhiTExpl,NULL,U0);CHKERRQ(ierr);
+  }
   ierr = PetscObjectSetName((PetscObject)PhiTExpl,"PhiT");CHKERRQ(ierr);
   ierr = MatViewFromOptions(PhiTExpl,NULL,"-propT_view");CHKERRQ(ierr);
   ierr = MatTranspose(PhiTExpl,MAT_INITIAL_MATRIX,&H);CHKERRQ(ierr);
@@ -292,6 +323,7 @@ int main(int argc, char* argv[])
   ierr = MatDestroy(&Phi);CHKERRQ(ierr);
   ierr = MatDestroy(&PhiTExpl);CHKERRQ(ierr);
   ierr = MatDestroy(&PhiT);CHKERRQ(ierr);
+  ierr = MatDestroy(&P);CHKERRQ(ierr);
   ierr = MatDestroy(&J);CHKERRQ(ierr);
   ierr = PetscFinalize();
   return ierr;
@@ -300,7 +332,7 @@ int main(int argc, char* argv[])
 /*TEST
     test:
       suffix: lorentz
-      args: -ts_type rk -tf 3  -lorentz -ts_rtol 1.e-6 -ts_atol 1.e-6 -ts_trajectory_type memory
+      args: -ts_type rk -tf 3  -lorentz -ts_rtol 1.e-6 -ts_atol 1.e-6 -ts_trajectory_type memory -testp
 
     test:
       suffix: lorentz_i_noifunc
@@ -314,17 +346,17 @@ int main(int argc, char* argv[])
 
     test:
       suffix: oscillator
-      args: -ts_type rk -ts_rk_type 5dp -tlm_ts_rk_type 5dp -adjoint_tlm_ts_rk_type 5dp -tf 10  -omega 3 -gamma 2 -ts_trajectory_type memory
+      args: -ts_type rk -ts_rk_type 5dp -tlm_ts_rk_type 5dp -adjoint_tlm_ts_rk_type 5dp -tf 10  -omega 3 -gamma 2 -ts_trajectory_type memory -testp  -adjoint_tlm_constjacobians
       output_file: output/ex2_oscillator.out
 
     test:
       suffix: oscillator_i_noifunc
-      args: -ts_type cn -tf 10 -dt 0.1 -omega 3 -gamma 2 -ts_trajectory_type memory
-      output_file: output/ex2_oscillator.out
+      args: -ts_type cn -tf 10 -dt 0.1 -omega 3 -gamma 2 -ts_trajectory_type memory -tlm_ts_adapt_type none -tlm_constjacobians -adjoint_tlm_reuseksp -prop_view -propT_view
+      output_file: output/ex2_oscillator_out.out
 
     test:
       suffix: oscillator_i
-      args: -ts_type cn -tf 10 -dt 0.1 -omega 3 -gamma 2 -ts_trajectory_type memory -ifunc
-      output_file: output/ex2_oscillator.out
+      args: -ts_type cn -tf 10 -dt 0.1 -omega 3 -gamma 2 -ts_trajectory_type memory -ifunc -tlm_userijacobian -tlm_reuseksp -tlm_constjacobians -adjoint_tlm_constjacobians -prop_view -propT_view
+      output_file: output/ex2_oscillator_out.out
 
 TEST*/
