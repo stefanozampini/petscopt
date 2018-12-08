@@ -423,21 +423,13 @@ PetscErrorCode TSCreateAdjointTS(TS ts, TS* adjts)
     ierr = TSGetIJacobian(ts,&A,&B,NULL,NULL);CHKERRQ(ierr);
     ierr = TSSetIFunction(*adjts,NULL,AdjointTSIFunctionLinear,NULL);CHKERRQ(ierr);
     ierr = TSSetIJacobian(*adjts,A,B,AdjointTSIJacobian,NULL);CHKERRQ(ierr);
+    /* setup _ts_splitJac container */
+    ierr = TSGetSplitJacobians(ts,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
     /* caching to prevent from recomputation of Jacobians */
     ierr = PetscObjectQuery((PetscObject)ts,"_ts_splitJac",(PetscObject*)&container);CHKERRQ(ierr);
-    if (container) {
-      ierr = PetscContainerGetPointer(container,(void**)&splitJ);CHKERRQ(ierr);
-    } else {
-      ierr = PetscNew(&splitJ);CHKERRQ(ierr);
-      splitJ->Astate = -1;
-      splitJ->Aid    = PETSC_MIN_INT;
-      splitJ->shift  = PETSC_MIN_REAL;
-      ierr = PetscContainerCreate(PetscObjectComm((PetscObject)ts),&container);CHKERRQ(ierr);
-      ierr = PetscContainerSetPointer(container,splitJ);CHKERRQ(ierr);
-      ierr = PetscContainerSetUserDestroy(container,TSSplitJacobiansDestroy_Private);CHKERRQ(ierr);
-      ierr = PetscObjectCompose((PetscObject)ts,"_ts_splitJac",(PetscObject)container);CHKERRQ(ierr);
-      ierr = PetscContainerDestroy(&container);CHKERRQ(ierr);
-    }
+    if (!container) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Missing _ts_splitJac container");
+    ierr = PetscContainerGetPointer(container,(void**)&splitJ);CHKERRQ(ierr);
+
     splitJ->splitdone = PETSC_FALSE;
   } else {
     TSRHSJacobian rhsjacfunc;

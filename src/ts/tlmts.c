@@ -541,23 +541,15 @@ PetscErrorCode TSCreateTLMTS(TS ts, TS* lts)
     ierr = TSGetIJacobian(ts,&A,&B,NULL,NULL);CHKERRQ(ierr);
     ierr = TSSetIFunction(*lts,NULL,TLMTSIFunctionLinear,NULL);CHKERRQ(ierr);
     ierr = TSSetIJacobian(*lts,A,B,TLMTSIJacobian,NULL);CHKERRQ(ierr);
+    /* setup _ts_splitJac container */
+    ierr = TSGetSplitJacobians(ts,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
     /* caching to prevent from recomputation of Jacobians */
     ierr = PetscObjectQuery((PetscObject)ts,"_ts_splitJac",(PetscObject*)&container);CHKERRQ(ierr);
-    if (container) {
-      ierr = PetscContainerGetPointer(container,(void**)&splitJ);CHKERRQ(ierr);
-    } else {
-      ierr = PetscNew(&splitJ);CHKERRQ(ierr);
-      splitJ->Astate = -1;
-      splitJ->Aid    = PETSC_MIN_INT;
-      splitJ->shift  = PETSC_MIN_REAL;
-      ierr = PetscContainerCreate(PetscObjectComm((PetscObject)ts),&container);CHKERRQ(ierr);
-      ierr = PetscContainerSetPointer(container,splitJ);CHKERRQ(ierr);
-      ierr = PetscContainerSetUserDestroy(container,TSSplitJacobiansDestroy_Private);CHKERRQ(ierr);
-      ierr = PetscObjectCompose((PetscObject)ts,"_ts_splitJac",(PetscObject)container);CHKERRQ(ierr);
-      /* we can setup an AdjointTS from a TLMTS -> propagate splitJac to save memory */
-      ierr = PetscObjectCompose((PetscObject)(*lts),"_ts_splitJac",(PetscObject)container);CHKERRQ(ierr);
-      ierr = PetscContainerDestroy(&container);CHKERRQ(ierr);
-    }
+    if (!container) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Missing _ts_splitJac container");
+    /* we can setup an AdjointTS from a TLMTS -> propagate splitJac to save memory */
+    ierr = PetscObjectCompose((PetscObject)(*lts),"_ts_splitJac",(PetscObject)container);CHKERRQ(ierr);
+    ierr = PetscContainerGetPointer(container,(void**)&splitJ);CHKERRQ(ierr);
+
     splitJ->splitdone = PETSC_FALSE;
   } else {
     TSRHSJacobian rhsjacfunc;

@@ -113,7 +113,6 @@ PetscErrorCode TSGetSplitJacobians(TS ts, Mat* JU, Mat* pJU, Mat *JUdot, Mat* pJ
   if (pJUdot) PetscValidPointer(pJUdot,5);
   ierr = PetscObjectQuery((PetscObject)ts,"_ts_splitJac",(PetscObject*)&c);CHKERRQ(ierr);
   if (!c) {
-    ierr = PetscInfo(ts,"WARNING: Creating new split jacobians container");CHKERRQ(ierr);
     ierr = PetscNew(&splitJ);CHKERRQ(ierr);
     splitJ->Astate    = -1;
     splitJ->Aid       = PETSC_MIN_INT;
