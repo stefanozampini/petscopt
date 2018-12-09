@@ -546,14 +546,13 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, PetscBoo
   fwdt = adj_ctx->tf - time + adj_ctx->t0;
   ierr = TSGetTSOpt(adj_ctx->fwdts,&tsopt);CHKERRQ(ierr);
   if (adj_ctx->direction) { /* second-order adjoint */
-    TS          fwdts = adj_ctx->fwdts;
-    TS          tlmts = adj_ctx->tlmts;
-    TS          foats = adj_ctx->foats;
-    TSIFunction ifunc;
-    DM          dm;
-    Vec         soawork0,soawork1;
-    Vec         FWDH,TLMH;
-    PetscBool   hast;
+    TS         fwdts = adj_ctx->fwdts;
+    TS         tlmts = adj_ctx->tlmts;
+    TS         foats = adj_ctx->foats;
+    DM         dm;
+    Vec        soawork0,soawork1;
+    Vec        FWDH,TLMH;
+    PetscBool  hast;
 
     if (U) SETERRQ(PetscObjectComm((PetscObject)adjts),PETSC_ERR_SUP,"Not implemented");
     ierr = VecSet(F,0.0);CHKERRQ(ierr);
@@ -571,8 +570,7 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, PetscBoo
       ierr = VecAXPY(F,1.0,soawork1);CHKERRQ(ierr);
       has  = PETSC_TRUE;
     }
-    ierr = TSGetIFunction(adjts,NULL,&ifunc,NULL);CHKERRQ(ierr);
-    if (ifunc && (tsopt->HF[0][0] || tsopt->HF[0][1] || tsopt->HF[0][2])) {
+    if (tsopt->HF[0][0] || tsopt->HF[0][1] || tsopt->HF[0][2]) {
       Vec FWDHdot,FOAH;
 
       ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,fwdt,NULL,&FWDHdot);CHKERRQ(ierr);
