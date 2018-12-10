@@ -1477,6 +1477,7 @@ int main(int argc, char* argv[])
 
   test:
     requires: !single
+    timeoutfactor: 2
     suffix: 5
     args: -t0 0.7 -tf 0.8 -ts_type cn -test_event_constant -p 0.8 -test_ifunc -ts_trajectory_reconstruction_order 2 -test_pjac 0 -tsgradient_adjoint_ts_adapt_type history -tshessian_tlm_ts_adapt_type history -tshessian_foadjoint_ts_adapt_type history -tshessian_soadjoint_ts_adapt_type {{none history}} -tshessian_tlm_userijacobian -use_taylor -m 0.4
 
@@ -1514,6 +1515,7 @@ int main(int argc, char* argv[])
 
   test:
     requires: !single
+    timeoutfactor: 2
     suffix: 12
     args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type bdf -test_general_final -test_general -test_event_constant -test_event_final -ts_rtol 1.e-14 -ts_atol 1.e-14 -ts_trajectory_type memory -test_forward_event -use_taylor -test_ifunc -m 1.1
 
