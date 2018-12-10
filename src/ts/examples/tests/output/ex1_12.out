@@ -1,11 +1,12 @@
 Termination event 0 detected at time 0.4367
-Objective function: time [0.41,0.4367], val 1.54865
+Objective function: time [0.41,0.4367], val 1.64592
 Termination event 0 detected at time 0.4367
 Vec Object: 1 MPI processes
   type: seq
-0.161643
-0.0472845
-0.369176
+0.162426
+0.0477734
+0.369205
+0.176705
 Termination event 0 detected at time 0.4367
 Termination event 0 detected at time 0.4367
 Termination event 0 detected at time 0.4367
@@ -13,12 +14,12 @@ Termination event 0 detected at time 0.4367
 Termination event 0 detected at time 0.4367
 Termination event 0 detected at time 0.4367
 Taylor test: gradient
-0.000441214 0. (order 0)
-0.000110311 1.9999 (order 2)
-2.75788e-05 1.99995 (order 2)
-6.89481e-06 1.99998 (order 2)
+0.000475623 0. (order 0)
+0.000118866 2.00049 (order 2)
+2.97115e-05 2.00024 (order 2)
+7.42727e-06 2.00012 (order 2)
 Taylor test: Hessian
-6.11064e-08 0. (order 0)
-7.49685e-09 3.02697 (order 3)
-9.28932e-10 3.01264 (order 3)
-1.15845e-10 3.00338 (order 3)
+3.16939e-07 0. (order 0)
+3.92086e-08 3.01496 (order 3)
+4.87491e-09 3.00772 (order 3)
+6.0733e-10 3.00482 (order 3)

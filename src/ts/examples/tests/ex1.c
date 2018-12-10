@@ -1,17 +1,22 @@
-static const char help[] = "Demonstrates the use of TSComputeObjectiveAndGradient and TSComputeHessian.";
+static const char help[] = "Demonstrates the use of PETScOPT.";
 /*
   Computes the gradient of
 
-    Obj(u,m) = \int^{TF}_{T0} f(u,m) dt
+    Obj(u,m) = \int^{TF}_{T0} f(u,m) dt + other_terms_tested
 
-  where u obeys the ODE:
+  where u obeys the ODEs:
 
-    udot = b*u^p
-    u(0) = a
+      (mm^2+1)*udot = b*u^p
+               u(0) = a
 
   The integrand of the objective function is either f(u) = ||u||^2 or f(u) = Sum(u).
-  The design variables are m = [a,b,p].
+
+  The design variables are:
+    - with the implicit (IFunction/IJacobian) interface: m = [a,b,p,mm].
+    - with the explicit (RHSFunction/RHSJacobian) interface: m = [a,b,p].
+
   It also shows how to compute gradients with point-functionals of the type f(u,T,m), with T in (T0,TF].
+
   For parallel runs, we replicate the same solution on each process.
 */
 #include <petscopt.h>
@@ -249,10 +254,13 @@ static PetscErrorCode EvalObjective_MM_Gen(Vec U, Vec M, PetscReal time, Mat H, 
   PetscFunctionReturn(0);
 }
 
+/* DAE callbacks */
+
 typedef struct {
   PetscScalar a;
   PetscScalar b;
   PetscReal   p;
+  PetscScalar mm;
   VecScatter  Msct;
   Vec         M;
   Mat         F_MM; /* Hessian workspace */
@@ -264,10 +272,10 @@ typedef struct {
 static PetscErrorCode EvalGradientDAE(TS ts, PetscReal time, Vec U, Vec Udot, Vec M, Mat J, void *ctx)
 {
   UserDAE        *user = (UserDAE*)ctx;
-  PetscInt       rst,ren,r;
-  PetscScalar    *arr;
+  PetscInt       rst,ren,r,ls;
+  PetscScalar    *arr, *arrd;
   PetscReal      p;
-  PetscScalar    b;
+  PetscScalar    b, mm = 0.0;
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser;
@@ -275,27 +283,38 @@ static PetscErrorCode EvalGradientDAE(TS ts, PetscReal time, Vec U, Vec Udot, Ve
      we could have used the User ctx without the need for the scatters */
   ierr = VecScatterBegin(user->Msct,M,user->M,INSERT_VALUES,SCATTER_FORWARD);CHKERRQ(ierr);
   ierr = VecScatterEnd(user->Msct,M,user->M,INSERT_VALUES,SCATTER_FORWARD);CHKERRQ(ierr);
+  ierr = VecGetLocalSize(user->M,&ls);CHKERRQ(ierr);
   ierr = VecGetArrayRead(user->M,(const PetscScalar**)&arr);CHKERRQ(ierr);
   b    = arr[1];
   p    = PetscRealPart(arr[2]);
+  if (ls > 3) mm = arr[3];
   ierr = VecRestoreArrayRead(user->M,(const PetscScalar**)&arr);CHKERRQ(ierr);
   ierr = VecGetArrayRead(U,(const PetscScalar**)&arr);CHKERRQ(ierr);
+  ierr = VecGetArrayRead(Udot,(const PetscScalar**)&arrd);CHKERRQ(ierr);
   ierr = MatZeroEntries(J);CHKERRQ(ierr);
   ierr = MatGetOwnershipRange(J,&rst,&ren);CHKERRQ(ierr);
   for (r = rst; r < ren; r++) {
-    /* F_a : 0 */
-    /* F_b : -x^p */
-    /* F_p : -b*x^p*log(x) */
+    /* F_a  : 0 */
+    /* F_b  : -x^p */
+    /* F_p  : -b*x^p*log(x) */
+    /* F_mm : 2*mm*xdot */
     PetscInt    c = 1;
     PetscScalar v = -PetscPowScalarReal(arr[r-rst],p);
+
     ierr = MatSetValues(J,1,&r,1,&c,&v,INSERT_VALUES);CHKERRQ(ierr);
     c    = 2;
     v   *= b*PetscLogScalar(arr[r-rst]);
     ierr = MatSetValues(J,1,&r,1,&c,&v,INSERT_VALUES);CHKERRQ(ierr);
+    if (ls > 3) { /* IFunction interface */
+      c    = 3;
+      v    = 2*mm*arrd[r-rst];
+      ierr = MatSetValues(J,1,&r,1,&c,&v,INSERT_VALUES);CHKERRQ(ierr);
+    }
   }
   ierr = MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(J,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = VecRestoreArrayRead(U,(const PetscScalar**)&arr);CHKERRQ(ierr);
+  ierr = VecRestoreArrayRead(Udot,(const PetscScalar**)&arrd);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -338,7 +357,7 @@ static PetscErrorCode EvalHessianDAE_UU(TS ts, PetscReal time, Vec U, Vec Udot, 
   l    = arr[0];
   ierr = VecRestoreArrayRead(L,(const PetscScalar**)&arr);CHKERRQ(ierr);
   ierr = VecGetArrayRead(U,(const PetscScalar**)&arr);CHKERRQ(ierr);
-  if (p != 2.0) v = -l*p*b*(p-1.0)*PetscPowScalarReal(arr[0],p - 2.0); /* x^0 gives error on my Mac */
+  if (p != 2.0) v = -l*p*b*(p-1.0)*PetscPowScalarReal(arr[0],p - 2.0);
   else          v = -l*p*b*(p-1.0);
   ierr = VecRestoreArrayRead(U,(const PetscScalar**)&arr);CHKERRQ(ierr);
   ierr = MatZeroEntries(user->F_UU);CHKERRQ(ierr);
@@ -358,7 +377,7 @@ static PetscErrorCode EvalHessianDAE_UU(TS ts, PetscReal time, Vec U, Vec Udot, 
 
    The output should be computed as:  Y = (\sum_k L_k*F^k_UM)*X, with L_k the k-th entry of the adjoint variable L.
 
-   In this example, {F^k_UM}_ij != 0 only when i == k, with the k-th row of F^k_UM given by [0, p*u_k^(p-1), -p*u_k^(p-1)*(1+p*log(u_k))].
+   In this example, {F^k_UM}_ij != 0 only when i == k, with the k-th row of F^k_UM given by [0, p*u_k^(p-1), -p*u_k^(p-1)*(1+p*log(u_k)), 0].
 */
 static PetscErrorCode EvalHessianDAE_UM(TS ts, PetscReal time, Vec U, Vec Udot, Vec M, Vec L, Vec X, Vec Y, void *ctx)
 {
@@ -377,8 +396,11 @@ static PetscErrorCode EvalHessianDAE_UM(TS ts, PetscReal time, Vec U, Vec Udot, 
   p    = PetscRealPart(arr[2]);
   ierr = VecRestoreArrayRead(user->M,(const PetscScalar**)&arr);CHKERRQ(ierr);
   if (!user->F_UM) { /* create the workspace matrix once */
+    PetscInt dsize;
+
+    ierr = VecGetSize(M,&dsize);CHKERRQ(ierr);
     ierr = MatCreate(PETSC_COMM_WORLD,&user->F_UM);CHKERRQ(ierr);
-    ierr = MatSetSizes(user->F_UM,1,PETSC_DECIDE,PETSC_DECIDE,3);CHKERRQ(ierr);
+    ierr = MatSetSizes(user->F_UM,1,PETSC_DECIDE,PETSC_DECIDE,dsize);CHKERRQ(ierr);
     ierr = MatSetUp(user->F_UM);CHKERRQ(ierr);
     ierr = MatAssemblyBegin(user->F_UM,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
     ierr = MatAssemblyEnd(user->F_UM,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
@@ -431,8 +453,11 @@ static PetscErrorCode EvalHessianDAE_MU(TS ts, PetscReal time, Vec U, Vec Udot, 
   p    = PetscRealPart(arr[2]);
   ierr = VecRestoreArrayRead(user->M,(const PetscScalar**)&arr);CHKERRQ(ierr);
   if (!user->F_UM) { /* create the workspace matrix once */
+    PetscInt dsize;
+
+    ierr = VecGetSize(M,&dsize);CHKERRQ(ierr);
     ierr = MatCreate(PETSC_COMM_WORLD,&user->F_UM);CHKERRQ(ierr);
-    ierr = MatSetSizes(user->F_UM,1,PETSC_DECIDE,PETSC_DECIDE,3);CHKERRQ(ierr);
+    ierr = MatSetSizes(user->F_UM,1,PETSC_DECIDE,PETSC_DECIDE,dsize);CHKERRQ(ierr);
     ierr = MatSetUp(user->F_UM);CHKERRQ(ierr);
     ierr = MatAssemblyBegin(user->F_UM,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
     ierr = MatAssemblyEnd(user->F_UM,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
@@ -457,6 +482,85 @@ static PetscErrorCode EvalHessianDAE_MU(TS ts, PetscReal time, Vec U, Vec Udot, 
   PetscFunctionReturn(0);
 }
 
+/* returns Y = (L^T \otimes I_N)*F_UdotM*X, where L and X are vectors of size N and P respectively, I_N is the identity matrix of size N, \otimes is the Kronecker product,
+   and F_UdotM is the N^2 x P matrix with entries
+
+             | F^1_UdotM |
+   F_UdotM = |    ...    |, F^k has dimension NxP, with {F^k_UdotM}_ij = \frac{\partial^2 F_k}{\partial m_j \partial udot_i}, where F_k is the k-th component of the DAE
+             | F^N_UdotM |
+
+   with m_j the j-th design variable and udot_i the time derivative of the i-th state variable, with N the number of state variables and P the number of design variables.
+
+   The output should be computed as:  Y = (\sum_k L_k*F^k_UdotM)*X, with L_k the k-th entry of the adjoint variable L.
+
+   In this example, {F^k_UdotM}_ij != 0 only when i == k, with the i-th row of F^k_UdotM given by [0, 0, 0, 2*m].
+*/
+static PetscErrorCode EvalHessianDAE_UdotM(TS ts, PetscReal time, Vec U, Vec Udot, Vec M, Vec L, Vec X, Vec Y, void *ctx)
+{
+  UserDAE        *user = (UserDAE*)ctx;
+  PetscScalar    *arr;
+  PetscScalar    x,l;
+  PetscInt       dsize,rst;
+  PetscErrorCode ierr;
+
+  PetscFunctionBeginUser;
+  ierr = VecSet(Y,0.0);CHKERRQ(ierr);
+  ierr = VecGetSize(M,&dsize);CHKERRQ(ierr);
+  if (dsize < 4) { /* with the RHSFunction interface, this term is zero */
+    PetscFunctionReturn(0);
+  }
+  ierr = VecGetArrayRead(L,(const PetscScalar**)&arr);CHKERRQ(ierr);
+  l    = arr[0];
+  ierr = VecRestoreArrayRead(L,(const PetscScalar**)&arr);CHKERRQ(ierr);
+  ierr = VecScatterBegin(user->Msct,X,user->M,INSERT_VALUES,SCATTER_FORWARD);CHKERRQ(ierr);
+  ierr = VecScatterEnd(user->Msct,X,user->M,INSERT_VALUES,SCATTER_FORWARD);CHKERRQ(ierr);
+  ierr = VecGetArrayRead(user->M,(const PetscScalar**)&arr);CHKERRQ(ierr);
+  x    = arr[3];
+  ierr = VecRestoreArrayRead(user->M,(const PetscScalar**)&arr);CHKERRQ(ierr);
+  ierr = VecGetOwnershipRange(Y,&rst,NULL);CHKERRQ(ierr);
+  ierr = VecSetValue(Y,rst,l*2.0*user->mm*x,ADD_VALUES);CHKERRQ(ierr);
+  ierr = VecAssemblyBegin(Y);CHKERRQ(ierr);
+  ierr = VecAssemblyEnd(Y);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+/* returns Y = (L^T \otimes I_P)*F_MUdot*X, where L and X are vectors of size N, I_P is the identity matrix of size P, \otimes is the Kronecker product,
+   and F_MUdot is the N*P x N matrix with entries
+
+          | F^1_MUdot |
+   F_MU = |     ...   |, F^k has dimension PxN, with {F^k_MUdot}_ij = \frac{\partial^2 F_k}{\partial udot_j \partial m_i}, where F_k is the k-th component of the DAE
+          | F^N_MUdot |
+
+   with udot_j the time derivative of the j-th state variable and m_i the i-th design variable, with N the number of state variables and P the number of design variables.
+
+   The output should be computed as:  Y = (\sum_k L_k*F^k_MUdot)*X = (\sum_k L_k*(F^k_MUdot)^T)*X, with L_k the k-th entry of the adjoint variable L.
+*/
+static PetscErrorCode EvalHessianDAE_MUdot(TS ts, PetscReal time, Vec U, Vec Udot, Vec M, Vec L, Vec X, Vec Y, void *ctx)
+{
+  UserDAE        *user = (UserDAE*)ctx;
+  PetscScalar    *arr;
+  PetscScalar    x,l;
+  PetscInt       dsize;
+  PetscErrorCode ierr;
+
+  PetscFunctionBeginUser;
+  ierr = VecSet(Y,0.0);CHKERRQ(ierr);
+  ierr = VecGetSize(M,&dsize);CHKERRQ(ierr);
+  if (dsize < 4) { /* with the RHSFunction interface, this term is zero */
+    PetscFunctionReturn(0);
+  }
+  ierr = VecGetArrayRead(L,(const PetscScalar**)&arr);CHKERRQ(ierr);
+  l    = arr[0];
+  ierr = VecRestoreArrayRead(L,(const PetscScalar**)&arr);CHKERRQ(ierr);
+  ierr = VecGetArrayRead(X,(const PetscScalar**)&arr);CHKERRQ(ierr);
+  x    = arr[0];
+  ierr = VecRestoreArrayRead(X,(const PetscScalar**)&arr);CHKERRQ(ierr);
+  ierr = VecSetValue(Y,3,l*2.0*user->mm*x,ADD_VALUES);CHKERRQ(ierr);
+  ierr = VecAssemblyBegin(Y);CHKERRQ(ierr);
+  ierr = VecAssemblyEnd(Y);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
 /* returns Y = (L^T \otimes I_P)*F_MM*X, where L and X are vectors of size N and P respectively, I_P is the identity matrix of size P, \otimes is the Kronecker product,
    and F_MM is the N*P x P matrix with entries
 
@@ -468,9 +572,10 @@ static PetscErrorCode EvalHessianDAE_MU(TS ts, PetscReal time, Vec U, Vec Udot, 
 
    The output should be computed as:  Y = (\sum_k L_k*F^k_MM)*X, with L_k the k-th entry of the adjoint variable L.
 
-                             | 0       0                   0         |
-   In this example, F^k_MM = | 0       0           -u_k^p*log(u_k)   |.
-                             | 0 -u_k^p*log(u_k) -b*log^2(u_k)*u_k^p |
+                             | 0       0                   0           0        |
+   In this example, F^k_MM = | 0       0           -u_k^p*log(u_k)     0        |.
+                             | 0 -u_k^p*log(u_k) -b*log^2(u_k)*u_k^p   0        |
+                             | 0       0                   0           2*udot_k |
 */
 static PetscErrorCode EvalHessianDAE_MM(TS ts, PetscReal time, Vec U, Vec Udot, Vec M, Vec L, Vec X, Vec Y, void *ctx)
 {
@@ -478,7 +583,7 @@ static PetscErrorCode EvalHessianDAE_MM(TS ts, PetscReal time, Vec U, Vec Udot, 
   PetscScalar    *arr;
   PetscReal      p;
   PetscScalar    b,v[9],tmp,x,l,ll;
-  PetscInt       id[3] = {0, 1, 2};
+  PetscInt       dsize, id[3] = {0, 1, 2};
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser;
@@ -489,8 +594,11 @@ static PetscErrorCode EvalHessianDAE_MM(TS ts, PetscReal time, Vec U, Vec Udot, 
   p    = PetscRealPart(arr[2]);
   ierr = VecRestoreArrayRead(user->M,(const PetscScalar**)&arr);CHKERRQ(ierr);
   if (!user->F_MM) { /* create the workspace matrix once */
+    PetscInt dsize;
+
+    ierr = VecGetSize(M,&dsize);CHKERRQ(ierr);
     ierr = MatCreate(PETSC_COMM_WORLD,&user->F_MM);CHKERRQ(ierr);
-    ierr = MatSetSizes(user->F_MM,PETSC_DECIDE,PETSC_DECIDE,3,3);CHKERRQ(ierr);
+    ierr = MatSetSizes(user->F_MM,PETSC_DECIDE,PETSC_DECIDE,dsize,dsize);CHKERRQ(ierr);
     ierr = MatSetUp(user->F_MM);CHKERRQ(ierr);
     ierr = MatAssemblyBegin(user->F_MM,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
     ierr = MatAssemblyEnd(user->F_MM,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
@@ -515,13 +623,22 @@ static PetscErrorCode EvalHessianDAE_MM(TS ts, PetscReal time, Vec U, Vec Udot, 
   v[2*3+2] = -l*b*ll*ll*tmp;
   ierr = MatZeroEntries(user->F_MM);CHKERRQ(ierr);
   ierr = MatSetValues(user->F_MM,3,id,3,id,v,ADD_VALUES);CHKERRQ(ierr);
+  ierr = VecGetLocalSize(user->M,&dsize);CHKERRQ(ierr);
+  if (dsize > 3) {
+    PetscInt r = 3;
+
+    ierr = VecGetArrayRead(Udot,(const PetscScalar**)&arr);CHKERRQ(ierr);
+    x    = l*2.0*arr[0];
+    ierr = VecRestoreArrayRead(Udot,(const PetscScalar**)&arr);CHKERRQ(ierr);
+    ierr = MatSetValues(user->F_MM,1,&r,1,&r,&x,ADD_VALUES);CHKERRQ(ierr);
+  }
   ierr = MatAssemblyBegin(user->F_MM,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(user->F_MM,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatMult(user->F_MM,X,Y);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
-/* returns \partial_u0 G and \partial_m G, with G the initial conditions in implicit form */
+/* returns \partial_u0 G and \partial_m G, with G the initial conditions in implicit form, i.e. G(u0,m) = 0 */
 static PetscErrorCode EvalGradientIC(TS ts, PetscReal t0, Vec u0, Vec M, Mat G_u0, Mat G_m, void *ctx)
 {
   PetscInt       rst,ren,r;
@@ -554,7 +671,7 @@ static PetscErrorCode FormIFunction(TS ts,PetscReal time, Vec U, Vec Udot, Vec F
   ierr = VecGetArray(F,&aF);CHKERRQ(ierr);
   ierr = VecGetArrayRead(U,(const PetscScalar**)&aU);CHKERRQ(ierr);
   ierr = VecGetArrayRead(Udot,(const PetscScalar**)&aUdot);CHKERRQ(ierr);
-  aF[0] = aUdot[0] - user->b*PetscPowScalarReal(aU[0],user->p);
+  aF[0] = (user->mm*user->mm+1.0)*aUdot[0] - user->b*PetscPowScalarReal(aU[0],user->p);
   ierr = VecRestoreArrayRead(U,(const PetscScalar**)&aU);CHKERRQ(ierr);
   ierr = VecRestoreArrayRead(Udot,(const PetscScalar**)&aUdot);CHKERRQ(ierr);
   ierr = VecRestoreArray(F,&aF);CHKERRQ(ierr);
@@ -565,12 +682,13 @@ static PetscErrorCode FormIJacobian(TS ts,PetscReal time, Vec U, Vec Udot, Petsc
 {
   UserDAE        *user = (UserDAE*)ctx;
   PetscInt       i;
-  PetscScalar    *aU,v;
+  PetscScalar    *aU,v,shfm;
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser;
+  shfm = shift*(user->mm*user->mm+1.0);
   ierr = MatZeroEntries(A);CHKERRQ(ierr);
-  ierr = MatShift(A,shift);CHKERRQ(ierr);
+  ierr = MatShift(A,shfm);CHKERRQ(ierr);
   ierr = VecGetArrayRead(U,(const PetscScalar**)&aU);CHKERRQ(ierr);
   if (user->p != 1.0) v = -user->b*user->p*PetscPowScalarReal(aU[0],user->p - 1.0);
   else v = -user->b*user->p;
@@ -579,10 +697,10 @@ static PetscErrorCode FormIJacobian(TS ts,PetscReal time, Vec U, Vec Udot, Petsc
   ierr = VecRestoreArrayRead(U,(const PetscScalar**)&aU);CHKERRQ(ierr);
   ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-  if (P && P != A) {
+  if (P && P != A) { /* just to make it different */
+    v   *= 1.01;
     ierr = MatZeroEntries(P);CHKERRQ(ierr);
-    ierr = MatShift(P,shift);CHKERRQ(ierr);
-    v   *= 1.01; /* just to make it different */
+    ierr = MatShift(P,shfm*1.01);CHKERRQ(ierr);
     ierr = MatSetValues(P,1,&i,1,&i,&v,ADD_VALUES);CHKERRQ(ierr);
     ierr = MatAssemblyBegin(P,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
     ierr = MatAssemblyEnd(P,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
@@ -592,13 +710,14 @@ static PetscErrorCode FormIJacobian(TS ts,PetscReal time, Vec U, Vec Udot, Petsc
 
 static PetscErrorCode FormIFunction_mix(TS ts,PetscReal time, Vec U, Vec Udot, Vec F,void* ctx)
 {
+  UserDAE        *user = (UserDAE*)ctx;
   PetscScalar    *aUdot,*aF;
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser;
   ierr = VecGetArray(F,&aF);CHKERRQ(ierr);
   ierr = VecGetArrayRead(Udot,(const PetscScalar**)&aUdot);CHKERRQ(ierr);
-  aF[0] = aUdot[0];
+  aF[0] = (user->mm*user->mm+1.0)*aUdot[0];
   ierr = VecRestoreArrayRead(Udot,(const PetscScalar**)&aUdot);CHKERRQ(ierr);
   ierr = VecRestoreArray(F,&aF);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -606,18 +725,21 @@ static PetscErrorCode FormIFunction_mix(TS ts,PetscReal time, Vec U, Vec Udot, V
 
 static PetscErrorCode FormIJacobian_mix(TS ts,PetscReal time, Vec U, Vec Udot, PetscReal shift, Mat A, Mat P, void* ctx)
 {
+  UserDAE        *user = (UserDAE*)ctx;
+  PetscScalar    shfm;
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser;
+  shfm = shift*(user->mm*user->mm+1.0);
   ierr = MatZeroEntries(A);CHKERRQ(ierr);
   ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-  ierr = MatShift(A,shift);CHKERRQ(ierr);
-  if (P && P != A) {
+  ierr = MatShift(A,shfm);CHKERRQ(ierr);
+  if (P && P != A) { /* just to make it different */
     ierr = MatZeroEntries(P);CHKERRQ(ierr);
     ierr = MatAssemblyBegin(P,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
     ierr = MatAssemblyEnd(P,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-    ierr = MatShift(P,shift*1.01);CHKERRQ(ierr); /* just to make it different */
+    ierr = MatShift(P,shfm*1.01);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
 }
@@ -654,9 +776,9 @@ static PetscErrorCode FormRHSJacobian(TS ts,PetscReal time, Vec U, Mat A, Mat P,
   ierr = VecRestoreArrayRead(U,(const PetscScalar**)&aU);CHKERRQ(ierr);
   ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-  if (P && P != A) {
+  if (P && P != A) { /* just to make it different */
+    v   *= 1.01;
     ierr = MatZeroEntries(P);CHKERRQ(ierr);
-    v   *= 1.01; /* just to make it different */
     ierr = MatSetValues(P,1,&i,1,&i,&v,INSERT_VALUES);CHKERRQ(ierr);
     ierr = MatAssemblyBegin(P,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
     ierr = MatAssemblyEnd(P,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
@@ -669,6 +791,7 @@ static PetscErrorCode MyTSSetUpFromDesign(TS ts, Vec x0, Vec M, void *ctx)
   UserDAE           *userdae = (UserDAE*)ctx;
   const PetscScalar *a;
   PetscErrorCode    ierr;
+  PetscInt          ls;
   Mat               J,pJ;
   TSRHSJacobian     rhsjac;
   TSProblemType     ptype;
@@ -676,10 +799,12 @@ static PetscErrorCode MyTSSetUpFromDesign(TS ts, Vec x0, Vec M, void *ctx)
   PetscFunctionBeginUser;
   ierr = VecScatterBegin(userdae->Msct,M,userdae->M,INSERT_VALUES,SCATTER_FORWARD);CHKERRQ(ierr);
   ierr = VecScatterEnd(userdae->Msct,M,userdae->M,INSERT_VALUES,SCATTER_FORWARD);CHKERRQ(ierr);
+  ierr = VecGetLocalSize(userdae->M,&ls);CHKERRQ(ierr);
   ierr = VecGetArrayRead(userdae->M,&a);CHKERRQ(ierr);
   userdae->a = a[0];
   userdae->b = a[1];
   userdae->p = PetscRealPart(a[2]);
+  if (ls > 3) userdae->mm = a[3];
   ierr = VecRestoreArrayRead(userdae->M,&a);CHKERRQ(ierr);
   ierr = VecSet(x0,userdae->a);CHKERRQ(ierr);
   ierr = TSGetRHSJacobian(ts,&J,&pJ,&rhsjac,NULL);CHKERRQ(ierr);
@@ -735,7 +860,7 @@ int main(int argc, char* argv[])
   UserObjective  userobj;
   UserDAE        userdae;
   TSProblemType  problemtype;
-  PetscScalar    a, b, one = 1.0;
+  PetscScalar    a, b, one = 1.0, m;
   PetscReal      p, t0 = 0.0, tf = 2.0, dt = 0.1, rtf;
   PetscReal      obj,objtest,err,normPhi;
   PetscMPIInt    np;
@@ -757,8 +882,10 @@ int main(int argc, char* argv[])
   PetscBool      userobjective = PETSC_TRUE;
   PetscBool      usefd = PETSC_FALSE, usetaylor = PETSC_FALSE;
   PetscBool      analytic = PETSC_FALSE;
+  PetscBool      testm = PETSC_TRUE;
   PetscReal      dx = PETSC_SMALL;
   PetscReal      testfwdeventctx;
+  PetscInt       dsize;
   PetscErrorCode ierr;
 
   ierr = PetscInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
@@ -770,10 +897,12 @@ int main(int argc, char* argv[])
   a              = 0.5;
   b              = 0.7;
   p              = 1.0;
+  m              = 0.0;
   userobj.isnorm = PETSC_FALSE;
   ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"PDE-constrained options","");
   ierr = PetscOptionsScalar("-a","Initial condition","",a,&a,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsScalar("-b","Grow rate","",b,&b,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsScalar("-m","Mass coefficient","",m,&m,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-p","Nonlinearity","",p,&p,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-t0","Initial time","",t0,&t0,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-tf","Final time","",tf,&tf,NULL);CHKERRQ(ierr);
@@ -796,16 +925,25 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsBool("-test_forward_event","Test event handling in forward solve","",testfwdevent,&testfwdevent,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_tlm_gradient","Test TLM for gradient computation","",testtlmgrad,&testtlmgrad,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_poststep","Test with TS having a poststep method","",testps,&testps,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-test_mass","Test with parameter dependent mass matrix","",testm,&testm,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-use_analytic","Use analytic solution to test gradient evaluation","",analytic,&analytic,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-use_fd","Use finite differencing to test gradient evaluation","",usefd,&usefd,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-use_taylor","Use Taylor remainders to check gradient evaluation","",usetaylor,&usetaylor,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-dx","dx for FD","",dx,&dx,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsEnd();CHKERRQ(ierr);
 
-  userdae.a = a;
-  userdae.b = b;
-  userdae.p = p;
   problemtype = TS_LINEAR;
+
+  userdae.a  = a;
+  userdae.b  = b;
+  userdae.p  = p;
+  userdae.mm = m;
+
+  dsize = 3;
+  if (testm && (testifunc || testmix)) {
+    dsize++;
+    analytic = PETSC_FALSE;
+  }
   if (p != 1.0) {
     analytic = PETSC_FALSE;
     problemtype = TS_NONLINEAR;
@@ -829,22 +967,27 @@ int main(int argc, char* argv[])
 
   /* design vectors */
   ierr = VecCreate(PETSC_COMM_WORLD,&M);CHKERRQ(ierr);
-  ierr = VecSetSizes(M,PETSC_DECIDE,3);CHKERRQ(ierr);
+  ierr = VecSetSizes(M,PETSC_DECIDE,dsize);CHKERRQ(ierr);
   ierr = VecSetType(M,VECSTANDARD);CHKERRQ(ierr);
   ierr = VecSetValue(M,0,a,INSERT_VALUES);CHKERRQ(ierr);
   ierr = VecSetValue(M,1,b,INSERT_VALUES);CHKERRQ(ierr);
   ierr = VecSetValue(M,2,p,INSERT_VALUES);CHKERRQ(ierr);
+  if (dsize > 3) {
+    ierr = VecSetValue(M,3,m,INSERT_VALUES);CHKERRQ(ierr);
+  }
   ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
   ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
   ierr = VecDuplicate(M,&Mgrad);CHKERRQ(ierr);
 
-  /* Context for gradient and hessian of the ODE */
-  userdae.F_UU = NULL;
-  userdae.F_UM = NULL;
-  userdae.F_MM = NULL;
-  ierr = VecScatterCreateToAll(M,&userdae.Msct,&userdae.M);CHKERRQ(ierr);
+  /* ---------- Create TS solver  ---------- */
 
-  /* rhs jacobian */
+  ierr = TSCreate(PETSC_COMM_WORLD,&ts);CHKERRQ(ierr);
+  ierr = TSSetProblemType(ts,problemtype);CHKERRQ(ierr);
+  ierr = VecDuplicate(U,&sol);CHKERRQ(ierr);
+  ierr = TSSetSolution(ts,sol);CHKERRQ(ierr);
+  ierr = VecDestroy(&sol);CHKERRQ(ierr);
+
+  /* we test different combinations of IFunction/RHSFunction on the same ODE */
   ierr = MatCreate(PETSC_COMM_WORLD,&J);CHKERRQ(ierr);
   ierr = MatSetSizes(J,1,1,PETSC_DECIDE,PETSC_DECIDE);CHKERRQ(ierr);
   ierr = MatSetUp(J);CHKERRQ(ierr);
@@ -856,47 +999,6 @@ int main(int argc, char* argv[])
     ierr = PetscObjectReference((PetscObject)J);CHKERRQ(ierr);
     pJ   = J;
   }
-
-  /* Jacobian for F_m */
-  ierr = MatCreate(PETSC_COMM_WORLD,&F_M);CHKERRQ(ierr);
-  ierr = MatSetSizes(F_M,1,PETSC_DECIDE,PETSC_DECIDE,3);CHKERRQ(ierr);
-  ierr = MatSetUp(F_M);CHKERRQ(ierr);
-  ierr = MatAssemblyBegin(F_M,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-  ierr = MatAssemblyEnd(F_M,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-
-  /* Jacobians for initial conditions */
-  ierr = MatCreate(PETSC_COMM_WORLD,&G_X);CHKERRQ(ierr);
-  ierr = MatSetSizes(G_X,1,1,PETSC_DECIDE,PETSC_DECIDE);CHKERRQ(ierr);
-  ierr = MatSetUp(G_X);CHKERRQ(ierr);
-  ierr = MatAssemblyBegin(G_X,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-  ierr = MatAssemblyEnd(G_X,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-  ierr = MatCreate(PETSC_COMM_WORLD,&G_M);CHKERRQ(ierr);
-  ierr = MatSetSizes(G_M,1,PETSC_DECIDE,PETSC_DECIDE,3);CHKERRQ(ierr);
-  ierr = MatSetUp(G_M);CHKERRQ(ierr);
-  ierr = MatAssemblyBegin(G_M,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-  ierr = MatAssemblyEnd(G_M,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-
-  /* Objective hessians (we create matrices with the correct layout here
-     and we duplicate them for each objective that needs them) */
-  ierr = MatCreate(PETSC_COMM_WORLD,&H_UU);CHKERRQ(ierr);
-  ierr = MatSetSizes(H_UU,1,1,PETSC_DECIDE,PETSC_DECIDE);CHKERRQ(ierr);
-  ierr = MatSetUp(H_UU);CHKERRQ(ierr);
-  ierr = MatAssemblyBegin(H_UU,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-  ierr = MatAssemblyEnd(H_UU,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-  ierr = MatCreate(PETSC_COMM_WORLD,&H_MM);CHKERRQ(ierr);
-  ierr = MatSetSizes(H_MM,PETSC_DECIDE,PETSC_DECIDE,3,3);CHKERRQ(ierr);
-  ierr = MatSetUp(H_MM);CHKERRQ(ierr);
-  ierr = MatAssemblyBegin(H_MM,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-  ierr = MatAssemblyEnd(H_MM,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-
-  /* TS solver */
-  ierr = TSCreate(PETSC_COMM_WORLD,&ts);CHKERRQ(ierr);
-  ierr = TSSetProblemType(ts,problemtype);CHKERRQ(ierr);
-  ierr = VecDuplicate(U,&sol);CHKERRQ(ierr);
-  ierr = TSSetSolution(ts,sol);CHKERRQ(ierr);
-  ierr = VecDestroy(&sol);CHKERRQ(ierr);
-
-  /* we test different combinations of IFunction/RHSFunction on the same ODE */
   if (!testifunc) {
     ierr = TSSetRHSFunction(ts,NULL,FormRHSFunction,&userdae);CHKERRQ(ierr);
     if (testrhsjacconst) {
@@ -923,13 +1025,25 @@ int main(int argc, char* argv[])
     testfwdeventctx = t0 + 0.89*(tf-t0);
     ierr = TSSetEventHandler(ts,1,&dir,&term,TestTSEventFunction,TestTSPostEvent,&testfwdeventctx);CHKERRQ(ierr);
   }
-  ierr = TSSetSetUpFromDesign(ts,MyTSSetUpFromDesign,&userdae);CHKERRQ(ierr);
-
   if (testps) {
     ierr = TSSetPostStep(ts,DummyPostStep);CHKERRQ(ierr);
   }
-
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
+
+  /* ---------- Customize TS objectives ---------- */
+
+  /* Objective hessians (we create matrices with the correct layout here
+     and we duplicate them for each objective that needs them) */
+  ierr = MatCreate(PETSC_COMM_WORLD,&H_UU);CHKERRQ(ierr);
+  ierr = MatSetSizes(H_UU,1,1,PETSC_DECIDE,PETSC_DECIDE);CHKERRQ(ierr);
+  ierr = MatSetUp(H_UU);CHKERRQ(ierr);
+  ierr = MatAssemblyBegin(H_UU,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyEnd(H_UU,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatCreate(PETSC_COMM_WORLD,&H_MM);CHKERRQ(ierr);
+  ierr = MatSetSizes(H_MM,PETSC_DECIDE,PETSC_DECIDE,dsize,dsize);CHKERRQ(ierr);
+  ierr = MatSetUp(H_MM);CHKERRQ(ierr);
+  ierr = MatAssemblyBegin(H_MM,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyEnd(H_MM,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
 
   /* Set cost functionals: many can be added, by simply calling TSAddObjective multiple times */
   if (userobjective) {
@@ -983,7 +1097,7 @@ int main(int argc, char* argv[])
     ierr = PetscNew(&ctx);CHKERRQ(ierr);
     ierr = VecDuplicate(U,&ctx->U);CHKERRQ(ierr);
     ierr = VecDuplicate(M,&ctx->M);CHKERRQ(ierr);
-    ierr = MatCreateShell(PETSC_COMM_WORLD,1,PETSC_DECIDE,PETSC_DECIDE,3,ctx,&HUM);CHKERRQ(ierr);
+    ierr = MatCreateShell(PETSC_COMM_WORLD,1,PETSC_DECIDE,PETSC_DECIDE,dsize,ctx,&HUM);CHKERRQ(ierr);
     ierr = MatShellSetOperation(HUM,MATOP_MULT,(void(*)(void))MatMult_Gen_UM);CHKERRQ(ierr);
     ierr = MatShellSetOperation(HUM,MATOP_MULT_TRANSPOSE,(void(*)(void))MatMultTranspose_Gen_UM);CHKERRQ(ierr);
     ierr = MatShellSetOperation(HUM,MATOP_DESTROY,(void(*)(void))MatDestroy_Gen_UM);CHKERRQ(ierr);
@@ -1005,7 +1119,7 @@ int main(int argc, char* argv[])
     ierr = PetscNew(&ctx);CHKERRQ(ierr);
     ierr = VecDuplicate(U,&ctx->U);CHKERRQ(ierr);
     ierr = VecDuplicate(M,&ctx->M);CHKERRQ(ierr);
-    ierr = MatCreateShell(PETSC_COMM_WORLD,1,PETSC_DECIDE,PETSC_DECIDE,3,ctx,&HUM);CHKERRQ(ierr);
+    ierr = MatCreateShell(PETSC_COMM_WORLD,1,PETSC_DECIDE,PETSC_DECIDE,dsize,ctx,&HUM);CHKERRQ(ierr);
     ierr = MatShellSetOperation(HUM,MATOP_MULT,(void(*)(void))MatMult_Gen_UM);CHKERRQ(ierr);
     ierr = MatShellSetOperation(HUM,MATOP_MULT_TRANSPOSE,(void(*)(void))MatMultTranspose_Gen_UM);CHKERRQ(ierr);
     ierr = MatShellSetOperation(HUM,MATOP_DESTROY,(void(*)(void))MatDestroy_Gen_UM);CHKERRQ(ierr);
@@ -1027,7 +1141,7 @@ int main(int argc, char* argv[])
     ierr = PetscNew(&ctx);CHKERRQ(ierr);
     ierr = VecDuplicate(U,&ctx->U);CHKERRQ(ierr);
     ierr = VecDuplicate(M,&ctx->M);CHKERRQ(ierr);
-    ierr = MatCreateShell(PETSC_COMM_WORLD,1,PETSC_DECIDE,PETSC_DECIDE,3,ctx,&HUM);CHKERRQ(ierr);
+    ierr = MatCreateShell(PETSC_COMM_WORLD,1,PETSC_DECIDE,PETSC_DECIDE,dsize,ctx,&HUM);CHKERRQ(ierr);
     ierr = MatShellSetOperation(HUM,MATOP_MULT,(void(*)(void))MatMult_Gen_UM);CHKERRQ(ierr);
     ierr = MatShellSetOperation(HUM,MATOP_MULT_TRANSPOSE,(void(*)(void))MatMultTranspose_Gen_UM);CHKERRQ(ierr);
     ierr = MatShellSetOperation(HUM,MATOP_DESTROY,(void(*)(void))MatDestroy_Gen_UM);CHKERRQ(ierr);
@@ -1038,22 +1152,46 @@ int main(int argc, char* argv[])
     ierr = MatDestroy(&HUU);CHKERRQ(ierr);
   }
 
+  /* ---------- Customize TS parameter dependency ---------- */
+
+  /* Context for gradient and hessian of the ODE */
+  userdae.F_UU = NULL;
+  userdae.F_UM = NULL;
+  userdae.F_MM = NULL;
+  ierr = VecScatterCreateToAll(M,&userdae.Msct,&userdae.M);CHKERRQ(ierr);
+
+  /* Callback to setup when the design variables change */
+  ierr = TSSetSetUpFromDesign(ts,MyTSSetUpFromDesign,&userdae);CHKERRQ(ierr);
+
   /* Set dependence of F(Udot,U,t;M) = 0 from the parameters */
+  ierr = MatCreate(PETSC_COMM_WORLD,&F_M);CHKERRQ(ierr);
+  ierr = MatSetSizes(F_M,1,PETSC_DECIDE,PETSC_DECIDE,dsize);CHKERRQ(ierr);
+  ierr = MatSetUp(F_M);CHKERRQ(ierr);
+  ierr = MatAssemblyBegin(F_M,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyEnd(F_M,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = TSSetGradientDAE(ts,F_M,EvalGradientDAE,&userdae);CHKERRQ(ierr);
-  ierr = TSSetHessianDAE(ts,EvalHessianDAE_UU,NULL,EvalHessianDAE_UM,
-                            NULL,             NULL,NULL,
-                            EvalHessianDAE_MU,NULL,EvalHessianDAE_MM,&userdae);CHKERRQ(ierr);
+  ierr = TSSetHessianDAE(ts,EvalHessianDAE_UU,NULL,                EvalHessianDAE_UM,
+                            NULL,             NULL,                EvalHessianDAE_UdotM,
+                            EvalHessianDAE_MU,EvalHessianDAE_MUdot,EvalHessianDAE_MM,
+                            &userdae);CHKERRQ(ierr);
 
   /* Set dependence of initial conditions (in implicit form G(U(0);M) = 0) from the parameters */
+  ierr = MatCreate(PETSC_COMM_WORLD,&G_X);CHKERRQ(ierr);
+  ierr = MatSetSizes(G_X,1,1,PETSC_DECIDE,PETSC_DECIDE);CHKERRQ(ierr);
+  ierr = MatSetUp(G_X);CHKERRQ(ierr);
+  ierr = MatAssemblyBegin(G_X,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyEnd(G_X,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatCreate(PETSC_COMM_WORLD,&G_M);CHKERRQ(ierr);
+  ierr = MatSetSizes(G_M,1,PETSC_DECIDE,PETSC_DECIDE,dsize);CHKERRQ(ierr);
+  ierr = MatSetUp(G_M);CHKERRQ(ierr);
+  ierr = MatAssemblyBegin(G_M,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyEnd(G_M,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   if (testnulljacIC) {
     ierr = TSSetGradientIC(ts,NULL,G_M,EvalGradientIC,NULL);CHKERRQ(ierr);
   } else {
     ierr = TSSetGradientIC(ts,G_X,G_M,EvalGradientIC,NULL);CHKERRQ(ierr);
   }
-  /* Hessian terms are null */
   ierr = TSSetHessianIC(ts,NULL,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
-
-  ierr = TSSetUp(ts);CHKERRQ(ierr);
 
   /* Test objective function evaluation */
   ierr = TSComputeObjectiveAndGradient(ts,t0,dt,tf,U,M,NULL,&obj);CHKERRQ(ierr);
@@ -1063,17 +1201,18 @@ int main(int argc, char* argv[])
   ierr = TSGetTime(ts,&rtf);CHKERRQ(ierr);
   objtest = 0.0;
   if (userobjective) {
-    if (b != 0.0) { /* we can compute the analytic solution for the objective function */
+    PetscScalar bb = b/(m*m+1.0);
+    if (bb != 0.0) { /* we can compute the analytic solution for the objective function */
       if (p == 1.0) {
         if (userobj.isnorm) {
-          objtest = np * PetscRealPart((a * a) / (2.0*b) * (PetscExpScalar(2.0*(rtf-t0)*b) - one));
+          objtest = np * PetscRealPart((a * a) / (2.0*bb) * (PetscExpScalar(2.0*(rtf-t0)*bb) - one));
         } else {
-          objtest = np * PetscRealPart((a / b) * (PetscExpScalar((rtf-t0)*b) - one));
+          objtest = np * PetscRealPart((a / bb) * (PetscExpScalar((rtf-t0)*bb) - one));
         }
       } else {
         PetscReal   scale = userobj.isnorm ? 2.0 : 1.0;
         PetscScalar alpha = PetscPowScalarReal(a,1.0-p);
-        PetscScalar  beta = b*(1.0-p), snp = np;
+        PetscScalar  beta = bb*(1.0-p), snp = np;
         PetscReal   gamma = scale/(1.0-p);
         objtest = PetscRealPart(snp / ( (gamma + 1.0) * beta )* ( PetscPowScalar(beta*(rtf-t0)+alpha,gamma+1.0) - PetscPowScalar(alpha,gamma+1.0) ));
       }
@@ -1124,28 +1263,35 @@ int main(int argc, char* argv[])
   ierr = MatComputeExplicitOperator(H,&He);CHKERRQ(ierr);
   ierr = MatViewFromOptions(He,NULL,"-tshessian_view");CHKERRQ(ierr);
 
-  if (usefd) { /* we test against finite differencing the function evaluation */
+  /* Test the gradient code by finite differencing the objective evaluation */
+  if (usefd) {
     PetscInt    i;
-    PetscScalar oa = a, ob = b;
+    PetscScalar oa = a, ob = b, om = m;
     PetscReal   op = p;
-    for (i=0; i<3; i++) {
+
+    for (i=0; i<dsize; i++) {
       PetscReal objdx[2];
       PetscInt  j;
 
       for (j=0; j<2; j++) {
-        PetscScalar param[3];
-        param[0] = oa;
-        param[1] = ob;
-        param[2] = op;
-        param[i] = (j == 0 ? param[i] + dx : param[i] - dx);
-        userdae.a = param[0];
-        userdae.b = param[1];
-        userdae.p = PetscRealPart(param[2]);
+        PetscScalar param[4];
+        PetscInt    k;
+
+        param[0]   = oa;
+        param[1]   = ob;
+        param[2]   = op;
+        param[3]   = om;
+        param[i]   = (j == 0 ? param[i] + dx : param[i] - dx);
+        userdae.a  = param[0];
+        userdae.b  = param[1];
+        userdae.p  = PetscRealPart(param[2]);
+        userdae.mm = param[3];
 
         store_Event = 0.0;
-        ierr = VecSetValue(M,0,param[0],INSERT_VALUES);CHKERRQ(ierr);
-        ierr = VecSetValue(M,1,param[1],INSERT_VALUES);CHKERRQ(ierr);
-        ierr = VecSetValue(M,2,param[2],INSERT_VALUES);CHKERRQ(ierr);
+        ierr = VecZeroEntries(M);CHKERRQ(ierr);
+        for (k=0;k<dsize;k++) {
+          ierr = VecSetValue(M,k,param[k],INSERT_VALUES);CHKERRQ(ierr);
+        }
         ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
         ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
         ierr = TSComputeObjectiveAndGradient(ts,t0,dt,tf,U,M,NULL,&objdx[j]);CHKERRQ(ierr);
@@ -1153,22 +1299,26 @@ int main(int argc, char* argv[])
       ierr = PetscPrintf(PETSC_COMM_WORLD,"%D-th component of gradient should be (approximated) %g\n",i,(double)((objdx[0]-objdx[1])/(2.*dx)));CHKERRQ(ierr);
     }
   }
+
+  /* Test gradient and Hessian using Taylor series */
   if (usetaylor || testtlmgrad) {
     PetscRandom rand;
-    PetscReal   h = 0.125, ra,rb,rp;
-    PetscScalar oa = a, ob = b;
+    PetscReal   h = 0.125, ra,rb,rp,rm;
+    PetscScalar oa = a, ob = b, om = m;
     PetscReal   op = p;
-    PetscReal   tG[7],tH[7],tT[7];
+    PetscReal   tG[4],tH[4],tT[4];
     PetscInt    i;
 
     ierr = PetscRandomCreate(PETSC_COMM_SELF,&rand);CHKERRQ(ierr);
     ierr = PetscRandomGetValueReal(rand,&ra);CHKERRQ(ierr);
     ierr = PetscRandomGetValueReal(rand,&rb);CHKERRQ(ierr);
     ierr = PetscRandomGetValueReal(rand,&rp);CHKERRQ(ierr);
+    ierr = PetscRandomGetValueReal(rand,&rm);CHKERRQ(ierr);
     ierr = PetscRandomDestroy(&rand);CHKERRQ(ierr);
 
-    for (i = 0 ; i < 7; i++) {
+    for (i = 0 ; i < 4; i++) {
       PetscScalar val;
+
       store_Event = 0.0;
       userdae.a = oa + h*ra;
       userdae.b = ob + h*rb;
@@ -1176,25 +1326,32 @@ int main(int argc, char* argv[])
       ierr = VecSetValue(M,0,userdae.a,INSERT_VALUES);CHKERRQ(ierr);
       ierr = VecSetValue(M,1,userdae.b,INSERT_VALUES);CHKERRQ(ierr);
       ierr = VecSetValue(M,2,userdae.p,INSERT_VALUES);CHKERRQ(ierr);
+      if (dsize > 3) {
+        userdae.mm = om + h*rm;
+        ierr = VecSetValue(M,3,userdae.mm,INSERT_VALUES);CHKERRQ(ierr);
+      }
       ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
       ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
       ierr = TSComputeObjectiveAndGradient(ts,t0,dt,tf,U,M,NULL,&objtest);CHKERRQ(ierr);
       ierr = VecSetValue(M,0,ra,INSERT_VALUES);CHKERRQ(ierr);
       ierr = VecSetValue(M,1,rb,INSERT_VALUES);CHKERRQ(ierr);
       ierr = VecSetValue(M,2,rp,INSERT_VALUES);CHKERRQ(ierr);
+      if (dsize > 3) {
+        ierr = VecSetValue(M,3,rm,INSERT_VALUES);CHKERRQ(ierr);
+      }
       ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
       ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
       if (usetaylor) {
         Vec         M2;
         PetscScalar val2;
 
-        ierr = MatCreateVecs(He,&M2,NULL);CHKERRQ(ierr);
-        ierr = VecDot(Mgrad,M,&val);CHKERRQ(ierr);
+        ierr  = MatCreateVecs(He,&M2,NULL);CHKERRQ(ierr);
+        ierr  = VecDot(Mgrad,M,&val);CHKERRQ(ierr);
         tG[i] = PetscAbsReal(objtest-obj-h*PetscRealPart(val));
-        ierr = MatMult(He,M,M2);CHKERRQ(ierr);
-        ierr = VecDot(M2,M,&val2);CHKERRQ(ierr);
+        ierr  = MatMult(He,M,M2);CHKERRQ(ierr);
+        ierr  = VecDot(M2,M,&val2);CHKERRQ(ierr);
         tH[i] = PetscAbsReal(objtest-obj-h*PetscRealPart(val)-0.5*h*h*PetscRealPart(val2));
-        ierr = VecDestroy(&M2);CHKERRQ(ierr);
+        ierr  = VecDestroy(&M2);CHKERRQ(ierr);
       }
       if (testtlmgrad) {
         Vec J_U,tU;
@@ -1205,6 +1362,9 @@ int main(int argc, char* argv[])
         ierr = VecSetValue(M,0,oa,INSERT_VALUES);CHKERRQ(ierr);
         ierr = VecSetValue(M,1,ob,INSERT_VALUES);CHKERRQ(ierr);
         ierr = VecSetValue(M,2,op,INSERT_VALUES);CHKERRQ(ierr);
+        if (dsize > 3) {
+          ierr = VecSetValue(M,3,om,INSERT_VALUES);CHKERRQ(ierr);
+        }
         ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
         ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
         if (testeventfinal) {
@@ -1213,6 +1373,9 @@ int main(int argc, char* argv[])
         ierr = VecSetValue(M,0,ra,INSERT_VALUES);CHKERRQ(ierr);
         ierr = VecSetValue(M,1,rb,INSERT_VALUES);CHKERRQ(ierr);
         ierr = VecSetValue(M,2,rp,INSERT_VALUES);CHKERRQ(ierr);
+        if (dsize > 3) {
+          ierr = VecSetValue(M,3,rm,INSERT_VALUES);CHKERRQ(ierr);
+        }
         ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
         ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
         ierr = MatMult(Phi,M,tU);CHKERRQ(ierr);
@@ -1225,23 +1388,28 @@ int main(int argc, char* argv[])
     }
 
     if (usetaylor) {
+      PetscReal rate;
+
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Taylor test: gradient\n");CHKERRQ(ierr);
-      for (i=0;i<7;i++) {
-        ierr = PetscPrintf(PETSC_COMM_WORLD,"%g\n",(double)tG[i]);CHKERRQ(ierr);
+      for (i=0;i<4;i++) {
+        rate = i > 0 ? -PetscLogReal(tG[i]/tG[i-1])/PetscLogReal(2.0) : 0.0;
+        ierr = PetscPrintf(PETSC_COMM_WORLD,"%g %g (order %d)\n",(double)tG[i],(double)rate,(PetscInt)PetscRoundReal(rate));CHKERRQ(ierr);
       }
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Taylor test: Hessian\n");CHKERRQ(ierr);
-      for (i=0;i<7;i++) {
-        ierr = PetscPrintf(PETSC_COMM_WORLD,"%g\n",(double)tH[i]);CHKERRQ(ierr);
+      for (i=0;i<4;i++) {
+        rate = i > 0 ? -PetscLogReal(tH[i]/tH[i-1])/PetscLogReal(2.0) : 0.0;
+        ierr = PetscPrintf(PETSC_COMM_WORLD,"%g %g (order %d)\n",(double)tH[i],(double)rate,(PetscInt)PetscRoundReal(rate));CHKERRQ(ierr);
       }
     }
     if (testtlmgrad) {
       ierr = PetscPrintf(PETSC_COMM_WORLD,"Taylor test: TLM gradient\n");CHKERRQ(ierr);
-      for (i=0;i<7;i++) {
+      for (i=0;i<4;i++) {
         ierr = PetscPrintf(PETSC_COMM_WORLD,"%g\n",(double)tT[i]);CHKERRQ(ierr);
       }
     }
   }
   if (analytic) { /* analytic solution */
+
     if (userobj.isnorm) {
       objtest = np * PetscRealPart( a / b * (PetscExpScalar(2.0*(tf-t0)*b) - one));
     } else {
@@ -1255,6 +1423,7 @@ int main(int argc, char* argv[])
     }
     ierr = PetscPrintf(PETSC_COMM_WORLD,"2nd component of gradient should be (analytic) %g\n",(double)objtest);CHKERRQ(ierr);
     ierr = PetscPrintf(PETSC_COMM_WORLD,"3rd component of gradient not yet coded (use -use_taylor or -use_fd to test it)\n");CHKERRQ(ierr);
+    if (dsize > 3) { ierr = PetscPrintf(PETSC_COMM_WORLD,"4th component of gradient not yet coded (use -use_taylor or -use_fd to test it)\n");CHKERRQ(ierr); }
   }
 
   ierr = VecScatterDestroy(&userdae.Msct);CHKERRQ(ierr);
@@ -1289,58 +1458,63 @@ int main(int argc, char* argv[])
   test:
     requires: !single
     suffix: 1
-    args: -t0 1.1 -tf 1.2 -ts_type rk -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -ts_trajectory_type memory
+    args: -t0 1.1 -tf 1.2 -ts_type rk -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -ts_trajectory_type memory -use_taylor
 
   test:
     requires: !single
     suffix: 2
-    args: -t0 1.6 -tf 1.7 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3
+    args: -t0 1.6 -tf 1.7 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -use_taylor
 
   test:
     requires: !single
     suffix: 3
-    args: -t0 1.6 -tf 1.7 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -test_ifunc -test_nulljac_IC -test_nullgrad_M
+    args: -t0 1.6 -tf 1.7 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -test_ifunc -test_nulljac_IC -test_nullgrad_M -use_taylor
 
   test:
     requires: !single
     suffix: 4
-    args: -t0 1.1 -tf 1.2 -ts_type rk -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_constant -test_rhsjacconst -ts_trajectory_reconstruction_order 3
+    args: -t0 1.1 -tf 1.2 -ts_type rk -ts_adapt_type none -test_event_constant -test_rhsjacconst -ts_trajectory_reconstruction_order 3 -use_taylor
 
   test:
     requires: !single
     suffix: 5
-    args: -t0 0.7 -tf 0.8 -dt 0.01 -ts_type cn -test_event_constant -p 0.8 -test_ifunc -ts_trajectory_reconstruction_order 2 -test_pjac 0 -tsgradient_adjoint_ts_adapt_type history -tshessian_tlm_ts_adapt_type history -tshessian_foadjoint_ts_adapt_type history -tshessian_soadjoint_ts_adapt_type {{none history}} -tshessian_tlm_userijacobian
+    args: -t0 0.7 -tf 0.8 -ts_type cn -test_event_constant -p 0.8 -test_ifunc -ts_trajectory_reconstruction_order 2 -test_pjac 0 -tsgradient_adjoint_ts_adapt_type history -tshessian_tlm_ts_adapt_type history -tshessian_foadjoint_ts_adapt_type history -tshessian_soadjoint_ts_adapt_type {{none history}} -tshessian_tlm_userijacobian -use_taylor -m 0.4
 
   test:
     requires: !single
     suffix: 6
-    args: -t0 0.01 -tf 0.1 -b 0.3 -a 1.7 -p 1 -ts_type rk -ts_adapt_type basic -ts_atol 1.e-8 -ts_rtol 1.e-8 -test_event_func -ts_trajectory_reconstruction_order 4 -tshessian_mffd
+    args: -t0 0.01 -tf 0.1 -b 0.3 -a 1.7 -p 1 -ts_type rk -ts_adapt_type none -test_event_func -ts_trajectory_reconstruction_order 4 -tshessian_mffd -use_taylor
 
   test:
     requires: !single
     suffix: 7
-    args: -t0 0 -tf 0.02 -dt 0.001 -b 0.3 -a 1.7 -p 1 -ts_type rosw -test_ifunc -test_event_func -ts_adapt_type none -tshessian_mffd
+    args: -t0 0 -tf 0.02 -dt 0.0001 -b 0.3 -a 1.7 -p 1 -ts_type rosw -test_ifunc -test_event_func -ts_adapt_type none -tshessian_mffd -use_taylor
 
   test:
     requires: !single
     suffix: 8
-    args: -t0 0 -tf 0.07 -b 0.5 -a 1.1 -p 0.4 -ts_type bdf -test_mix -test_pjac 0 -test_event_constant -ts_rtol 1.e-8 -ts_atol 1.e-8
+    args: -t0 0 -tf 0.07 -b 0.5 -a 1.1 -p 0.4 -ts_type bdf -test_mix -test_pjac 0 -test_event_constant -ts_rtol 1.e-10 -ts_atol 1.e-10 -use_taylor
 
   test:
     requires: !single
     suffix: 9
     nsize: 4
-    args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type rk -test_general_fixed -test_general_final -test_general -test_event_func -test_event_constant -test_event_final -ts_rtol 1.e-6 -ts_atol 1.e-6 -tshessian_mffd
+    args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type rk -test_general_fixed -test_general_final -test_general -test_event_func -test_event_constant -test_event_final -ts_rtol 1.e-12 -ts_atol 1.e-12 -tshessian_mffd -use_taylor
 
   test:
     requires: !single
     suffix: 10
     nsize: 4
-    args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type bdf -test_general_fixed -test_general_final -test_general -test_event_func -test_event_constant -test_event_final -ts_rtol 1.e-6 -ts_atol 1.e-6 -tshessian_mffd
+    args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type bdf -test_general_fixed -test_general_final -test_general -test_event_func -test_event_constant -test_event_final -ts_rtol 1.e-10 -ts_atol 1.e-10 -tshessian_mffd -use_taylor
 
   test:
     requires: !single
     suffix: 11
-    args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type rk -test_general_final -test_general -test_event_constant -test_event_final -ts_rtol 1.e-10 -ts_atol 1.e-10 -ts_trajectory_type memory -test_forward_event
+    args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type rk -test_general_final -test_general -test_event_constant -test_event_final -ts_rtol 1.e-14 -ts_atol 1.e-14 -ts_trajectory_type memory -test_forward_event -use_taylor
+
+  test:
+    requires: !single
+    suffix: 12
+    args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type bdf -test_general_final -test_general -test_event_constant -test_event_final -ts_rtol 1.e-14 -ts_atol 1.e-14 -ts_trajectory_type memory -test_forward_event -use_taylor -test_ifunc -m 1.1
 
 TEST*/

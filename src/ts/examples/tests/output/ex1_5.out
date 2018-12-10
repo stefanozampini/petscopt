@@ -1,6 +1,17 @@
-Objective function: time [0.7,0.8], val 1.05205 (should be 1.05205)
+Objective function: time [0.7,0.8], val 1.05177 (should be 1.05177)
 Vec Object: 1 MPI processes
   type: seq
-0.103269
-0.00299685
--0.00139834
+0.102811
+0.0025686
+-0.0012047
+-0.00124002
+Taylor test: gradient
+4.99459e-06 0. (order 0)
+1.28123e-06 1.96284 (order 2)
+3.24704e-07 1.98033 (order 2)
+8.17483e-08 1.98987 (order 2)
+Taylor test: Hessian
+2.71775e-07 0. (order 0)
+3.53613e-08 2.94217 (order 3)
+4.4433e-09 2.99247 (order 3)
+5.38599e-10 3.04435 (order 3)

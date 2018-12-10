@@ -8,3 +8,13 @@ Process [1]
 Process [2]
 3.49245
 Process [3]
+Taylor test: gradient
+0.0564604 0. (order 0)
+0.0140889 2.00268 (order 2)
+0.00351898 2.00133 (order 2)
+0.00087934 2.00066 (order 2)
+Taylor test: Hessian
+0.000208404 0. (order 0)
+2.59113e-05 3.00773 (order 3)
+3.22815e-06 3.0048 (order 3)
+4.01817e-07 3.0061 (order 3)

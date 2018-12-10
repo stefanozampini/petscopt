@@ -4,3 +4,14 @@ Vec Object: 1 MPI processes
 1.24481
 0.048473
 -0.0225632
+0.
+Taylor test: gradient
+0.00980428 0. (order 0)
+0.0024457 2.00316 (order 2)
+0.000610744 2.00161 (order 2)
+0.000152601 2.0008 (order 2)
+Taylor test: Hessian
+4.33778e-05 0. (order 0)
+5.47478e-06 2.98608 (order 3)
+6.87991e-07 2.99234 (order 3)
+8.71812e-08 2.9803 (order 3)
