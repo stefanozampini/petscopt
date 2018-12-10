@@ -101,8 +101,7 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
   TSOpt          tsopt;
   Vec            FWDH[2],FOAH;
   PetscReal      adjt  = q->tf - t + q->t0;
-  PetscInt       tlmts_step;
-  PetscBool      AXPY;
+  PetscBool      AXPY, rest = PETSC_FALSE;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -119,7 +118,8 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
     }
   }
   ierr = TSGetTSOpt(fwdts,&tsopt);CHKERRQ(ierr);
-  if (tsopt->HF[2][0] || tsopt->HF[2][1] || tsopt->HF[2][2]) {
+  if (tsopt->HF[2][0] || (tsopt->HF[2][1] && q->init) || tsopt->HF[2][2]) {
+    rest = PETSC_TRUE;
     ierr = TSTrajectoryGetUpdatedHistoryVecs(adjts->trajectory,adjts,adjt,&FOAH,NULL);CHKERRQ(ierr);
   }
   if (tsopt->HF[2][2]) { /* (L^T \otimes I_M) H_MM direction */
@@ -140,16 +140,13 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
       AXPY = PETSC_TRUE;
     }
   }
-  ierr = TSGetStepNumber(tlmts,&tlmts_step);CHKERRQ(ierr);
   if (tsopt->HF[2][1] && q->init) { /* (L^T \otimes I_M) H_MXdot \etadot, \eta the TLM solution */
     Vec TLMHdot;
-    TS  model;
     DM  dm;
 
-    ierr = TLMTSGetModelTS(tlmts,&model);CHKERRQ(ierr);
-    ierr = TSGetDM(model,&dm);CHKERRQ(ierr);
+    ierr = TSGetDM(tlmts,&dm);CHKERRQ(ierr);
     ierr = DMGetGlobalVector(dm,&TLMHdot);CHKERRQ(ierr);
-    ierr = TSTrajectoryGetVecs(tlmts->trajectory,NULL,tlmts_step,&t,NULL,TLMHdot);CHKERRQ(ierr);
+    ierr = TSTrajectoryGetVecs(tlmts->trajectory,NULL,PETSC_DECIDE,&t,NULL,TLMHdot);CHKERRQ(ierr);
     if (AXPY) {
       ierr = (*tsopt->HF[2][1])(fwdts,t,FWDH[0],FWDH[1],q->design,FOAH,TLMHdot,q->work1,tsopt->HFctx);CHKERRQ(ierr);
       ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
@@ -159,7 +156,7 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
     ierr = DMRestoreGlobalVector(dm,&TLMHdot);CHKERRQ(ierr);
   }
   ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
-  if (tsopt->HF[2][0] || tsopt->HF[2][1] || tsopt->HF[2][2]) {
+  if (rest) {
     ierr = TSTrajectoryRestoreUpdatedHistoryVecs(adjts->trajectory,&FOAH,NULL);CHKERRQ(ierr);
   }
   q->init = PETSC_TRUE;
