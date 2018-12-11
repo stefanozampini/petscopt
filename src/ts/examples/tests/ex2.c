@@ -1,4 +1,4 @@
-static const char help[] = "TSCreatePropagatorMatrix";
+static const char help[] = "Demonstrates the use of TSCreatePropagatorMat.";
 
 #include <petscopt.h>
 

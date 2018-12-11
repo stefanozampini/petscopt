@@ -1,16 +1,16 @@
-Objective function: time [1.1,1.2], val 0.331841 (should be 0.33184)
+Objective function: time [1.1,1.2], val 0.0941812 (should be 0.0941812)
 Vec Object: 1 MPI processes
   type: seq
-1.24481
-0.048473
--0.0225632
+0.659524
+0.0100366
+-0.0095812
 Taylor test: gradient
-0.0098207 0. (order 0)
-0.0024491 2.00357 (order 2)
-0.000611515 2.00179 (order 2)
-0.000152784 2.0009 (order 2)
+0.0165527 0. (order 0)
+0.00390355 2.08421 (order 2)
+0.000947618 2.04241 (order 2)
+0.000233436 2.02128 (order 2)
 Taylor test: Hessian
-4.87079e-05 0. (order 0)
-6.10305e-06 2.99655 (order 3)
-7.65742e-07 2.9946 (order 3)
-9.63925e-08 2.98986 (order 3)
+0.0018321 0. (order 0)
+0.000223407 3.03575 (order 3)
+2.75823e-05 3.01786 (order 3)
+3.42753e-06 3.0085 (order 3)

@@ -1,0 +1,17 @@
+Objective function: time [0.41,0.44], val 44.8313
+Vec Object: 1 MPI processes
+  type: seq
+-0.363065
+3.43022
+28.0747
+13.5127
+Taylor test: gradient
+0.110405 0. (order 0)
+0.0266005 2.05328 (order 2)
+0.00652706 2.02695 (order 2)
+0.00161651 2.01355 (order 2)
+Taylor test: Hessian
+0.00791947 0. (order 0)
+0.000979069 3.01592 (order 3)
+0.00012171 3.00797 (order 3)
+1.51715e-05 3.00401 (order 3)

@@ -1,4 +1,4 @@
-static const char help[] = "Demonstrates the use of PETScOPT.";
+static const char help[] = "Demonstrates the use of PETScOpt.";
 /*
   Computes the gradient of
 
@@ -7,7 +7,7 @@ static const char help[] = "Demonstrates the use of PETScOPT.";
   where u obeys the ODEs:
 
       (mm^2+1)*udot = b*u^p
-               u(0) = a
+               u(0) = a^2
 
   The integrand of the objective function is either f(u) = ||u||^2 or f(u) = Sum(u).
 
@@ -244,13 +244,19 @@ static PetscErrorCode EvalObjective_UM_Gen(Vec U, Vec M, PetscReal time, Mat H, 
                  |         0          2*(3 + 0.004*||u||^2) | */
 static PetscErrorCode EvalObjective_MM_Gen(Vec U, Vec M, PetscReal time, Mat H, void *ctx)
 {
+  PetscBool      flg1,flg2; /* I don't know why the operations pop back in the matrix */
   PetscReal      v1;
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser;
+  ierr = MatHasOperation(H,MATOP_MULT_ADD,&flg1);CHKERRQ(ierr);
+  ierr = MatHasOperation(H,MATOP_MULT_TRANSPOSE_ADD,&flg2);CHKERRQ(ierr);
   ierr = VecNorm(U,NORM_2,&v1);CHKERRQ(ierr);
   ierr = MatZeroEntries(H);CHKERRQ(ierr);
+  /* MatShift for some reason puts back the original operations in place */
   ierr = MatShift(H,2.0*(3.0+0.004*v1*v1));CHKERRQ(ierr);
+  if (!flg1) { ierr = MatSetOperation(H,MATOP_MULT_ADD,(void(*)(void))NULL);CHKERRQ(ierr); }
+  if (!flg2) { ierr = MatSetOperation(H,MATOP_MULT_TRANSPOSE_ADD,(void(*)(void))NULL);CHKERRQ(ierr); }
   PetscFunctionReturn(0);
 }
 
@@ -299,15 +305,17 @@ static PetscErrorCode EvalGradientDAE(TS ts, PetscReal time, Vec U, Vec Udot, Ve
     /* F_p  : -b*x^p*log(x) */
     /* F_mm : 2*mm*xdot */
     PetscInt    c = 1;
-    PetscScalar v = -PetscPowScalarReal(arr[r-rst],p);
+    PetscScalar lx, v = -PetscPowScalarReal(arr[r-rst],p);
 
     ierr = MatSetValues(J,1,&r,1,&c,&v,INSERT_VALUES);CHKERRQ(ierr);
     c    = 2;
-    v   *= b*PetscLogScalar(arr[r-rst]);
+    lx   = PetscLogScalar(arr[r-rst]);
+    if (PetscIsInfOrNanScalar(lx)) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_SUP,"Error in log! Invalid combination of parameters");
+    v   *= b*lx;
     ierr = MatSetValues(J,1,&r,1,&c,&v,INSERT_VALUES);CHKERRQ(ierr);
     if (ls > 3) { /* IFunction interface */
       c    = 3;
-      v    = 2*mm*arrd[r-rst];
+      v    = 2.0*mm*arrd[r-rst];
       ierr = MatSetValues(J,1,&r,1,&c,&v,INSERT_VALUES);CHKERRQ(ierr);
     }
   }
@@ -612,6 +620,7 @@ static PetscErrorCode EvalHessianDAE_MM(TS ts, PetscReal time, Vec U, Vec Udot, 
   if (p != 0.0) tmp = PetscPowScalarReal(x,p);
   else          tmp = 1.0;
   ll = PetscLogScalar(x);
+  if (PetscIsInfOrNanScalar(ll)) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_SUP,"Error in log! Invalid combination of parameters");
   v[0*3+0] = 0.0;
   v[0*3+1] = 0.0;
   v[0*3+2] = 0.0;
@@ -642,6 +651,7 @@ static PetscErrorCode EvalHessianDAE_MM(TS ts, PetscReal time, Vec U, Vec Udot, 
 static PetscErrorCode EvalGradientIC(TS ts, PetscReal t0, Vec u0, Vec M, Mat G_u0, Mat G_m, void *ctx)
 {
   PetscInt       rst,ren,r;
+  PetscScalar    *a = (PetscScalar*)(ctx);
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser;
@@ -653,11 +663,50 @@ static PetscErrorCode EvalGradientIC(TS ts, PetscReal t0, Vec u0, Vec M, Mat G_u
   ierr = MatGetOwnershipRange(G_m,&rst,&ren);CHKERRQ(ierr);
   for (r = rst; r < ren; r++) {
     PetscInt    c = 0;
-    PetscScalar v = -1;
+    PetscScalar v = -2.0*(*a);
     ierr = MatSetValues(G_m,1,&r,1,&c,&v,INSERT_VALUES);CHKERRQ(ierr);
   }
   ierr = MatAssemblyBegin(G_m,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(G_m,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+/* returns Y = (L^T \otimes I_P)*G_MM*X, where L and X are vectors of size N and P respectively, I_P is the identity matrix of size P, \otimes is the Kronecker product,
+   and G_MM is the N*P x P matrix with entries
+
+          | G^1_MM |
+   G_MM = |   ...  |, G^k has dimension PxP, with {G^k_MM}_ij = \frac{\partial^2 G_k}{\partial m_j \partial m_i}, where G_k is the k-th component of initial condition residual in implicit form, i.e. G(u0,m) = 0
+          | G^N_MM |
+
+   with m_j the j-th design variable, N the number of state variables, and P the number of design variables.
+
+   The output should be computed as:  Y = (\sum_k L_k*G^k_MM)*X, with L_k the k-th entry of the adjoint variable L.
+
+                             | -2 0 0 0 |
+   In this example, G^k_MM = |  0 0 0 0 |.
+                             |  0 0 0 0 |
+                             |  0 0 0 0 |
+*/
+static PetscErrorCode EvalHessianIC_MM(TS ts, PetscReal time, Vec U, Vec M, Vec L, Vec X, Vec Y, void *ctx)
+{
+  UserDAE        *user = (UserDAE*)ctx;
+  PetscScalar    *arr;
+  PetscScalar    x,l;
+  PetscErrorCode ierr;
+
+  PetscFunctionBeginUser;
+  ierr = VecSet(Y,0.0);CHKERRQ(ierr);
+  ierr = VecScatterBegin(user->Msct,X,user->M,INSERT_VALUES,SCATTER_FORWARD);CHKERRQ(ierr);
+  ierr = VecScatterEnd(user->Msct,X,user->M,INSERT_VALUES,SCATTER_FORWARD);CHKERRQ(ierr);
+  ierr = VecGetArrayRead(user->M,(const PetscScalar**)&arr);CHKERRQ(ierr);
+  x    = arr[0];
+  ierr = VecRestoreArrayRead(user->M,(const PetscScalar**)&arr);CHKERRQ(ierr);
+  ierr = VecGetArrayRead(L,(const PetscScalar**)&arr);CHKERRQ(ierr);
+  l    = arr[0];
+  ierr = VecRestoreArrayRead(L,(const PetscScalar**)&arr);CHKERRQ(ierr);
+  ierr = VecSetValue(Y,0,-l*2.0*x,ADD_VALUES);CHKERRQ(ierr);
+  ierr = VecAssemblyBegin(Y);CHKERRQ(ierr);
+  ierr = VecAssemblyEnd(Y);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -806,7 +855,7 @@ static PetscErrorCode MyTSSetUpFromDesign(TS ts, Vec x0, Vec M, void *ctx)
   userdae->p = PetscRealPart(a[2]);
   if (ls > 3) userdae->mm = a[3];
   ierr = VecRestoreArrayRead(userdae->M,&a);CHKERRQ(ierr);
-  ierr = VecSet(x0,userdae->a);CHKERRQ(ierr);
+  ierr = VecSet(x0,userdae->a*userdae->a);CHKERRQ(ierr);
   ierr = TSGetRHSJacobian(ts,&J,&pJ,&rhsjac,NULL);CHKERRQ(ierr);
   if (rhsjac == TSComputeRHSJacobianConstant) { /* need to update the constant RHS jacobian */
     if (userdae->p != 1.0) {
@@ -876,13 +925,15 @@ int main(int argc, char* argv[])
   PetscBool      testgeneral_fixed = PETSC_FALSE;
   PetscBool      testgeneral_final = PETSC_FALSE;
   PetscBool      testgeneral = PETSC_FALSE;
+  PetscBool      testgeneral_final_double = PETSC_FALSE;
+  PetscBool      testgeneral_double = PETSC_FALSE;
   PetscBool      testfwdevent = PETSC_FALSE;
   PetscBool      testtlmgrad = PETSC_FALSE;
   PetscBool      testps = PETSC_TRUE;
   PetscBool      userobjective = PETSC_TRUE;
   PetscBool      usefd = PETSC_FALSE, usetaylor = PETSC_FALSE;
-  PetscBool      analytic = PETSC_FALSE;
   PetscBool      testm = PETSC_TRUE;
+  PetscBool      testremove_multadd = PETSC_FALSE;
   PetscReal      dx = PETSC_SMALL;
   PetscReal      testfwdeventctx;
   PetscInt       dsize;
@@ -920,15 +971,17 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsBool("-test_event_func","Test functional at given time in between the simulation","",testevent,&testevent,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_event_final","Test functional at final time of the simulation","",testeventfinal,&testeventfinal,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_general_final","Test general functional","",testgeneral_final,&testgeneral_final,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-test_general_final","Test general functional (twice)","",testgeneral_final_double,&testgeneral_final_double,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_general_fixed","Test general functional","",testgeneral_fixed,&testgeneral_fixed,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_general","Test general functional","",testgeneral,&testgeneral,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-test_general_double","Test general functional (twice)","",testgeneral_double,&testgeneral_double,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_forward_event","Test event handling in forward solve","",testfwdevent,&testfwdevent,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_tlm_gradient","Test TLM for gradient computation","",testtlmgrad,&testtlmgrad,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_poststep","Test with TS having a poststep method","",testps,&testps,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_mass","Test with parameter dependent mass matrix","",testm,&testm,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsBool("-use_analytic","Use analytic solution to test gradient evaluation","",analytic,&analytic,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-use_fd","Use finite differencing to test gradient evaluation","",usefd,&usefd,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-use_taylor","Use Taylor remainders to check gradient evaluation","",usetaylor,&usetaylor,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-test_remove_multadd","Test with removal of MultAdd operations","",testremove_multadd,&testremove_multadd,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-dx","dx for FD","",dx,&dx,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsEnd();CHKERRQ(ierr);
 
@@ -942,10 +995,8 @@ int main(int argc, char* argv[])
   dsize = 3;
   if (testm && (testifunc || testmix)) {
     dsize++;
-    analytic = PETSC_FALSE;
   }
   if (p != 1.0) {
-    analytic = PETSC_FALSE;
     problemtype = TS_NONLINEAR;
     testrhsjacconst = PETSC_FALSE;
   }
@@ -1116,6 +1167,12 @@ int main(int argc, char* argv[])
     general_fixed = PETSC_TRUE;
     ierr = MatDuplicate(H_UU,MAT_DO_NOT_COPY_VALUES,&HUU);CHKERRQ(ierr);
     ierr = MatDuplicate(H_MM,MAT_DO_NOT_COPY_VALUES,&HMM);CHKERRQ(ierr);
+    if (testremove_multadd) {
+      ierr = MatSetOperation(HUU,MATOP_MULT_ADD,(void(*)(void))NULL);CHKERRQ(ierr);
+      ierr = MatSetOperation(HUU,MATOP_MULT_TRANSPOSE_ADD,(void(*)(void))NULL);CHKERRQ(ierr);
+      ierr = MatSetOperation(HMM,MATOP_MULT_ADD,(void(*)(void))NULL);CHKERRQ(ierr);
+      ierr = MatSetOperation(HMM,MATOP_MULT_TRANSPOSE_ADD,(void(*)(void))NULL);CHKERRQ(ierr);
+    }
     ierr = PetscNew(&ctx);CHKERRQ(ierr);
     ierr = VecDuplicate(U,&ctx->U);CHKERRQ(ierr);
     ierr = VecDuplicate(M,&ctx->M);CHKERRQ(ierr);
@@ -1123,8 +1180,16 @@ int main(int argc, char* argv[])
     ierr = MatShellSetOperation(HUM,MATOP_MULT,(void(*)(void))MatMult_Gen_UM);CHKERRQ(ierr);
     ierr = MatShellSetOperation(HUM,MATOP_MULT_TRANSPOSE,(void(*)(void))MatMultTranspose_Gen_UM);CHKERRQ(ierr);
     ierr = MatShellSetOperation(HUM,MATOP_DESTROY,(void(*)(void))MatDestroy_Gen_UM);CHKERRQ(ierr);
+    if (testremove_multadd) {
+      ierr = MatShellSetOperation(HUM,MATOP_MULT_ADD,(void(*)(void))NULL);CHKERRQ(ierr);
+      ierr = MatShellSetOperation(HUM,MATOP_MULT_TRANSPOSE_ADD,(void(*)(void))NULL);CHKERRQ(ierr);
+    }
     ierr = TSAddObjective(ts,tf,EvalObjective_Gen,EvalObjective_U_Gen,EvalObjective_M_Gen,
                           HUU,EvalObjective_UU_Gen,HUM,EvalObjective_UM_Gen,HMM,EvalObjective_MM_Gen,NULL);CHKERRQ(ierr);
+    if (testgeneral_final_double) {
+      ierr = TSAddObjective(ts,tf,EvalObjective_Gen,EvalObjective_U_Gen,EvalObjective_M_Gen,
+                            HUU,EvalObjective_UU_Gen,HUM,EvalObjective_UM_Gen,HMM,EvalObjective_MM_Gen,NULL);CHKERRQ(ierr);
+    }
     ierr = MatDestroy(&HUM);CHKERRQ(ierr);
     ierr = MatDestroy(&HMM);CHKERRQ(ierr);
     ierr = MatDestroy(&HUU);CHKERRQ(ierr);
@@ -1138,6 +1203,12 @@ int main(int argc, char* argv[])
     general_fixed = PETSC_TRUE;
     ierr = MatDuplicate(H_UU,MAT_DO_NOT_COPY_VALUES,&HUU);CHKERRQ(ierr);
     ierr = MatDuplicate(H_MM,MAT_DO_NOT_COPY_VALUES,&HMM);CHKERRQ(ierr);
+    if (testremove_multadd) {
+      ierr = MatSetOperation(HUU,MATOP_MULT_ADD,(void(*)(void))NULL);CHKERRQ(ierr);
+      ierr = MatSetOperation(HUU,MATOP_MULT_TRANSPOSE_ADD,(void(*)(void))NULL);CHKERRQ(ierr);
+      ierr = MatSetOperation(HMM,MATOP_MULT_ADD,(void(*)(void))NULL);CHKERRQ(ierr);
+      ierr = MatSetOperation(HMM,MATOP_MULT_TRANSPOSE_ADD,(void(*)(void))NULL);CHKERRQ(ierr);
+    }
     ierr = PetscNew(&ctx);CHKERRQ(ierr);
     ierr = VecDuplicate(U,&ctx->U);CHKERRQ(ierr);
     ierr = VecDuplicate(M,&ctx->M);CHKERRQ(ierr);
@@ -1145,8 +1216,16 @@ int main(int argc, char* argv[])
     ierr = MatShellSetOperation(HUM,MATOP_MULT,(void(*)(void))MatMult_Gen_UM);CHKERRQ(ierr);
     ierr = MatShellSetOperation(HUM,MATOP_MULT_TRANSPOSE,(void(*)(void))MatMultTranspose_Gen_UM);CHKERRQ(ierr);
     ierr = MatShellSetOperation(HUM,MATOP_DESTROY,(void(*)(void))MatDestroy_Gen_UM);CHKERRQ(ierr);
+    if (testremove_multadd) {
+      ierr = MatShellSetOperation(HUM,MATOP_MULT_ADD,(void(*)(void))NULL);CHKERRQ(ierr);
+      ierr = MatShellSetOperation(HUM,MATOP_MULT_TRANSPOSE_ADD,(void(*)(void))NULL);CHKERRQ(ierr);
+    }
     ierr = TSAddObjective(ts,PETSC_MIN_REAL,EvalObjective_Gen,EvalObjective_U_Gen,EvalObjective_M_Gen,
                           HUU,EvalObjective_UU_Gen,HUM,EvalObjective_UM_Gen,HMM,EvalObjective_MM_Gen,NULL);CHKERRQ(ierr);
+    if (testgeneral_double) {
+      ierr = TSAddObjective(ts,PETSC_MIN_REAL,EvalObjective_Gen,EvalObjective_U_Gen,EvalObjective_M_Gen,
+                            HUU,EvalObjective_UU_Gen,HUM,EvalObjective_UM_Gen,HMM,EvalObjective_MM_Gen,NULL);CHKERRQ(ierr);
+    }
     ierr = MatDestroy(&HUM);CHKERRQ(ierr);
     ierr = MatDestroy(&HMM);CHKERRQ(ierr);
     ierr = MatDestroy(&HUU);CHKERRQ(ierr);
@@ -1187,11 +1266,11 @@ int main(int argc, char* argv[])
   ierr = MatAssemblyBegin(G_M,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(G_M,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   if (testnulljacIC) {
-    ierr = TSSetGradientIC(ts,NULL,G_M,EvalGradientIC,NULL);CHKERRQ(ierr);
+    ierr = TSSetGradientIC(ts,NULL,G_M,EvalGradientIC,&userdae.a);CHKERRQ(ierr);
   } else {
-    ierr = TSSetGradientIC(ts,G_X,G_M,EvalGradientIC,NULL);CHKERRQ(ierr);
+    ierr = TSSetGradientIC(ts,G_X,G_M,EvalGradientIC,&userdae.a);CHKERRQ(ierr);
   }
-  ierr = TSSetHessianIC(ts,NULL,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
+  ierr = TSSetHessianIC(ts,NULL,NULL,NULL,EvalHessianIC_MM,&userdae);CHKERRQ(ierr);
 
   /* Test objective function evaluation */
   ierr = TSComputeObjectiveAndGradient(ts,t0,dt,tf,U,M,NULL,&obj);CHKERRQ(ierr);
@@ -1202,16 +1281,17 @@ int main(int argc, char* argv[])
   objtest = 0.0;
   if (userobjective) {
     PetscScalar bb = b/(m*m+1.0);
+    PetscScalar aa = a*a;
     if (bb != 0.0) { /* we can compute the analytic solution for the objective function */
       if (p == 1.0) {
         if (userobj.isnorm) {
-          objtest = np * PetscRealPart((a * a) / (2.0*bb) * (PetscExpScalar(2.0*(rtf-t0)*bb) - one));
+          objtest = np * PetscRealPart((aa * aa) / (2.0*bb) * (PetscExpScalar(2.0*(rtf-t0)*bb) - one));
         } else {
-          objtest = np * PetscRealPart((a / bb) * (PetscExpScalar((rtf-t0)*bb) - one));
+          objtest = np * PetscRealPart((aa / bb) * (PetscExpScalar((rtf-t0)*bb) - one));
         }
       } else {
         PetscReal   scale = userobj.isnorm ? 2.0 : 1.0;
-        PetscScalar alpha = PetscPowScalarReal(a,1.0-p);
+        PetscScalar alpha = PetscPowScalarReal(aa,1.0-p);
         PetscScalar  beta = bb*(1.0-p), snp = np;
         PetscReal   gamma = scale/(1.0-p);
         objtest = PetscRealPart(snp / ( (gamma + 1.0) * beta )* ( PetscPowScalar(beta*(rtf-t0)+alpha,gamma+1.0) - PetscPowScalar(alpha,gamma+1.0) ));
@@ -1228,40 +1308,6 @@ int main(int argc, char* argv[])
   /* Test gradient evaluation */
   ierr = TSComputeObjectiveAndGradient(ts,t0,dt,tf,U,M,Mgrad,NULL);CHKERRQ(ierr);
   ierr = VecView(Mgrad,NULL);CHKERRQ(ierr);
-
-  /* Test tangent Linear Model */
-  ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
-  ierr = VecDuplicate(sol,&tlmsol);CHKERRQ(ierr);
-  ierr = VecCopy(sol,tlmsol);CHKERRQ(ierr);
-  ierr = VecSet(U,a);CHKERRQ(ierr);
-  ierr = TSCreatePropagatorMat(ts,t0,dt,tf,U,M,NULL,&Phi);CHKERRQ(ierr);
-  ierr = MatComputeExplicitOperator(Phi,&PhiExpl);CHKERRQ(ierr);
-  ierr = MatNorm(PhiExpl,NORM_INFINITY,&normPhi);CHKERRQ(ierr);
-  ierr = PetscObjectSetName((PetscObject)PhiExpl,"Phi");CHKERRQ(ierr);
-  ierr = MatViewFromOptions(PhiExpl,NULL,"-phi_view");CHKERRQ(ierr);
-  ierr = MatCreateTranspose(Phi,&PhiT);CHKERRQ(ierr);
-  ierr = MatComputeExplicitOperator(PhiT,&PhiTExpl);CHKERRQ(ierr);
-  ierr = PetscObjectSetName((PetscObject)PhiTExpl,"PhiT");CHKERRQ(ierr);
-  ierr = MatViewFromOptions(PhiTExpl,NULL,"-phiT_view");CHKERRQ(ierr);
-  ierr = MatTranspose(PhiTExpl,MAT_INITIAL_MATRIX,&checkTLM);CHKERRQ(ierr);
-  ierr = MatAXPY(checkTLM,-1.0,PhiExpl,SAME_NONZERO_PATTERN);CHKERRQ(ierr);
-  ierr = MatScale(checkTLM,1./normPhi);CHKERRQ(ierr);
-  ierr = PetscObjectSetName((PetscObject)checkTLM,"||Phi - (Phi^T)^T||/||Phi||");CHKERRQ(ierr);
-  ierr = MatNorm(checkTLM,NORM_INFINITY,&err);CHKERRQ(ierr);
-  ierr = MatViewFromOptions(checkTLM,NULL,"-err_view");CHKERRQ(ierr);
-  if (err > 0.01) { /* 1% difference */
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"Possible error with TLM: ||Phi|| is  %g (%g)\n",(double)normPhi,(double)err);CHKERRQ(ierr);
-    ierr = MatView(PhiExpl,NULL);CHKERRQ(ierr);
-    ierr = MatView(PhiTExpl,NULL);CHKERRQ(ierr);
-    ierr = MatView(checkTLM,NULL);CHKERRQ(ierr);
-  }
-  ierr = MatDestroy(&checkTLM);CHKERRQ(ierr);
-
-  /* Test Hessian evaluation */
-  ierr = MatCreate(PETSC_COMM_WORLD,&H);CHKERRQ(ierr);
-  ierr = TSComputeHessian(ts,t0,dt,tf,U,M,H);CHKERRQ(ierr);
-  ierr = MatComputeExplicitOperator(H,&He);CHKERRQ(ierr);
-  ierr = MatViewFromOptions(He,NULL,"-tshessian_view");CHKERRQ(ierr);
 
   /* Test the gradient code by finite differencing the objective evaluation */
   if (usefd) {
@@ -1299,6 +1345,40 @@ int main(int argc, char* argv[])
       ierr = PetscPrintf(PETSC_COMM_WORLD,"%D-th component of gradient should be (approximated) %g\n",i,(double)((objdx[0]-objdx[1])/(2.*dx)));CHKERRQ(ierr);
     }
   }
+
+  /* Test tangent Linear Model */
+  ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
+  ierr = VecDuplicate(sol,&tlmsol);CHKERRQ(ierr);
+  ierr = VecCopy(sol,tlmsol);CHKERRQ(ierr);
+  ierr = VecSet(U,a*a);CHKERRQ(ierr); /* XXX IC */
+  ierr = TSCreatePropagatorMat(ts,t0,dt,tf,U,M,NULL,&Phi);CHKERRQ(ierr);
+  ierr = MatComputeExplicitOperator(Phi,&PhiExpl);CHKERRQ(ierr);
+  ierr = MatNorm(PhiExpl,NORM_INFINITY,&normPhi);CHKERRQ(ierr);
+  ierr = PetscObjectSetName((PetscObject)PhiExpl,"Phi");CHKERRQ(ierr);
+  ierr = MatViewFromOptions(PhiExpl,NULL,"-phi_view");CHKERRQ(ierr);
+  ierr = MatCreateTranspose(Phi,&PhiT);CHKERRQ(ierr);
+  ierr = MatComputeExplicitOperator(PhiT,&PhiTExpl);CHKERRQ(ierr);
+  ierr = PetscObjectSetName((PetscObject)PhiTExpl,"PhiT");CHKERRQ(ierr);
+  ierr = MatViewFromOptions(PhiTExpl,NULL,"-phiT_view");CHKERRQ(ierr);
+  ierr = MatTranspose(PhiTExpl,MAT_INITIAL_MATRIX,&checkTLM);CHKERRQ(ierr);
+  ierr = MatAXPY(checkTLM,-1.0,PhiExpl,SAME_NONZERO_PATTERN);CHKERRQ(ierr);
+  ierr = MatScale(checkTLM,1./normPhi);CHKERRQ(ierr);
+  ierr = PetscObjectSetName((PetscObject)checkTLM,"||Phi - (Phi^T)^T||/||Phi||");CHKERRQ(ierr);
+  ierr = MatNorm(checkTLM,NORM_INFINITY,&err);CHKERRQ(ierr);
+  ierr = MatViewFromOptions(checkTLM,NULL,"-err_view");CHKERRQ(ierr);
+  if (err > 0.01) { /* 1% difference */
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"Possible error with TLM: ||Phi|| is  %g (%g)\n",(double)normPhi,(double)err);CHKERRQ(ierr);
+    ierr = MatView(PhiExpl,NULL);CHKERRQ(ierr);
+    ierr = MatView(PhiTExpl,NULL);CHKERRQ(ierr);
+    ierr = MatView(checkTLM,NULL);CHKERRQ(ierr);
+  }
+  ierr = MatDestroy(&checkTLM);CHKERRQ(ierr);
+
+  /* Test Hessian evaluation */
+  ierr = MatCreate(PETSC_COMM_WORLD,&H);CHKERRQ(ierr);
+  ierr = TSComputeHessian(ts,t0,dt,tf,U,M,H);CHKERRQ(ierr);
+  ierr = MatComputeExplicitOperator(H,&He);CHKERRQ(ierr);
+  ierr = MatViewFromOptions(He,NULL,"-tshessian_view");CHKERRQ(ierr);
 
   /* Test gradient and Hessian using Taylor series */
   if (usetaylor || testtlmgrad) {
@@ -1408,23 +1488,6 @@ int main(int argc, char* argv[])
       }
     }
   }
-  if (analytic) { /* analytic solution */
-
-    if (userobj.isnorm) {
-      objtest = np * PetscRealPart( a / b * (PetscExpScalar(2.0*(tf-t0)*b) - one));
-    } else {
-      objtest = np * PetscRealPart(-(one - PetscExpScalar((tf-t0)*b))/b);
-    }
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"1st component of gradient should be (analytic) %g\n",(double)objtest);CHKERRQ(ierr);
-    if (userobj.isnorm) {
-      objtest = np * PetscRealPart(0.5*a*a/ (b*b) * ( (2.0*b*(tf-t0) - one)*PetscExpScalar(2.0*(tf-t0)*b) + one));
-    } else {
-      objtest = np * PetscRealPart((a/b)*( (tf-t0)*PetscExpScalar((tf-t0)*b) - (PetscExpScalar((tf-t0)*b) - one)/b));
-    }
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"2nd component of gradient should be (analytic) %g\n",(double)objtest);CHKERRQ(ierr);
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"3rd component of gradient not yet coded (use -use_taylor or -use_fd to test it)\n");CHKERRQ(ierr);
-    if (dsize > 3) { ierr = PetscPrintf(PETSC_COMM_WORLD,"4th component of gradient not yet coded (use -use_taylor or -use_fd to test it)\n");CHKERRQ(ierr); }
-  }
 
   ierr = VecScatterDestroy(&userdae.Msct);CHKERRQ(ierr);
   ierr = VecDestroy(&userdae.M);CHKERRQ(ierr);
@@ -1494,7 +1557,7 @@ int main(int argc, char* argv[])
   test:
     requires: !single
     suffix: 8
-    args: -t0 0 -tf 0.07 -b 0.5 -a 1.1 -p 0.4 -ts_type bdf -test_mix -test_pjac 0 -test_event_constant -ts_rtol 1.e-10 -ts_atol 1.e-10 -use_taylor
+    args: -t0 0 -tf 0.07 -b 0.5 -a 1.1 -p 0.4 -ts_type bdf -test_mix -test_pjac 0 -test_event_constant -ts_rtol 1.e-12 -ts_atol 1.e-12 -use_taylor
 
   test:
     requires: !single
@@ -1518,5 +1581,11 @@ int main(int argc, char* argv[])
     timeoutfactor: 2
     suffix: 12
     args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type bdf -test_general_final -test_general -test_event_constant -test_event_final -ts_rtol 1.e-14 -ts_atol 1.e-14 -ts_trajectory_type memory -test_forward_event -use_taylor -test_ifunc -m 1.1
+
+  test:
+    requires: !single
+    timeoutfactor: 2
+    suffix: 13
+    args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type bdf -test_general_final -test_general -ts_rtol 1.e-14 -ts_atol 1.e-14 -ts_trajectory_type memory -use_taylor -test_ifunc -m 1.1 -test_general_double {{0 1}separate output} -test_general_final_double {{0 1}separate output} -test_remove_multadd {{0 1}separate output}
 
 TEST*/

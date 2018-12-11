@@ -1,20 +1,20 @@
-Objective function: time [-0.3,-0.28], val 37.3518
+Objective function: time [-0.3,-0.28], val -20.6972
 Vec Object: 4 MPI processes
   type: mpi
 Process [0]
-26.4267
+-100.704
 Process [1]
-14.6372
+22.2754
 Process [2]
-3.49245
+2.8672
 Process [3]
 Taylor test: gradient
-0.0564604 0. (order 0)
-0.0140889 2.00268 (order 2)
-0.00351898 2.00133 (order 2)
-0.00087934 2.00066 (order 2)
+0.694061 0. (order 0)
+0.171268 2.01881 (order 2)
+0.0425365 2.00948 (order 2)
+0.0105991 2.00476 (order 2)
 Taylor test: Hessian
-0.000208404 0. (order 0)
-2.59113e-05 3.00773 (order 3)
-3.22815e-06 3.0048 (order 3)
-4.01817e-07 3.0061 (order 3)
+0.0179605 0. (order 0)
+0.00224258 3.0016 (order 3)
+0.000280193 3.00066 (order 3)
+3.50345e-05 2.99957 (order 3)
