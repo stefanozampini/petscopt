@@ -852,7 +852,6 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
     Vec       f_x,W;
     PetscBool has_f;
 
-    if (adj_ctx->direction) SETERRQ(PetscObjectComm((PetscObject)adjts),PETSC_ERR_SUP,"Second order adjoint for INDEX-1 DAE not yet coded");
     ierr = VecDuplicate(adj_ctx->workinit,&f_x);CHKERRQ(ierr);
     if (!svec) {
       ierr = TSTrajectoryGetUpdatedHistoryVecs(adj_ctx->fwdts->trajectory,adj_ctx->fwdts,fwdt,&svec,NULL);CHKERRQ(ierr);
@@ -869,7 +868,7 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
       ierr = VecDestroy(&f_x);CHKERRQ(ierr);
       goto initialize;
     }
-    if (!ijac) SETERRQ(PetscObjectComm((PetscObject)adj_ctx->fwdts),PETSC_ERR_SUP,"IJacobian routine is missing");
+    if (adj_ctx->direction) SETERRQ(PetscObjectComm((PetscObject)adjts),PETSC_ERR_SUP,"Second order adjoint for INDEX-1 DAE not yet coded");
     ierr = PetscObjectQuery((PetscObject)adj_ctx->fwdts,"_ts_algebraic_is",(PetscObject*)&alg);CHKERRQ(ierr);
     ierr = PetscObjectQuery((PetscObject)adj_ctx->fwdts,"_ts_differential_is",(PetscObject*)&diff);CHKERRQ(ierr);
     ierr = PetscObjectQuery((PetscObject)adj_ctx->fwdts,"_ts_dae_BMat",(PetscObject*)&B);CHKERRQ(ierr);
