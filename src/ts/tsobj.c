@@ -1,5 +1,5 @@
 #include <petscopt/private/tsobjimpl.h>
-#include <petsc/private/tsimpl.h>
+#include <petsc/private/petscimpl.h>
 
 /* ------------------ Helper routines for PDE-constrained support to evaluate objective functions, gradients and Hessian terms ----------------------- */
 

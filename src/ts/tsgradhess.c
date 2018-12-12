@@ -1,11 +1,9 @@
+#include <petscopt/adjointts.h>
+#include <petscopt/tlmts.h>
 #include <petscopt/private/tsobjimpl.h>
 #include <petscopt/private/tsoptimpl.h>
 #include <petscopt/private/tspdeconstrainedutilsimpl.h>
-#include <petscopt/private/adjointtsimpl.h>
-#include <petscopt/private/tlmtsimpl.h>
-#include <petsc/private/tsimpl.h>
 #include <petsc/private/tshistoryimpl.h>
-#include <petsc/private/petscimpl.h>
 
 /*
    TODO: add custom fortran wrappers ?

@@ -1,10 +1,10 @@
 #include <petscopt/private/tspdeconstrainedutilsimpl.h>
 #include <petscopt/private/tsobjimpl.h>
 #include <petscopt/private/tsoptimpl.h>
-#include <petscopt/private/tlmtsimpl.h>
-#include <petsc/private/tsimpl.h>
+#include <petsc/private/tsimpl.h> /* adapt and poststep dependency */
 #include <petsc/private/kspimpl.h>
 #include <petsc/private/petscimpl.h>
+#include <petscopt/tlmts.h>
 #include <petscdm.h>
 
 /* ------------------ Wrappers for quadrature evaluation ----------------------- */
@@ -98,6 +98,7 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
   TS             fwdts = q->fwdts;
   TS             adjts = q->adjts;
   TS             tlmts = q->tlmts;
+  TSTrajectory   tj,atj,ltj;
   TSOpt          tsopt;
   Vec            FWDH[2],FOAH;
   PetscReal      adjt  = q->tf - t + q->t0;
@@ -105,7 +106,10 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,t,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
+  ierr = TSGetTrajectory(fwdts,&tj);CHKERRQ(ierr);
+  ierr = TSGetTrajectory(adjts,&atj);CHKERRQ(ierr);
+  ierr = TSGetTrajectory(tlmts,&ltj);CHKERRQ(ierr);
+  ierr = TSTrajectoryGetUpdatedHistoryVecs(tj,fwdts,t,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
   ierr = TSObjEval_MU(q->obj,FWDH[0],q->design,t,U,q->work1,&AXPY,F);CHKERRQ(ierr);
   if (!AXPY) {
     ierr = TSObjEval_MM(q->obj,FWDH[0],q->design,t,q->direction,q->work1,&AXPY,F);CHKERRQ(ierr);
@@ -120,7 +124,7 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
   ierr = TSGetTSOpt(fwdts,&tsopt);CHKERRQ(ierr);
   if (tsopt->HF[2][0] || (tsopt->HF[2][1] && q->init) || tsopt->HF[2][2]) {
     rest = PETSC_TRUE;
-    ierr = TSTrajectoryGetUpdatedHistoryVecs(adjts->trajectory,adjts,adjt,&FOAH,NULL);CHKERRQ(ierr);
+    ierr = TSTrajectoryGetUpdatedHistoryVecs(atj,adjts,adjt,&FOAH,NULL);CHKERRQ(ierr);
   }
   if (tsopt->HF[2][2]) { /* (L^T \otimes I_M) H_MM direction */
     if (AXPY) {
@@ -146,7 +150,7 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
 
     ierr = TSGetDM(tlmts,&dm);CHKERRQ(ierr);
     ierr = DMGetGlobalVector(dm,&TLMHdot);CHKERRQ(ierr);
-    ierr = TSTrajectoryGetVecs(tlmts->trajectory,NULL,PETSC_DECIDE,&t,NULL,TLMHdot);CHKERRQ(ierr);
+    ierr = TSTrajectoryGetVecs(ltj,NULL,PETSC_DECIDE,&t,NULL,TLMHdot);CHKERRQ(ierr);
     if (AXPY) {
       ierr = (*tsopt->HF[2][1])(fwdts,t,FWDH[0],FWDH[1],q->design,FOAH,TLMHdot,q->work1,tsopt->HFctx);CHKERRQ(ierr);
       ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
@@ -155,9 +159,9 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
     }
     ierr = DMRestoreGlobalVector(dm,&TLMHdot);CHKERRQ(ierr);
   }
-  ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
+  ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
   if (rest) {
-    ierr = TSTrajectoryRestoreUpdatedHistoryVecs(adjts->trajectory,&FOAH,NULL);CHKERRQ(ierr);
+    ierr = TSTrajectoryRestoreUpdatedHistoryVecs(atj,&FOAH,NULL);CHKERRQ(ierr);
   }
   q->init = PETSC_TRUE;
   PetscFunctionReturn(0);
@@ -167,12 +171,14 @@ static PetscErrorCode EvalQuadIntegrandFixed_TLM(Vec U, PetscReal t, Vec F, void
 {
   TLMEvalQuadCtx *q = (TLMEvalQuadCtx*)ctx;
   TS             fwdts = q->fwdts;
+  TSTrajectory   tj;
   PetscBool      has;
   Vec            FWDH;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,t,&FWDH,NULL);CHKERRQ(ierr);
+  ierr = TSGetTrajectory(fwdts,&tj);CHKERRQ(ierr);
+  ierr = TSTrajectoryGetUpdatedHistoryVecs(tj,fwdts,t,&FWDH,NULL);CHKERRQ(ierr);
   ierr = TSObjEvalFixed_MU(q->obj,FWDH,q->design,t,U,q->work1,&has,F);CHKERRQ(ierr);
   if (!has) {
     ierr = TSObjEvalFixed_MM(q->obj,FWDH,q->design,t,q->direction,q->work1,&has,F);CHKERRQ(ierr);
@@ -185,18 +191,19 @@ static PetscErrorCode EvalQuadIntegrandFixed_TLM(Vec U, PetscReal t, Vec F, void
       ierr = VecAXPY(F,1.0,q->work2);CHKERRQ(ierr);
     }
   }
-  ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,&FWDH,NULL);CHKERRQ(ierr);
+  ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,&FWDH,NULL);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
 PetscErrorCode TSQuadraturePostStep_Private(TS ts)
 {
-  PetscContainer  container;
-  Vec             solution;
-  TSQuadratureCtx *qeval_ctx;
-  PetscReal       squad = 0.0;
-  PetscReal       dt,time,ptime;
-  PetscErrorCode  ierr;
+  PetscContainer    container;
+  Vec               solution;
+  TSQuadratureCtx   *qeval_ctx;
+  PetscReal         squad = 0.0;
+  PetscReal         dt,time,ptime;
+  TSConvergedReason reason;
+  PetscErrorCode    ierr;
 
   PetscFunctionBegin;
   PetscValidHeaderSpecific(ts,TS_CLASSID,1);
@@ -211,7 +218,8 @@ PetscErrorCode TSQuadraturePostStep_Private(TS ts)
 
   ierr = TSGetSolution(ts,&solution);CHKERRQ(ierr);
   ierr = TSGetTime(ts,&time);CHKERRQ(ierr);
-  if (ts->reason == TS_CONVERGED_TIME) {
+  ierr = TSGetConvergedReason(ts,&reason);CHKERRQ(ierr);
+  if (reason == TS_CONVERGED_TIME) {
     ierr = TSGetMaxTime(ts,&time);CHKERRQ(ierr);
   }
 

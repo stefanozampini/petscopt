@@ -1,7 +1,7 @@
 #ifndef __PETSCOPT_TSOBJIMPL_H
 #define __PETSCOPT_TSOBJIMPL_H
 
-#include <petscopt_tsobj.h>
+#include <petscopt/tsobj.h>
 
 typedef struct _TSObj *TSObj;
 

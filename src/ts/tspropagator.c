@@ -1,9 +1,8 @@
-#include <petscopt_tsopt.h>
-#include <petscopt/private/tlmtsimpl.h>
-#include <petscopt/private/adjointtsimpl.h>
-#include <petscopt/private/tspdeconstrainedutilsimpl.h>
+#include <petscopt/tsopt.h>
+#include <petscopt/tsobj.h>
+#include <petscopt/adjointts.h>
+#include <petscopt/tlmts.h>
 #include <petscopt/private/tsoptimpl.h>
-#include <petsc/private/tsimpl.h>
 #include <petsc/private/tshistoryimpl.h>
 
 /* ------------------ Routines for the Mat that represents the linearized propagator ----------------------- */

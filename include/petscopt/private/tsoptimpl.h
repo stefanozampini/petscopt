@@ -1,7 +1,7 @@
 #ifndef __PETSCOPT_TSOPTIMPL_H
 #define __PETSCOPT_TSOPTIMPL_H
 
-#include <petscopt_tsopt.h>
+#include <petscopt/tsopt.h>
 
 typedef struct _TSOpt *TSOpt;
 

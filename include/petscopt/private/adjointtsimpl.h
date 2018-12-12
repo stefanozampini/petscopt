@@ -1,7 +1,7 @@
 #ifndef __PETSCOPT_ADJOINTTSIMPL_H
 #define __PETSCOPT_ADJOINTTSIMPL_H
 
-#include <petscopt_adjointts.h>
+#include <petscopt/adjointts.h>
 #include <petscopt/private/tsobjimpl.h>
 
 typedef struct {

@@ -3,7 +3,6 @@
 #include <petscopt/private/tssplitjacimpl.h>
 #include <petscopt/private/tspdeconstrainedutilsimpl.h>
 #include <petsc/private/tsimpl.h>
-#include <petsc/private/petscimpl.h>
 #include <petscdm.h>
 
 static PetscErrorCode TLMTSDestroy_Private(void *ptr)

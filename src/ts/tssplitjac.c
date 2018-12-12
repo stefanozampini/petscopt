@@ -1,5 +1,4 @@
 #include <petscopt/private/tssplitjacimpl.h>
-#include <petsc/private/tsimpl.h>
 #include <petsc/private/petscimpl.h>
 
 /* ------------------ Helper routines to compute split Jacobians ----------------------- */
@@ -181,7 +180,10 @@ PetscErrorCode TSUpdateSplitJacobiansFromHistory_Private(TS ts, PetscReal time)
   if (splitJ->jacconsts && splitJ->splitdone) PetscFunctionReturn(0);
   ierr = TSGetProblemType(ts,&type);CHKERRQ(ierr);
   if (type > TS_LINEAR) {
-    ierr = TSTrajectoryGetUpdatedHistoryVecs(ts->trajectory,ts,time,&U,&Udot);CHKERRQ(ierr);
+    TSTrajectory     tj;
+
+    ierr = TSGetTrajectory(ts,&tj);CHKERRQ(ierr);
+    ierr = TSTrajectoryGetUpdatedHistoryVecs(tj,ts,time,&U,&Udot);CHKERRQ(ierr);
   } else { /* use fake U and Udot */
     ierr = TSGetSolution(ts,&U);CHKERRQ(ierr);
     Udot = U;
@@ -189,7 +191,10 @@ PetscErrorCode TSUpdateSplitJacobiansFromHistory_Private(TS ts, PetscReal time)
   ierr = TSGetSplitJacobians(ts,&J_U,&pJ_U,&J_Udot,&pJ_Udot);CHKERRQ(ierr);
   ierr = TSComputeSplitJacobians(ts,time,U,Udot,J_U,pJ_U,J_Udot,pJ_Udot);CHKERRQ(ierr);
   if (type > TS_LINEAR) {
-    ierr = TSTrajectoryRestoreUpdatedHistoryVecs(ts->trajectory,&U,&Udot);CHKERRQ(ierr);
+    TSTrajectory     tj;
+
+    ierr = TSGetTrajectory(ts,&tj);CHKERRQ(ierr);
+    ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,&U,&Udot);CHKERRQ(ierr);
   }
   splitJ->splitdone = splitJ->jacconsts ? PETSC_TRUE : PETSC_FALSE;
   PetscFunctionReturn(0);
