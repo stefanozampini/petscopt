@@ -968,6 +968,7 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
         ierr = MatMultTransposeAdd(C,g_a,g_d,g_d);CHKERRQ(ierr);
         if (tsopt->F_m && adj_ctx->quadvec) { /* add fixed term to the gradient */
           TS        ts = adj_ctx->fwdts;
+          Mat       F_m;
           PetscBool hasop;
 
           if (tsopt->F_m_f) { /* non constant dependence */
@@ -977,17 +978,19 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
             ierr = (*tsopt->F_m_f)(ts,fwdt,FWDH[0],FWDH[1],adj_ctx->design,tsopt->F_m,tsopt->F_m_ctx);CHKERRQ(ierr);
             ierr = TSTrajectoryRestoreUpdatedHistoryVecs(ts->trajectory,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
           }
-          ierr = MatHasOperation(tsopt->F_m,MATOP_MULT_TRANSPOSE_ADD,&hasop);CHKERRQ(ierr);
+          ierr = MatCreateSubMatrix(tsopt->F_m,alg,NULL,MAT_INITIAL_MATRIX,&F_m);CHKERRQ(ierr);
+          ierr = MatHasOperation(F_m,MATOP_MULT_TRANSPOSE_ADD,&hasop);CHKERRQ(ierr);
           if (hasop) {
-            ierr = MatMultTransposeAdd(tsopt->F_m,g_a,adj_ctx->quadvec,adj_ctx->quadvec);CHKERRQ(ierr);
+            ierr = MatMultTransposeAdd(F_m,g_a,adj_ctx->quadvec,adj_ctx->quadvec);CHKERRQ(ierr);
           } else {
             Vec w;
 
             ierr = VecDuplicate(adj_ctx->quadvec,&w);CHKERRQ(ierr);
-            ierr = MatMultTranspose(tsopt->F_m,g_a,w);CHKERRQ(ierr);
+            ierr = MatMultTranspose(F_m,g_a,w);CHKERRQ(ierr);
             ierr = VecAXPY(adj_ctx->quadvec,1.0,w);CHKERRQ(ierr);
             ierr = VecDestroy(&w);CHKERRQ(ierr);
           }
+          ierr = MatDestroy(&F_m);CHKERRQ(ierr);
         }
       }
       ierr = KSPSetOperators(kspM,M,pM);CHKERRQ(ierr);
@@ -1005,7 +1008,7 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
         PetscReal norm;
 
         ierr = VecDuplicate(adj_ctx->workinit,&test);CHKERRQ(ierr);
-        ierr = TSGetSplitJacobians(adj_ctx->fwdts,&J_U,NULL);CHKERRQ(ierr);
+        ierr = TSGetSplitJacobians(adj_ctx->fwdts,&J_U,NULL,NULL,NULL);CHKERRQ(ierr);
         ierr = MatMultTranspose(J_U,adj_ctx->workinit,test);CHKERRQ(ierr);
         ierr = VecGetSubVector(test,alg,&test_a);CHKERRQ(ierr);
         ierr = VecNorm(test_a,NORM_2,&norm);CHKERRQ(ierr);
