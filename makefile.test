@@ -166,7 +166,7 @@ $(foreach pkg, $(pkgs), $(call concattestlang,$(pkg),F F90)) : $(libpetscall)
 # Testing convenience targets
 .PHONY: test pre-clean
 
-test: pre-clean report_tests
+test: alllib pre-clean report_tests
 
 pre-clean:
 	@$(eval STARTTIME := $(shell date +%s))

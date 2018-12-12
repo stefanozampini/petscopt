@@ -25,7 +25,10 @@ LIBDIR := $(abspath $(PETSCOPT_ARCH)/lib)
 libpetscopt_shared := $(LIBDIR)/libpetscopt.$(SL_LINKER_SUFFIX)
 libpetscopt_static := $(LIBDIR)/libpetscopt.$(AR_LIB_SUFFIX)
 libpetscopt := $(if $(filter-out no,$(BUILDSHAREDLIB)),$(libpetscopt_shared),$(libpetscopt_static))
-all : $(generated) $(libpetscopt)
+alllib : $(generated) $(libpetscopt)
+.PHONY: alllib
+
+all : alllib
 
 ifeq ($(V),)           # Print help and short compile line
   quiet_HELP := "Use \"$(MAKE) V=1\" to see the verbose compile lines.\n"
