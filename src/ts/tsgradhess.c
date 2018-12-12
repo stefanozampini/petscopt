@@ -266,7 +266,6 @@ static PetscErrorCode TSComputeHessian_MFFD(TS ts, PetscReal t0, PetscReal dt, P
 {
   PetscContainer c;
   TSHessian_MFFD *mffd;
-  PetscInt       n,N;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -286,9 +285,7 @@ static PetscErrorCode TSComputeHessian_MFFD(TS ts, PetscReal t0, PetscReal dt, P
     ierr = TSGetSolution(ts,&X);CHKERRQ(ierr);
   }
   ierr = VecDuplicate(X,&mffd->X);CHKERRQ(ierr);
-  ierr = VecGetLocalSize(design,&n);CHKERRQ(ierr);
-  ierr = VecGetSize(design,&N);CHKERRQ(ierr);
-  ierr = MatSetSizes(H,n,n,N,N);CHKERRQ(ierr);
+
   ierr = MatSetType(H,MATMFFD);CHKERRQ(ierr);
   ierr = MatSetUp(H);CHKERRQ(ierr);
   ierr = MatMFFDSetBase(H,design,NULL);CHKERRQ(ierr);
@@ -305,7 +302,6 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
   Vec            U;
   TSTrajectory   otrj;
   TSAdapt        adapt;
-  PetscInt       n,N;
   PetscBool      has,istr;
   PetscErrorCode ierr;
 
@@ -327,9 +323,7 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
     ierr = PetscObjectCompose((PetscObject)H,"_ts_hessian_ctx",(PetscObject)c);CHKERRQ(ierr);
     ierr = PetscObjectDereference((PetscObject)c);CHKERRQ(ierr);
   }
-  ierr = VecGetLocalSize(design,&n);CHKERRQ(ierr);
-  ierr = VecGetSize(design,&N);CHKERRQ(ierr);
-  ierr = MatSetSizes(H,n,n,N,N);CHKERRQ(ierr);
+
   ierr = MatSetType(H,MATSHELL);CHKERRQ(ierr);
   ierr = MatShellSetOperation(H,MATOP_MULT,(void (*)())MatMult_TSHessian);CHKERRQ(ierr);
   ierr = PetscContainerGetPointer(c,(void**)&tshess);CHKERRQ(ierr);
@@ -884,6 +878,7 @@ PetscErrorCode TSComputeHessian(TS ts, PetscReal t0, PetscReal dt, PetscReal tf,
 {
   PetscBool      mffd;
   PetscErrorCode ierr;
+  PetscInt       n,N;
 
   PetscFunctionBegin;
   PetscValidHeaderSpecific(ts,TS_CLASSID,1);
@@ -898,6 +893,11 @@ PetscErrorCode TSComputeHessian(TS ts, PetscReal t0, PetscReal dt, PetscReal tf,
   PetscCheckSameComm(ts,1,design,6);
   PetscValidHeaderSpecific(H,MAT_CLASSID,7);
   PetscCheckSameComm(ts,1,H,7);
+
+  ierr = VecGetLocalSize(design,&n);CHKERRQ(ierr);
+  ierr = VecGetSize(design,&N);CHKERRQ(ierr);
+  ierr = MatSetSizes(H,n,n,N,N);CHKERRQ(ierr);
+
   mffd = PETSC_FALSE;
   ierr = PetscOptionsGetBool(((PetscObject)ts)->options,((PetscObject)ts)->prefix,"-tshessian_mffd",&mffd,NULL);CHKERRQ(ierr);
   if (mffd) {
