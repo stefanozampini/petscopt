@@ -23,3 +23,16 @@ Taylor test: Hessian
 1.20583e-05 3.01365 (order 3)
 1.50015e-06 3.00685 (order 3)
 1.87073e-07 3.00343 (order 3)
+Termination event 0 detected at time 0.4367
+Termination event 0 detected at time 0.4367
+Termination event 0 detected at time 0.4367
+Termination event 0 detected at time 0.4367
+Termination event 0 detected at time 0.4367
+Termination event 0 detected at time 0.4367
+-------------------------- Taylor test results ---------------------------
+		Gradient				Hessian
+--------------------------------------------------------------------------
+0.00117466	0       	0	9.73839e-05	0       	0
+0.000281378	2.06167 	2	1.20583e-05	3.01365 	3
+6.88301e-05	2.0314  	2	1.50015e-06	3.00686 	3
+1.70196e-05	2.01585 	2	1.87072e-07	3.00344 	3

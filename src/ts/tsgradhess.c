@@ -878,7 +878,7 @@ $ -tshessian_soadjoint_XXX
 
    Level: advanced
 
-.seealso: TSAddObjective(), TSSetGradientDAE(), TSSetHessianDAE(), TSSetGradientIC(), TSSetSolution(), TSComputeObjectiveAndGradient(), TSSetUpFromDesign(), TSSetSetUpFromDesign()
+.seealso: TSAddObjective(), TSSetGradientDAE(), TSSetHessianDAE(), TSSetGradientIC(), TSSetHessianIC(), TSComputeObjectiveAndGradient(), TSSetSetUpFromDesign()
 @*/
 PetscErrorCode TSComputeHessian(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec X, Vec design, Mat H)
 {
@@ -905,5 +905,148 @@ PetscErrorCode TSComputeHessian(TS ts, PetscReal t0, PetscReal dt, PetscReal tf,
   } else {
     ierr = TSComputeHessian_Private(ts,t0,dt,tf,X,design,H);CHKERRQ(ierr);
   }
+  PetscFunctionReturn(0);
+}
+
+/*@
+   TSTaylorTest - Performs a Taylor's reminders test at the prescribed design point.
+
+   Collective on TS
+
+   Input Parameters:
++  ts      - the TS context for the model DAE
+.  t0      - initial time
+.  dt      - initial time step
+.  tf      - final time
+.  X       - the initial vector for the state (can be NULL)
+.  design  - current design vector
+-  ddesign - design direction to be tested (can be NULL)
+
+   Options Database Keys (prepended by ts prefix, if any):
+.  -taylor_ts_hessian <false> - activates tests for the Hessian
+.  -taylor_ts_h <0.125>       - initial increment
+.  -taylor_ts_steps <4>       - number of refinements
+
+   Notes: If the direction design is not passed, a random perturbation is generated. Options for the internal PetscRandom() object are prefixed by -XXX_taylor_ts, with XXX the prefix for the TS solver.
+
+   Level: advanced
+
+.seealso: TSAddObjective(), TSSetGradientDAE(), TSSetHessianDAE(), TSSetGradientIC(), TSSetHessianIC(), TSComputeObjectiveAndGradient(), TSComputeHessian(), TSSetSetUpFromDesign()
+@*/
+PetscErrorCode TSTaylorTest(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec X, Vec design, Vec ddesign)
+{
+  Mat            H;
+  Vec            G,M,dM,M2;
+  PetscReal      h;
+  PetscReal      *tG,*tH,obj;
+  PetscInt       i,n;
+  PetscBool      hess;
+  PetscViewer    viewer;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(ts,TS_CLASSID,1);
+  PetscValidLogicalCollectiveReal(ts,t0,2);
+  PetscValidLogicalCollectiveReal(ts,dt,3);
+  PetscValidLogicalCollectiveReal(ts,tf,4);
+  if (X) {
+    PetscValidHeaderSpecific(X,VEC_CLASSID,5);
+    PetscCheckSameComm(ts,1,X,5);
+  }
+  PetscValidHeaderSpecific(design,VEC_CLASSID,6);
+  PetscCheckSameComm(ts,1,design,6);
+  if (ddesign) {
+    PetscValidHeaderSpecific(ddesign,VEC_CLASSID,7);
+    PetscCheckSameComm(ts,1,ddesign,7);
+  }
+
+  ierr = PetscOptionsGetBool(((PetscObject)ts)->options,((PetscObject)ts)->prefix,"-taylor_ts_hessian",(hess=PETSC_FALSE,&hess),NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsGetReal(((PetscObject)ts)->options,((PetscObject)ts)->prefix,"-taylor_ts_h",(h=0.125,&h),NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsGetInt(((PetscObject)ts)->options,((PetscObject)ts)->prefix,"-taylor_ts_steps",(n=4,&n),NULL);CHKERRQ(ierr);
+
+  ierr = PetscCalloc2(n,&tG,n,&tH);CHKERRQ(ierr);
+
+  if (!ddesign) {
+    PetscRandom r;
+
+    ierr = VecDuplicate(design,&dM);CHKERRQ(ierr);
+    ierr = PetscRandomCreate(PetscObjectComm((PetscObject)ts),&r);CHKERRQ(ierr);
+    ierr = PetscObjectSetOptionsPrefix((PetscObject)r,"taylor_ts_");CHKERRQ(ierr);
+    ierr = PetscObjectAppendOptionsPrefix((PetscObject)r,((PetscObject)ts)->prefix);CHKERRQ(ierr);
+    ierr = VecSetRandom(dM,r);CHKERRQ(ierr);
+    ierr = PetscRandomDestroy(&r);CHKERRQ(ierr);
+    ierr = VecRealPart(dM);CHKERRQ(ierr);
+  } else dM = ddesign;
+  ierr = VecDuplicate(design,&M);CHKERRQ(ierr);
+  ierr = VecDuplicate(design,&G);CHKERRQ(ierr);
+
+  /* Sample gradient and Hessian at design point */
+  ierr = TSComputeObjectiveAndGradient(ts,t0,dt,tf,X,design,G,&obj);CHKERRQ(ierr);
+  if (hess) {
+    PetscBool expl;
+
+    ierr = PetscOptionsGetBool(((PetscObject)ts)->options,((PetscObject)ts)->prefix,"-taylor_ts_hessian_explicit",(expl=PETSC_FALSE,&expl),NULL);CHKERRQ(ierr);
+    ierr = MatCreate(PETSC_COMM_WORLD,&H);CHKERRQ(ierr);
+    ierr = TSComputeHessian(ts,t0,dt,tf,X,design,H);CHKERRQ(ierr);
+    if (expl) {
+      Mat He;
+
+      ierr = MatComputeExplicitOperator(H,&He);CHKERRQ(ierr);
+      ierr = MatDestroy(&H);CHKERRQ(ierr);
+      H    = He;
+    }
+    ierr = VecDuplicate(M,&M2);CHKERRQ(ierr);
+  } else {
+    H  = NULL;
+    M2 = NULL;
+  }
+
+  /*
+    Taylor test:
+     - obj(M+dM) - obj(M) - h * (G^T * dM) should be O(h^2)
+     - obj(M+dM) - obj(M) - h * (G^T * dM) - 0.5 * h^2 * (dM^T * H * dM) should be O(h^3)
+  */
+  for (i = 0; i < n; i++, h /= 2.0) {
+    PetscScalar v,v2;
+    PetscReal   objtest;
+
+    ierr  = VecWAXPY(M,h,dM,design);CHKERRQ(ierr);
+    ierr  = TSComputeObjectiveAndGradient(ts,t0,dt,tf,X,M,NULL,&objtest);CHKERRQ(ierr);
+    ierr  = VecDot(G,dM,&v);CHKERRQ(ierr);
+    tG[i] = PetscAbsReal(objtest-obj-h*PetscRealPart(v)); /* XXX */
+    if (H) {
+      ierr  = MatMult(H,dM,M2);CHKERRQ(ierr);
+      ierr  = VecDot(M2,dM,&v2);CHKERRQ(ierr);
+      tH[i] = PetscAbsReal(objtest-obj-h*PetscRealPart(v)-0.5*h*h*PetscRealPart(v2)); /* XXX */
+    }
+  }
+
+  ierr = PetscViewerASCIIGetStdout(PetscObjectComm((PetscObject)ts),&viewer);CHKERRQ(ierr);
+  ierr = PetscViewerASCIIPrintf(viewer,"-------------------------- Taylor test results ---------------------------\n");CHKERRQ(ierr);
+  ierr = PetscViewerASCIIPrintf(viewer,"\t\tGradient");CHKERRQ(ierr);
+  if (H) {
+    ierr = PetscViewerASCIIPrintf(viewer,"\t\t\t\tHessian");CHKERRQ(ierr);
+  } else {
+    ierr = PetscViewerASCIIPrintf(viewer,"\t\t\tHessian not tested");CHKERRQ(ierr);
+  }
+  ierr = PetscViewerASCIIPrintf(viewer,"\n--------------------------------------------------------------------------\n");CHKERRQ(ierr);
+  for (i = 0; i < n; i++) {
+    PetscReal rate;
+
+    rate = (i > 0 && tG[i] != tG[i-1]) ? -PetscLogReal(tG[i]/tG[i-1])/PetscLogReal(2.0) : 0.0;
+    ierr = PetscViewerASCIIPrintf(viewer,"%-#8g\t%-#8g\t%D",(double)tG[i],(double)rate,(PetscInt)PetscRoundReal(rate));CHKERRQ(ierr);
+    rate = (i > 0 && tH[i] != tH[i-1]) ? -PetscLogReal(tH[i]/tH[i-1])/PetscLogReal(2.0) : 0.0;
+    ierr = PetscViewerASCIIPrintf(viewer,"\t%-#8g\t%-#8g\t%D",(double)tH[i],(double)rate,(PetscInt)PetscRoundReal(rate));CHKERRQ(ierr);
+    ierr = PetscViewerASCIIPrintf(viewer,"\n");CHKERRQ(ierr);
+  }
+
+  ierr = PetscFree2(tG,tH);CHKERRQ(ierr);
+  ierr = VecDestroy(&M2);CHKERRQ(ierr);
+  ierr = VecDestroy(&M);CHKERRQ(ierr);
+  ierr = VecDestroy(&G);CHKERRQ(ierr);
+  if (!ddesign) {
+    ierr = VecDestroy(&dM);CHKERRQ(ierr);
+  }
+  ierr = MatDestroy(&H);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }

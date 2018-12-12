@@ -1489,6 +1489,22 @@ int main(int argc, char* argv[])
     }
   }
 
+  /* Test also the public API for the Taylor test */
+  /* we skip the cases when we use the static variable store_Event */
+  if (usetaylor && !testgeneral_fixed && !testevent) {
+    ierr = PetscOptionsSetValue(NULL,"-taylor_ts_hessian","1");CHKERRQ(ierr);
+    ierr = VecSetValue(M,0,a,INSERT_VALUES);CHKERRQ(ierr);
+    ierr = VecSetValue(M,1,b,INSERT_VALUES);CHKERRQ(ierr);
+    ierr = VecSetValue(M,2,p,INSERT_VALUES);CHKERRQ(ierr);
+    if (dsize > 3) {
+      ierr = VecSetValue(M,3,m,INSERT_VALUES);CHKERRQ(ierr);
+    }
+    ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
+    ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
+    ierr = TSTaylorTest(ts,t0,dt,tf,NULL,M,NULL);CHKERRQ(ierr);
+  }
+
+
   ierr = VecScatterDestroy(&userdae.Msct);CHKERRQ(ierr);
   ierr = VecDestroy(&userdae.M);CHKERRQ(ierr);
   ierr = MatDestroy(&userdae.F_UU);CHKERRQ(ierr);

@@ -33,4 +33,6 @@ PETSC_EXTERN PetscErrorCode TSSetSetUpFromDesign(TS,PetscErrorCode (*)(TS,Vec,Ve
 PETSC_EXTERN PetscErrorCode TSSetUpFromDesign(TS,Vec,Vec);
 PETSC_EXTERN PetscErrorCode TSCreatePropagatorMat(TS,PetscReal,PetscReal,PetscReal,Vec,Vec,Mat,Mat*);
 
+PETSC_EXTERN PetscErrorCode TSTaylorTest(TS,PetscReal,PetscReal,PetscReal,Vec,Vec,Vec);
+
 #endif
