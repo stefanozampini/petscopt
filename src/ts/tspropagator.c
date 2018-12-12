@@ -70,7 +70,15 @@ static PetscErrorCode MatMultTranspose_Propagator(Mat A, Vec x, Vec y)
   otrj = prop->model->trajectory;
   prop->model->trajectory = prop->tj;
   prop->lts->trajectory = prop->tj;
+
+  /* Need to setup the model TS, as the tlm solver depends on it (relevant callbacks)
+     Note that x0 should not be changed, as we are using the same design vector
+     used in MatPropagatorUpdate_Propagator */
   ierr = TLMTSGetDesignVec(prop->lts,&tlmdesign);CHKERRQ(ierr);
+  ierr = VecLockPop(prop->x0);CHKERRQ(ierr);
+  ierr = TSSetUpFromDesign(prop->model,prop->x0,tlmdesign);CHKERRQ(ierr);
+  ierr = VecLockPush(prop->x0);CHKERRQ(ierr);
+
   ierr = AdjointTSSetDesignVec(prop->adjlts,tlmdesign);CHKERRQ(ierr);
   ierr = AdjointTSSetTimeLimits(prop->adjlts,prop->t0,prop->tf);CHKERRQ(ierr);
   ierr = AdjointTSSetQuadratureVec(prop->adjlts,y);CHKERRQ(ierr);
@@ -117,13 +125,22 @@ static PetscErrorCode MatMult_Propagator(Mat A, Vec x, Vec y)
   PetscErrorCode    ierr;
   PetscReal         dt;
   PetscBool         istr;
-  Vec               sol;
+  Vec               sol,tlmdesign;
   TSTrajectory      otrj;
 
   PetscFunctionBegin;
   ierr = MatShellGetContext(A,(void **)&prop);CHKERRQ(ierr);
   otrj = prop->model->trajectory;
   prop->model->trajectory = prop->tj;
+
+  /* Need to setup the model TS, as the tlm solver depends on it (relevant callbacks)
+     Note that x0 should not be changed, as we are using the same design vector
+     used in MatPropagatorUpdate_Propagator */
+  ierr = TLMTSGetDesignVec(prop->lts,&tlmdesign);CHKERRQ(ierr);
+  ierr = VecLockPop(prop->x0);CHKERRQ(ierr);
+  ierr = TSSetUpFromDesign(prop->model,prop->x0,tlmdesign);CHKERRQ(ierr);
+  ierr = VecLockPush(prop->x0);CHKERRQ(ierr);
+
   istr = PETSC_FALSE;
   if (prop->lts->adapt) {
     ierr = PetscObjectTypeCompare((PetscObject)prop->lts->adapt,TSADAPTHISTORY,&istr);CHKERRQ(ierr);
@@ -161,7 +178,7 @@ static PetscErrorCode MatMult_Propagator(Mat A, Vec x, Vec y)
 }
 
 /* solves the forward model and stores its trajectory */
-static PetscErrorCode MatPropagatorUpdate_Propagator(Mat A, PetscReal t0, PetscReal dt, PetscReal tf, Vec x0)
+static PetscErrorCode MatPropagatorUpdate_Propagator(Mat A, PetscReal t0, PetscReal dt, PetscReal tf, Vec x0, Vec design)
 {
   Vec               osol;
   TSTrajectory      otrj;
@@ -170,6 +187,10 @@ static PetscErrorCode MatPropagatorUpdate_Propagator(Mat A, PetscReal t0, PetscR
 
   PetscFunctionBegin;
   ierr = MatShellGetContext(A,(void **)&prop);CHKERRQ(ierr);
+
+  /* Need to setup the model TS, as the tlm solver depends on it (relevant callbacks) */
+  ierr = TSSetUpFromDesign(prop->model,x0,design);CHKERRQ(ierr);
+
   ierr = VecLockPop(prop->x0);CHKERRQ(ierr);
   ierr = VecCopy(x0,prop->x0);CHKERRQ(ierr);
   ierr = VecLockPush(prop->x0);CHKERRQ(ierr);
@@ -263,8 +284,8 @@ static PetscErrorCode TSCreatePropagatorMat_Private(TS ts, PetscReal t0, PetscRe
   ierr = MatShellSetOperation(*A,MATOP_MULT_TRANSPOSE,(void (*)())MatMultTranspose_Propagator);CHKERRQ(ierr);
   ierr = MatShellSetOperation(*A,MATOP_DESTROY,(void (*)())MatDestroy_Propagator);CHKERRQ(ierr);
   ierr = VecDuplicate(x0,&prop->x0);CHKERRQ(ierr);
-  ierr = VecLockPush(prop->x0);CHKERRQ(ierr);     /* this vector is locked since it stores the initial conditions */
-  ierr = MatPropagatorUpdate_Propagator(*A,t0,dt,tf,x0);CHKERRQ(ierr);
+  ierr = VecLockPush(prop->x0);CHKERRQ(ierr); /* this vector is locked since it stores the initial conditions */
+  ierr = MatPropagatorUpdate_Propagator(*A,t0,dt,tf,x0,design);CHKERRQ(ierr);
   ierr = MatSetUp(*A);CHKERRQ(ierr);
   /* model sampling can terminate before tf due to events */
   ierr = TSGetTime(prop->model,&prop->tf);CHKERRQ(ierr);

@@ -71,6 +71,9 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   otrj = tshess->model->trajectory;
   tshess->model->trajectory = tshess->modeltj;
 
+  /* Need to setup the model TS, as the tlm and soa solvers in the following depend on it (relevant callbacks) */
+  ierr = TSSetUpFromDesign(tshess->model,tshess->x0,tshess->design);CHKERRQ(ierr);
+
   /* solve tangent linear model */
   ierr = TSTrajectoryDestroy(&tshess->tlmts->trajectory);CHKERRQ(ierr); /* XXX add Reset method to TSTrajectory */
   ierr = TSTrajectoryCreate(PetscObjectComm((PetscObject)tshess->tlmts),&tshess->tlmts->trajectory);CHKERRQ(ierr);
