@@ -726,24 +726,26 @@ PetscErrorCode MonitorError(Tao tao,void *ctx)
     testset:
       args: -tao_max_it 5 -tao_gatol 1.e-4
       requires: !single
-      output_file: output/burgers_spectral.out
       test:
         suffix: 1
         args: -adjointode 0
+        output_file: output/burgers_spectral.out
       test:
         suffix: 1_ao
         args: -adjointode
+        output_file: output/burgers_spectral_ao.out
 
     testset:
       nsize: 2
       args: -tao_max_it 5 -tao_gatol 1.e-4
       requires: !single
-      output_file: output/burgers_spectral_2.out
       test:
         suffix: 2
         args: -adjointode 0
+        output_file: output/burgers_spectral_2.out
       test:
         suffix: 2_ao
         args: -adjointode
+        output_file: output/burgers_spectral_2_ao.out
 
 TEST*/

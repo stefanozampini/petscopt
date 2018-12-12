@@ -357,6 +357,6 @@ int main(int argc, char* argv[])
     test:
       suffix: oscillator_i
       args: -ts_type cn -tf 10 -dt 0.1 -omega 3 -gamma 2 -ts_trajectory_type memory -ifunc -tlm_userijacobian -tlm_reuseksp -tlm_constjacobians -adjoint_tlm_constjacobians -prop_view -propT_view
-      output_file: output/ex2_oscillator_out.out
+      output_file: output/ex2_oscillator_out_i.out
 
 TEST*/
