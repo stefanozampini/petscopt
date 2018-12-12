@@ -282,10 +282,10 @@ static PetscErrorCode TSComputeHessian_MFFD(TS ts, PetscReal t0, PetscReal dt, P
   if (dt < 0) { ierr = TSGetTimeStep(ts,&dt);CHKERRQ(ierr); }
   mffd->dt = dt;
   mffd->tf = tf;
-  if (X) {
-    ierr = PetscObjectReference((PetscObject)X);CHKERRQ(ierr);
-    mffd->X = X;
+  if (!X) {
+    ierr = TSGetSolution(ts,&X);CHKERRQ(ierr);
   }
+  ierr = VecDuplicate(X,&mffd->X);CHKERRQ(ierr);
   ierr = VecGetLocalSize(design,&n);CHKERRQ(ierr);
   ierr = VecGetSize(design,&N);CHKERRQ(ierr);
   ierr = MatSetSizes(H,n,n,N,N);CHKERRQ(ierr);
