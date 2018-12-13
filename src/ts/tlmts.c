@@ -425,6 +425,7 @@ PetscErrorCode TLMTSComputeInitialConditions(TS lts, PetscReal t0, Vec x0)
     ierr = TSSetSolution(lts,eta);CHKERRQ(ierr);
     ierr = PetscObjectDereference((PetscObject)eta);CHKERRQ(ierr);
   }
+  ierr = VecLockPush(x0);CHKERRQ(ierr);
   ierr = TSGetTSOpt(tlm->model,&tsopt);CHKERRQ(ierr);
   if (!tsopt->G_m) {
     /* For propagator computations, the linear dependence on the initial conditions is attached to the TLMTS if the model TS does not have any set */
@@ -437,8 +438,10 @@ PetscErrorCode TLMTSComputeInitialConditions(TS lts, PetscReal t0, Vec x0)
   /* initialize tlm->workrhs if needed */
   ierr = TLMTSGetRHSVec(lts,&tlm->workrhs);CHKERRQ(ierr);
   if (tsopt->F_m && !tsopt->F_m_f) { /* constant dependence */
-    ierr = MatMult(tsopt->F_m,x0,tlm->workrhs);CHKERRQ(ierr);
+    /* ierr = MatMult(tsopt->F_m,x0,tlm->workrhs);CHKERRQ(ierr); */
+    ierr = MatMult(tsopt->F_m,tlm->mdelta,tlm->workrhs);CHKERRQ(ierr);
   }
+  ierr = VecLockPop(x0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
