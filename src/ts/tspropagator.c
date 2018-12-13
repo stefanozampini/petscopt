@@ -236,6 +236,7 @@ static PetscErrorCode TSCreatePropagatorMat_Private(TS ts, PetscReal t0, PetscRe
   TSAdapt           adapt;
   Vec               X;
   PetscInt          M,N,m,n,rbs,cbs;
+  PetscBool         has;
   PetscErrorCode    ierr;
 
   PetscFunctionBegin;
@@ -263,8 +264,11 @@ static PetscErrorCode TSCreatePropagatorMat_Private(TS ts, PetscReal t0, PetscRe
   }
   ierr = TSGetTSOpt(prop->model,&tsopt);CHKERRQ(ierr);
   if (!design) {
-    if (tsopt->G_m) {
-      ierr = MatCreateVecs(tsopt->G_m,&design,NULL);CHKERRQ(ierr);
+    Mat G_m;
+
+    ierr = TSOptEvalGradientIC(tsopt,0.0,NULL,NULL,NULL,&G_m);CHKERRQ(ierr);
+    if (G_m) {
+      ierr = MatCreateVecs(G_m,&design,NULL);CHKERRQ(ierr);
     } else {
       ierr = VecDuplicate(x0,&design);CHKERRQ(ierr);
     }
@@ -302,10 +306,9 @@ static PetscErrorCode TSCreatePropagatorMat_Private(TS ts, PetscReal t0, PetscRe
   /* XXX coverage */
   ierr = TSSetGradientIC(prop->lts,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
   /* we need to call this since we will then compute the adjoint of the TLM */
-  ierr = TSSetGradientDAE(prop->lts,tsopt->F_m,tsopt->F_m_f,tsopt->F_m_ctx);CHKERRQ(ierr);
-  if (tsopt->G_m) {
-    ierr = TSSetGradientIC(prop->lts,tsopt->G_x,tsopt->G_m,tsopt->Ggrad,tsopt->Ggrad_ctx);CHKERRQ(ierr);
-  } else { /* we compute a linear dependence on u_0 by default */
+  ierr = TSSetTSOpt(prop->lts,tsopt);CHKERRQ(ierr);
+  ierr = TSOptHasGradientIC(tsopt,&has);CHKERRQ(ierr);
+  if (!has) { /* we compute a linear dependence on u_0 by default */
     Mat      G_m;
     PetscInt m;
 
