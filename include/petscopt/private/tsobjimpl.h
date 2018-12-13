@@ -5,6 +5,9 @@
 
 typedef struct _TSObj *TSObj;
 
+PETSC_EXTERN PetscLogEvent TSOPT_Obj_Eval;
+PETSC_EXTERN PetscBool TSOPT_ObjPackageInitialized;
+
 PETSC_INTERN PetscErrorCode TSGetTSObj(TS,TSObj*);
 
 struct _TSObj {

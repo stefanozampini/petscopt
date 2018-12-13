@@ -5,6 +5,13 @@
 
 typedef struct _TSOpt *TSOpt;
 
+PETSC_EXTERN PetscLogEvent TSOPT_Opt_Eval_Grad_DAE;
+PETSC_EXTERN PetscLogEvent TSOPT_Opt_Eval_Grad_IC;
+PETSC_EXTERN PetscLogEvent TSOPT_Opt_Eval_Hess_DAE;
+PETSC_EXTERN PetscLogEvent TSOPT_Opt_Eval_Hess_IC;
+PETSC_EXTERN PetscLogEvent TSOPT_Opt_SetUp;
+PETSC_EXTERN PetscBool TSOPT_OptPackageInitialized;
+
 PETSC_INTERN PetscErrorCode TSGetTSOpt(TS,TSOpt*);
 
 struct _TSOpt {

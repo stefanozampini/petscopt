@@ -3,17 +3,22 @@
 
 /* ------------------ Helper routines for PDE-constrained support to evaluate objective functions, gradients and Hessian terms ----------------------- */
 
+PetscLogEvent TSOPT_Obj_Eval = 0;
+PetscBool TSOPT_ObjPackageInitialized = PETSC_FALSE;
+
+
 /* Evaluates objective functions of the type f(state,design,t) */
 PetscErrorCode TSObjEval(TSObj funchead, Vec state, Vec design, PetscReal time, PetscReal *val)
 {
   PetscErrorCode ierr;
   TSObj          link = funchead;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(state,VEC_CLASSID,2);
   PetscValidHeaderSpecific(design,VEC_CLASSID,3);
   PetscValidLogicalCollectiveReal(state,time,4);
   PetscValidPointer(val,5);
+  ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   ierr = VecLockPush(state);CHKERRQ(ierr);
   ierr = VecLockPush(design);CHKERRQ(ierr);
   *val = 0.0;
@@ -27,6 +32,7 @@ PetscErrorCode TSObjEval(TSObj funchead, Vec state, Vec design, PetscReal time, 
   }
   ierr = VecLockPop(state);CHKERRQ(ierr);
   ierr = VecLockPop(design);CHKERRQ(ierr);
+  ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -36,11 +42,12 @@ PetscErrorCode TSObjEvalFixed(TSObj funchead, Vec state, Vec design, PetscReal t
   PetscErrorCode ierr;
   TSObj          link = funchead;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(state,VEC_CLASSID,2);
   PetscValidHeaderSpecific(design,VEC_CLASSID,3);
   PetscValidLogicalCollectiveReal(state,time,4);
   PetscValidPointer(val,5);
+  ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   ierr = VecLockPush(state);CHKERRQ(ierr);
   ierr = VecLockPush(design);CHKERRQ(ierr);
   *val = 0.0;
@@ -54,6 +61,7 @@ PetscErrorCode TSObjEvalFixed(TSObj funchead, Vec state, Vec design, PetscReal t
   }
   ierr = VecLockPop(state);CHKERRQ(ierr);
   ierr = VecLockPop(design);CHKERRQ(ierr);
+  ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -63,13 +71,14 @@ PetscErrorCode TSObjEval_U(TSObj funchead, Vec state, Vec design, PetscReal time
   PetscErrorCode ierr;
   TSObj          link = funchead;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(state,VEC_CLASSID,2);
   PetscValidHeaderSpecific(design,VEC_CLASSID,3);
   PetscValidLogicalCollectiveReal(state,time,4);
   PetscValidHeaderSpecific(work,VEC_CLASSID,5);
   PetscValidPointer(has,6);
   PetscValidHeaderSpecific(out,VEC_CLASSID,7);
+  ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   *has = PETSC_FALSE;
   if (work == out) SETERRQ(PetscObjectComm((PetscObject)out),PETSC_ERR_USER,"work and out vectors need to be different");
   while (link) {
@@ -97,6 +106,7 @@ PetscErrorCode TSObjEval_U(TSObj funchead, Vec state, Vec design, PetscReal time
     ierr = VecLockPop(state);CHKERRQ(ierr);
     ierr = VecLockPop(design);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -107,13 +117,14 @@ PetscErrorCode TSObjEvalFixed_U(TSObj funchead, Vec state, Vec design, PetscReal
   PetscErrorCode ierr;
   TSObj          link = funchead;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(state,VEC_CLASSID,2);
   PetscValidHeaderSpecific(design,VEC_CLASSID,3);
   PetscValidLogicalCollectiveReal(state,time,4);
   PetscValidHeaderSpecific(work,VEC_CLASSID,5);
   PetscValidPointer(has,6);
   PetscValidHeaderSpecific(out,VEC_CLASSID,7);
+  ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   *has = PETSC_FALSE;
   if (work == out) SETERRQ(PetscObjectComm((PetscObject)out),PETSC_ERR_USER,"work and out vectors need to be different");
   while (link) {
@@ -141,6 +152,7 @@ PetscErrorCode TSObjEvalFixed_U(TSObj funchead, Vec state, Vec design, PetscReal
     ierr = VecLockPop(state);CHKERRQ(ierr);
     ierr = VecLockPop(design);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -150,13 +162,14 @@ PetscErrorCode TSObjEval_M(TSObj funchead, Vec state, Vec design, PetscReal time
   PetscErrorCode ierr;
   TSObj          link = funchead;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(state,VEC_CLASSID,2);
   PetscValidHeaderSpecific(design,VEC_CLASSID,3);
   PetscValidLogicalCollectiveReal(state,time,4);
   PetscValidHeaderSpecific(work,VEC_CLASSID,5);
   PetscValidPointer(has,6);
   PetscValidHeaderSpecific(out,VEC_CLASSID,7);
+  ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   *has = PETSC_FALSE;
   if (work == out) SETERRQ(PetscObjectComm((PetscObject)out),PETSC_ERR_USER,"work and out vectors need to be different");
   while (link) {
@@ -184,6 +197,7 @@ PetscErrorCode TSObjEval_M(TSObj funchead, Vec state, Vec design, PetscReal time
     ierr = VecLockPop(state);CHKERRQ(ierr);
     ierr = VecLockPop(design);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -193,13 +207,14 @@ PetscErrorCode TSObjEvalFixed_M(TSObj funchead, Vec state, Vec design, PetscReal
   PetscErrorCode ierr;
   TSObj          link = funchead;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(state,VEC_CLASSID,2);
   PetscValidHeaderSpecific(design,VEC_CLASSID,3);
   PetscValidLogicalCollectiveReal(state,time,4);
   PetscValidHeaderSpecific(work,VEC_CLASSID,5);
   PetscValidPointer(has,6);
   PetscValidHeaderSpecific(out,VEC_CLASSID,7);
+  ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   *has = PETSC_FALSE;
   if (work == out) SETERRQ(PetscObjectComm((PetscObject)out),PETSC_ERR_USER,"work and out vectors need to be different");
   while (link) {
@@ -227,6 +242,7 @@ PetscErrorCode TSObjEvalFixed_M(TSObj funchead, Vec state, Vec design, PetscReal
     ierr = VecLockPop(state);CHKERRQ(ierr);
     ierr = VecLockPop(design);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -236,7 +252,7 @@ PetscErrorCode TSObjEval_UU(TSObj funchead, Vec state, Vec design, PetscReal tim
   PetscErrorCode ierr;
   TSObj          link = funchead;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(state,VEC_CLASSID,2);
   PetscValidHeaderSpecific(design,VEC_CLASSID,3);
   PetscValidLogicalCollectiveReal(state,time,4);
@@ -244,6 +260,7 @@ PetscErrorCode TSObjEval_UU(TSObj funchead, Vec state, Vec design, PetscReal tim
   PetscValidHeaderSpecific(work,VEC_CLASSID,6);
   PetscValidPointer(has,7);
   PetscValidHeaderSpecific(out,VEC_CLASSID,8);
+  ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   *has = PETSC_FALSE;
   if (work == out) SETERRQ(PetscObjectComm((PetscObject)out),PETSC_ERR_USER,"work and out vectors need to be different");
   while (link) {
@@ -283,6 +300,7 @@ PetscErrorCode TSObjEval_UU(TSObj funchead, Vec state, Vec design, PetscReal tim
     ierr = VecLockPop(design);CHKERRQ(ierr);
     ierr = VecLockPop(direction);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -292,7 +310,7 @@ PetscErrorCode TSObjEvalFixed_UU(TSObj funchead, Vec state, Vec design, PetscRea
   PetscErrorCode ierr;
   TSObj          link = funchead;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(state,VEC_CLASSID,2);
   PetscValidHeaderSpecific(design,VEC_CLASSID,3);
   PetscValidLogicalCollectiveReal(state,time,4);
@@ -300,6 +318,7 @@ PetscErrorCode TSObjEvalFixed_UU(TSObj funchead, Vec state, Vec design, PetscRea
   PetscValidHeaderSpecific(work,VEC_CLASSID,6);
   PetscValidPointer(has,7);
   PetscValidHeaderSpecific(out,VEC_CLASSID,8);
+  ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   *has = PETSC_FALSE;
   if (work == out) SETERRQ(PetscObjectComm((PetscObject)out),PETSC_ERR_USER,"work and out vectors need to be different");
   while (link) {
@@ -339,6 +358,7 @@ PetscErrorCode TSObjEvalFixed_UU(TSObj funchead, Vec state, Vec design, PetscRea
     ierr = VecLockPop(design);CHKERRQ(ierr);
     ierr = VecLockPop(direction);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -348,7 +368,7 @@ PetscErrorCode TSObjEval_UM(TSObj funchead, Vec state, Vec design, PetscReal tim
   PetscErrorCode ierr;
   TSObj          link = funchead;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(state,VEC_CLASSID,2);
   PetscValidHeaderSpecific(design,VEC_CLASSID,3);
   PetscValidLogicalCollectiveReal(state,time,4);
@@ -356,6 +376,7 @@ PetscErrorCode TSObjEval_UM(TSObj funchead, Vec state, Vec design, PetscReal tim
   PetscValidHeaderSpecific(work,VEC_CLASSID,6);
   PetscValidPointer(has,7);
   PetscValidHeaderSpecific(out,VEC_CLASSID,8);
+  ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   *has = PETSC_FALSE;
   if (work == out) SETERRQ(PetscObjectComm((PetscObject)out),PETSC_ERR_USER,"work and out vectors need to be different");
   while (link) {
@@ -395,6 +416,7 @@ PetscErrorCode TSObjEval_UM(TSObj funchead, Vec state, Vec design, PetscReal tim
     ierr = VecLockPop(design);CHKERRQ(ierr);
     ierr = VecLockPop(direction);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -404,7 +426,7 @@ PetscErrorCode TSObjEvalFixed_UM(TSObj funchead, Vec state, Vec design, PetscRea
   PetscErrorCode ierr;
   TSObj          link = funchead;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(state,VEC_CLASSID,2);
   PetscValidHeaderSpecific(design,VEC_CLASSID,3);
   PetscValidLogicalCollectiveReal(state,time,4);
@@ -412,6 +434,7 @@ PetscErrorCode TSObjEvalFixed_UM(TSObj funchead, Vec state, Vec design, PetscRea
   PetscValidHeaderSpecific(work,VEC_CLASSID,6);
   PetscValidPointer(has,7);
   PetscValidHeaderSpecific(out,VEC_CLASSID,8);
+  ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   *has = PETSC_FALSE;
   if (work == out) SETERRQ(PetscObjectComm((PetscObject)out),PETSC_ERR_USER,"work and out vectors need to be different");
   while (link) {
@@ -451,6 +474,7 @@ PetscErrorCode TSObjEvalFixed_UM(TSObj funchead, Vec state, Vec design, PetscRea
     ierr = VecLockPop(design);CHKERRQ(ierr);
     ierr = VecLockPop(direction);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -460,7 +484,7 @@ PetscErrorCode TSObjEval_MU(TSObj funchead, Vec state, Vec design, PetscReal tim
   PetscErrorCode ierr;
   TSObj          link = funchead;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(state,VEC_CLASSID,2);
   PetscValidHeaderSpecific(design,VEC_CLASSID,3);
   PetscValidLogicalCollectiveReal(state,time,4);
@@ -468,6 +492,7 @@ PetscErrorCode TSObjEval_MU(TSObj funchead, Vec state, Vec design, PetscReal tim
   PetscValidHeaderSpecific(work,VEC_CLASSID,6);
   PetscValidPointer(has,7);
   PetscValidHeaderSpecific(out,VEC_CLASSID,8);
+  ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   *has = PETSC_FALSE;
   if (work == out) SETERRQ(PetscObjectComm((PetscObject)out),PETSC_ERR_USER,"work and out vectors need to be different");
   while (link) {
@@ -507,6 +532,7 @@ PetscErrorCode TSObjEval_MU(TSObj funchead, Vec state, Vec design, PetscReal tim
     ierr = VecLockPop(design);CHKERRQ(ierr);
     ierr = VecLockPop(direction);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -516,7 +542,7 @@ PetscErrorCode TSObjEvalFixed_MU(TSObj funchead, Vec state, Vec design, PetscRea
   PetscErrorCode ierr;
   TSObj          link = funchead;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(state,VEC_CLASSID,2);
   PetscValidHeaderSpecific(design,VEC_CLASSID,3);
   PetscValidLogicalCollectiveReal(state,time,4);
@@ -524,6 +550,7 @@ PetscErrorCode TSObjEvalFixed_MU(TSObj funchead, Vec state, Vec design, PetscRea
   PetscValidHeaderSpecific(work,VEC_CLASSID,6);
   PetscValidPointer(has,7);
   PetscValidHeaderSpecific(out,VEC_CLASSID,8);
+  ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   *has = PETSC_FALSE;
   if (work == out) SETERRQ(PetscObjectComm((PetscObject)out),PETSC_ERR_USER,"work and out vectors need to be different");
   while (link) {
@@ -563,6 +590,7 @@ PetscErrorCode TSObjEvalFixed_MU(TSObj funchead, Vec state, Vec design, PetscRea
     ierr = VecLockPop(design);CHKERRQ(ierr);
     ierr = VecLockPop(direction);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -572,7 +600,7 @@ PetscErrorCode TSObjEval_MM(TSObj funchead, Vec state, Vec design, PetscReal tim
   PetscErrorCode ierr;
   TSObj          link = funchead;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(state,VEC_CLASSID,2);
   PetscValidHeaderSpecific(design,VEC_CLASSID,3);
   PetscValidLogicalCollectiveReal(state,time,4);
@@ -580,6 +608,7 @@ PetscErrorCode TSObjEval_MM(TSObj funchead, Vec state, Vec design, PetscReal tim
   PetscValidHeaderSpecific(work,VEC_CLASSID,6);
   PetscValidPointer(has,7);
   PetscValidHeaderSpecific(out,VEC_CLASSID,8);
+  ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   *has = PETSC_FALSE;
   if (work == out) SETERRQ(PetscObjectComm((PetscObject)out),PETSC_ERR_USER,"work and out vectors need to be different");
   while (link) {
@@ -619,6 +648,7 @@ PetscErrorCode TSObjEval_MM(TSObj funchead, Vec state, Vec design, PetscReal tim
     ierr = VecLockPop(design);CHKERRQ(ierr);
     ierr = VecLockPop(direction);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -628,7 +658,7 @@ PetscErrorCode TSObjEvalFixed_MM(TSObj funchead, Vec state, Vec design, PetscRea
   PetscErrorCode ierr;
   TSObj          link = funchead;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(state,VEC_CLASSID,2);
   PetscValidHeaderSpecific(design,VEC_CLASSID,3);
   PetscValidLogicalCollectiveReal(state,time,4);
@@ -636,6 +666,7 @@ PetscErrorCode TSObjEvalFixed_MM(TSObj funchead, Vec state, Vec design, PetscRea
   PetscValidHeaderSpecific(work,VEC_CLASSID,6);
   PetscValidPointer(has,7);
   PetscValidHeaderSpecific(out,VEC_CLASSID,8);
+  ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   *has = PETSC_FALSE;
   if (work == out) SETERRQ(PetscObjectComm((PetscObject)out),PETSC_ERR_USER,"work and out vectors need to be different");
   while (link) {
@@ -675,12 +706,13 @@ PetscErrorCode TSObjEvalFixed_MM(TSObj funchead, Vec state, Vec design, PetscRea
     ierr = VecLockPop(design);CHKERRQ(ierr);
     ierr = VecLockPop(direction);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
 PetscErrorCode TSObjGetNumObjectives(TSObj link, PetscInt *n)
 {
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   *n = 0;
   while (link) {
     (*n)++;
@@ -692,7 +724,7 @@ PetscErrorCode TSObjGetNumObjectives(TSObj link, PetscInt *n)
 /* Inquires the presence of integrand terms */
 PetscErrorCode TSObjHasObjectiveIntegrand(TSObj link, PetscBool *has, PetscBool *has_x, PetscBool *has_m, PetscBool *has_xx, PetscBool *has_xm, PetscBool *has_mm)
 {
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   if (has)    PetscValidPointer(has,2);
   if (has_x)  PetscValidPointer(has_x,3);
   if (has_m)  PetscValidPointer(has_m,4);
@@ -724,7 +756,7 @@ PetscErrorCode TSObjHasObjectiveFixed(TSObj linkin, PetscReal t0, PetscReal tf, 
 {
   TSObj link = linkin;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   if (has)    PetscValidPointer(has,3);
   if (has_x)  PetscValidPointer(has_x,4);
   if (has_m)  PetscValidPointer(has_m,5);
@@ -779,7 +811,7 @@ PetscErrorCode TSResetObjective(TS ts)
 {
   PetscErrorCode ierr;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   PetscValidHeaderSpecific(ts,TS_CLASSID,1);
   ierr = PetscObjectCompose((PetscObject)ts,"_ts_obj_ctx",NULL);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -790,7 +822,7 @@ static PetscErrorCode TSObjDestroy_Private(void *ptr)
   TSObj          link = (TSObj)ptr;
   PetscErrorCode ierr;
 
-  PetscFunctionBegin;
+  PetscFunctionBeginHot;
   while (link) {
     TSObj olink = link;
 
@@ -800,6 +832,54 @@ static PetscErrorCode TSObjDestroy_Private(void *ptr)
     ierr = MatDestroy(&olink->f_MM);CHKERRQ(ierr);
     ierr = PetscFree(olink);CHKERRQ(ierr);
   }
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSGetTSObj(TS ts, TSObj *obj)
+{
+  PetscErrorCode ierr;
+  PetscContainer c;
+
+  PetscFunctionBeginHot;
+  PetscValidHeaderSpecific(ts,TS_CLASSID,1);
+  PetscValidPointer(obj,2);
+  *obj = NULL;
+  ierr = PetscObjectQuery((PetscObject)ts,"_ts_obj_ctx",(PetscObject*)&c);CHKERRQ(ierr);
+  if (c) {
+    TSObj link;
+
+    ierr = PetscContainerGetPointer(c,(void**)&link);CHKERRQ(ierr);
+    *obj = link;
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode TSObjFinalizePackage(void)
+{
+  PetscFunctionBegin;
+  TSOPT_ObjPackageInitialized = PETSC_FALSE;
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode TSObjInitializePackage(void)
+{
+  char           logList[256];
+  PetscBool      opt,pkg;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  if (TSOPT_ObjPackageInitialized) PetscFunctionReturn(0);
+  TSOPT_ObjPackageInitialized = PETSC_TRUE;
+  /* Register Events */
+  ierr = PetscLogEventRegister("TSOptObjEval",0,&TSOPT_Obj_Eval);CHKERRQ(ierr);
+  /* Process summary exclusions */
+  ierr = PetscOptionsGetString(NULL,NULL,"-log_exclude",logList,sizeof(logList),&opt);CHKERRQ(ierr);
+  if (opt) {
+    ierr = PetscStrInList("tsobj",logList,',',&pkg);CHKERRQ(ierr);
+    if (pkg) {ierr = PetscLogEventDeactivate(TSOPT_Obj_Eval);CHKERRQ(ierr);}
+  }
+  /* Register package finalizer */
+  ierr = PetscRegisterFinalize(TSObjFinalizePackage);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -874,6 +954,7 @@ PetscErrorCode TSAddObjective(TS ts, PetscReal fixtime, TSEvalObjective f,
   PetscFunctionBegin;
   PetscValidHeaderSpecific(ts,TS_CLASSID,1);
   PetscValidLogicalCollectiveReal(ts,fixtime,2);
+  ierr = TSObjInitializePackage();CHKERRQ(ierr);
   if (f_XX) {
     PetscValidHeaderSpecific(f_XX,MAT_CLASSID,9);
     PetscCheckSameComm(ts,1,f_XX,9);
@@ -926,24 +1007,5 @@ PetscErrorCode TSAddObjective(TS ts, PetscReal fixtime, TSEvalObjective f,
   }
   link->f_ctx     = f_ctx;
   link->fixedtime = fixtime;
-  PetscFunctionReturn(0);
-}
-
-PetscErrorCode TSGetTSObj(TS ts, TSObj *obj)
-{
-  PetscErrorCode ierr;
-  PetscContainer c;
-
-  PetscFunctionBegin;
-  PetscValidHeaderSpecific(ts,TS_CLASSID,1);
-  PetscValidPointer(obj,2);
-  *obj = NULL;
-  ierr = PetscObjectQuery((PetscObject)ts,"_ts_obj_ctx",(PetscObject*)&c);CHKERRQ(ierr);
-  if (c) {
-    TSObj link;
-
-    ierr = PetscContainerGetPointer(c,(void**)&link);CHKERRQ(ierr);
-    *obj = link;
-  }
   PetscFunctionReturn(0);
 }

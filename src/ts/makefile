@@ -3,7 +3,7 @@ ALL: lib
 
 CFLAGS   =
 FFLAGS   =
-SOURCEC  = adjointts.c  tlmts.c  tsgradhess.c  tsobj.c  tspdeconstrainedutils.c  tspropagator.c  tssplitjac.c
+SOURCEC  = adjointts.c  tlmts.c  tsgradhess.c  tsobj.c  tsopt.c tspdeconstrainedutils.c  tspropagator.c  tssplitjac.c
 SOURCEF  =
 SOURCEH  =
 DIRS     = examples
