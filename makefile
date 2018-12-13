@@ -166,7 +166,13 @@ alletags :
 	-@$(PYTHON) $(PETSC_DIR)/lib/petsc/bin/maint/generateetags.py
 deleteetags :
 	-@$(RM) CTAGS TAGS
-.PHONY: alletags deleteetags
+allctags :
+	-@ctags -o $(PETSC_DIR)/.vimctags -R --exclude=$(PETSC_DIR)/include/petsc/finclude $(PETSC_DIR)/src/ $(PETSC_DIR)/include/
+	-@ctags -o .vimctags -R src/ include/
+deletectags :
+	-@$(RM) $(PETSC_DIR)/.vimctags
+	-@$(RM) .vimctags
+.PHONY: alletags deleteetags allctags deletectags
 
 # make print VAR=the-variable
 print : ; @echo "$($(VAR))"
