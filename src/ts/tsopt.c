@@ -224,6 +224,7 @@ static PetscErrorCode TSOptInitializePackage(void)
   ierr = PetscLogEventRegister("TSOptSetUp",     0,&TSOPT_Opt_SetUp);CHKERRQ(ierr);
   /* Process summary exclusions */
   ierr = PetscOptionsGetString(NULL,NULL,"-log_exclude",logList,sizeof(logList),&opt);CHKERRQ(ierr);
+  /* LCOV_EXCL_START */
   if (opt) {
     ierr = PetscStrInList("tsopt",logList,',',&pkg);CHKERRQ(ierr);
     if (pkg) {
@@ -234,6 +235,7 @@ static PetscErrorCode TSOptInitializePackage(void)
       ierr = PetscLogEventDeactivate(TSOPT_Opt_SetUp);CHKERRQ(ierr);
     }
   }
+  /* LCOV_EXCL_STOP */
   /* Register package finalizer */
   ierr = PetscRegisterFinalize(TSOptFinalizePackage);CHKERRQ(ierr);
   PetscFunctionReturn(0);

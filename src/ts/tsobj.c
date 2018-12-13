@@ -874,10 +874,12 @@ static PetscErrorCode TSObjInitializePackage(void)
   ierr = PetscLogEventRegister("TSOptObjEval",0,&TSOPT_Obj_Eval);CHKERRQ(ierr);
   /* Process summary exclusions */
   ierr = PetscOptionsGetString(NULL,NULL,"-log_exclude",logList,sizeof(logList),&opt);CHKERRQ(ierr);
+  /* LCOV_EXCL_START */
   if (opt) {
     ierr = PetscStrInList("tsobj",logList,',',&pkg);CHKERRQ(ierr);
     if (pkg) {ierr = PetscLogEventDeactivate(TSOPT_Obj_Eval);CHKERRQ(ierr);}
   }
+  /* LCOV_EXCL_STOP */
   /* Register package finalizer */
   ierr = PetscRegisterFinalize(TSObjFinalizePackage);CHKERRQ(ierr);
   PetscFunctionReturn(0);
