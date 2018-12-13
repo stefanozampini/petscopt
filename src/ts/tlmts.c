@@ -45,6 +45,7 @@ static PetscErrorCode TLMTSIFunctionLinear(TS lts, PetscReal time, Vec U, Vec Ud
   TLMTS_Ctx      *tlm_ctx;
   TSOpt          tsopt;
   Mat            J_U = NULL, J_Udot = NULL;
+  PetscBool      has,hasnc;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -54,15 +55,13 @@ static PetscErrorCode TLMTSIFunctionLinear(TS lts, PetscReal time, Vec U, Vec Ud
   ierr = MatMult(J_U,U,F);CHKERRQ(ierr);
   ierr = MatMultAdd(J_Udot,Udot,F,F);CHKERRQ(ierr);
   ierr = TSGetTSOpt(tlm_ctx->model,&tsopt);CHKERRQ(ierr);
-  if (tsopt->F_m) {
-    TS ts = tlm_ctx->model;
-    if (tsopt->F_m_f) { /* non constant dependence */
-      Vec W[2];
+  ierr = TSOptHasGradientDAE(tsopt,&has,&hasnc);CHKERRQ(ierr);
+  if (has) {
+    if (hasnc) { /* non constant dependence */
+      Mat F_m;
 
-      ierr = TSTrajectoryGetUpdatedHistoryVecs(ts->trajectory,ts,time,&W[0],&W[1]);CHKERRQ(ierr);
-      ierr = (*tsopt->F_m_f)(ts,time,W[0],W[1],tlm_ctx->design,tsopt->F_m,tsopt->F_m_ctx);CHKERRQ(ierr);
-      ierr = TSTrajectoryRestoreUpdatedHistoryVecs(ts->trajectory,&W[0],&W[1]);CHKERRQ(ierr);
-      ierr = MatMult(tsopt->F_m,tlm_ctx->mdelta,tlm_ctx->workrhs);CHKERRQ(ierr);
+      ierr = TSOptEvalGradientDAE(tsopt,time,NULL,NULL,tlm_ctx->design,&F_m,NULL);CHKERRQ(ierr);
+      ierr = MatMult(F_m,tlm_ctx->mdelta,tlm_ctx->workrhs);CHKERRQ(ierr);
     }
     ierr = VecAXPY(F,1.0,tlm_ctx->workrhs);CHKERRQ(ierr);
   }
@@ -95,6 +94,7 @@ static PetscErrorCode TLMTSRHSFunctionLinear(TS lts, PetscReal time, Vec U, Vec 
 {
   TLMTS_Ctx      *tlm_ctx;
   TSOpt          tsopt;
+  PetscBool      has,hasnc;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -104,15 +104,13 @@ static PetscErrorCode TLMTSRHSFunctionLinear(TS lts, PetscReal time, Vec U, Vec 
   ierr = TSComputeRHSJacobian(lts,time,U,lts->Arhs,lts->Brhs);CHKERRQ(ierr);
   ierr = MatMult(lts->Arhs,U,F);CHKERRQ(ierr);
   ierr = TSGetTSOpt(tlm_ctx->model,&tsopt);CHKERRQ(ierr);
-  if (tsopt->F_m) {
-    TS ts = tlm_ctx->model;
-    if (tsopt->F_m_f) { /* non constant dependence */
-      Vec W[2];
+  ierr = TSOptHasGradientDAE(tsopt,&has,&hasnc);CHKERRQ(ierr);
+  if (has) {
+    if (hasnc) { /* non constant dependence */
+      Mat F_m;
 
-      ierr = TSTrajectoryGetUpdatedHistoryVecs(ts->trajectory,ts,time,&W[0],&W[1]);CHKERRQ(ierr);
-      ierr = (*tsopt->F_m_f)(ts,time,W[0],W[1],tlm_ctx->design,tsopt->F_m,tsopt->F_m_ctx);CHKERRQ(ierr);
-      ierr = TSTrajectoryRestoreUpdatedHistoryVecs(ts->trajectory,&W[0],&W[1]);CHKERRQ(ierr);
-      ierr = MatMult(tsopt->F_m,tlm_ctx->mdelta,tlm_ctx->workrhs);CHKERRQ(ierr);
+      ierr = TSOptEvalGradientDAE(tsopt,time,NULL,NULL,tlm_ctx->design,&F_m,NULL);CHKERRQ(ierr);
+      ierr = MatMult(F_m,tlm_ctx->mdelta,tlm_ctx->workrhs);CHKERRQ(ierr);
     }
     ierr = VecAXPY(F,-1.0,tlm_ctx->workrhs);CHKERRQ(ierr);
   }
@@ -405,6 +403,7 @@ PetscErrorCode TLMTSComputeInitialConditions(TS lts, PetscReal t0, Vec x0)
   PetscContainer c;
   TLMTS_Ctx      *tlm;
   TSOpt          tsopt;
+  PetscBool      has,hasnc;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -427,7 +426,8 @@ PetscErrorCode TLMTSComputeInitialConditions(TS lts, PetscReal t0, Vec x0)
   }
   ierr = VecLockPush(x0);CHKERRQ(ierr);
   ierr = TSGetTSOpt(tlm->model,&tsopt);CHKERRQ(ierr);
-  if (!tsopt->G_m) {
+  ierr = TSOptHasGradientIC(tsopt,&has);CHKERRQ(ierr);
+  if (!has) {
     /* For propagator computations, the linear dependence on the initial conditions is attached to the TLMTS if the model TS does not have any set */
     ierr = TSLinearizedICApply_Private(lts,t0,x0,tlm->design,tlm->mdelta,eta,PETSC_FALSE,PETSC_TRUE);CHKERRQ(ierr);
   } else {
@@ -437,9 +437,13 @@ PetscErrorCode TLMTSComputeInitialConditions(TS lts, PetscReal t0, Vec x0)
 
   /* initialize tlm->workrhs if needed */
   ierr = TLMTSGetRHSVec(lts,&tlm->workrhs);CHKERRQ(ierr);
-  if (tsopt->F_m && !tsopt->F_m_f) { /* constant dependence */
-    /* ierr = MatMult(tsopt->F_m,x0,tlm->workrhs);CHKERRQ(ierr); */
-    ierr = MatMult(tsopt->F_m,tlm->mdelta,tlm->workrhs);CHKERRQ(ierr);
+  ierr = TSOptHasGradientDAE(tsopt,&has,&hasnc);CHKERRQ(ierr);
+  if (has && !hasnc) { /* constant dependence */
+    Mat F_m;
+
+    ierr = TSOptEvalGradientDAE(tsopt,t0,NULL,NULL,NULL,&F_m,NULL);CHKERRQ(ierr);
+    /* ierr = MatMult(F_m,x0,tlm->workrhs);CHKERRQ(ierr); */
+    ierr = MatMult(F_m,tlm->mdelta,tlm->workrhs);CHKERRQ(ierr);
   }
   ierr = VecLockPop(x0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
