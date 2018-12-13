@@ -17,6 +17,7 @@ static PetscErrorCode TSOptDestroy_Private(void *ptr)
   ierr = MatDestroy(&tsopt->G_x);CHKERRQ(ierr);
   ierr = MatDestroy(&tsopt->G_m);CHKERRQ(ierr);
   ierr = MatDestroy(&tsopt->F_m);CHKERRQ(ierr);
+  ierr = MatDestroy(&tsopt->adjF_m);CHKERRQ(ierr);
   ierr = PetscFree(tsopt);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -31,6 +32,7 @@ PetscErrorCode TSGetTSOpt(TS ts, TSOpt *tsopt)
   ierr = PetscObjectQuery((PetscObject)ts,"_ts_opt_ctx",(PetscObject*)&c);CHKERRQ(ierr);
   if (!c) {
     ierr = PetscNew(&t);CHKERRQ(ierr);
+    t->ts = ts;
     /* zeros pointers for Hessian callbacks */
     t->HF[0][0] = t->HF[0][1] = t->HF[0][2] = NULL;
     t->HF[1][0] = t->HF[1][1] = t->HF[1][2] = NULL;
@@ -44,6 +46,139 @@ PetscErrorCode TSGetTSOpt(TS ts, TSOpt *tsopt)
     ierr = PetscContainerGetPointer(c,(void**)&t);CHKERRQ(ierr);
   }
   *tsopt = t;
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSSetTSOpt(TS ts, TSOpt tsopt)
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TSSetGradientDAE(ts,tsopt->F_m,tsopt->F_m_f,tsopt->F_m_ctx);CHKERRQ(ierr);
+  ierr = TSSetGradientIC(ts,tsopt->G_x,tsopt->G_m,tsopt->Ggrad,tsopt->Ggrad_ctx);CHKERRQ(ierr);
+  ierr = TSSetHessianDAE(ts,tsopt->HF[0][0],tsopt->HF[0][1],tsopt->HF[0][2],
+                            tsopt->HF[1][0],tsopt->HF[1][1],tsopt->HF[1][2],
+                            tsopt->HF[2][0],tsopt->HF[2][1],tsopt->HF[2][2],tsopt->HFctx);CHKERRQ(ierr);
+  ierr = TSSetHessianIC(ts,tsopt->HG[0][0],tsopt->HG[0][1],
+                           tsopt->HG[1][0],tsopt->HG[1][1],tsopt->HGctx);CHKERRQ(ierr);
+  ierr = TSSetSetUpFromDesign(ts,tsopt->setupfromdesign,tsopt->setupfromdesignctx);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSOptHasGradientDAE(TSOpt tsopt, PetscBool *has, PetscBool *hasnc)
+{
+  PetscFunctionBegin;
+  if (has)   *has   = tsopt->F_m   ? PETSC_TRUE : PETSC_FALSE;
+  if (hasnc) *hasnc = tsopt->F_m_f ? PETSC_TRUE : PETSC_FALSE;
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSOptEvalGradientDAE(TSOpt tsopt, PetscReal t, Vec U, Vec Udot, Vec M, Mat* F_m, Mat *adjF_m)
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = PetscLogEventBegin(TSOPT_Opt_Eval_Grad_DAE,0,0,0,0);CHKERRQ(ierr);
+  if (tsopt->F_m_f && M) { /* non constant dependence */
+    TSTrajectory tj;
+    Vec          W[2];
+
+    W[0] = U;
+    W[1] = Udot;
+    ierr = TSGetTrajectory(tsopt->ts,&tj);CHKERRQ(ierr);
+    if (!U || !Udot) {
+      ierr = TSTrajectoryGetUpdatedHistoryVecs(tj,tsopt->ts,t,U ? NULL : &W[0],Udot ? NULL : &W[1]);CHKERRQ(ierr);
+    }
+    ierr = (*tsopt->F_m_f)(tsopt->ts,t,W[0],W[1],M,tsopt->F_m,tsopt->F_m_ctx);CHKERRQ(ierr);
+    if (!U || !Udot) {
+      ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,U ? NULL : &W[0],Udot ? NULL : &W[1]);CHKERRQ(ierr);
+    }
+  }
+  ierr = PetscLogEventEnd(TSOPT_Opt_Eval_Grad_DAE,0,0,0,0);CHKERRQ(ierr);
+  /* In the future we can probably support different discretization spaces for
+     forward and adjoint states */
+  if (F_m)       *F_m = tsopt->F_m;
+  if (adjF_m) *adjF_m = tsopt->adjF_m;
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSOptHasGradientIC(TSOpt tsopt, PetscBool *has)
+{
+  PetscFunctionBegin;
+  if (has) *has = tsopt->G_m ? PETSC_TRUE : PETSC_FALSE;
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSOptEvalGradientIC(TSOpt tsopt, PetscReal t, Vec x, Vec M, Mat* G_x, Mat *G_m)
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = PetscLogEventBegin(TSOPT_Opt_Eval_Grad_IC,0,0,0,0);CHKERRQ(ierr);
+  if (tsopt->Ggrad && M) {
+    ierr = (*tsopt->Ggrad)(tsopt->ts,t,x,M,tsopt->G_x,tsopt->G_m,tsopt->Ggrad_ctx);CHKERRQ(ierr);
+  }
+  ierr = PetscLogEventEnd(TSOPT_Opt_Eval_Grad_IC,0,0,0,0);CHKERRQ(ierr);
+  if (G_x) *G_x = tsopt->G_x;
+  if (G_m) *G_m = tsopt->G_m;
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSOptHasHessianDAE(TSOpt tsopt, PetscBool has[3][3])
+{
+  PetscFunctionBegin;
+  has[0][0] = tsopt->HF[0][0] ? PETSC_TRUE : PETSC_FALSE;
+  has[0][1] = tsopt->HF[0][1] ? PETSC_TRUE : PETSC_FALSE;
+  has[0][2] = tsopt->HF[0][2] ? PETSC_TRUE : PETSC_FALSE;
+  has[1][0] = tsopt->HF[1][0] ? PETSC_TRUE : PETSC_FALSE;
+  has[1][1] = tsopt->HF[1][1] ? PETSC_TRUE : PETSC_FALSE;
+  has[1][2] = tsopt->HF[1][2] ? PETSC_TRUE : PETSC_FALSE;
+  has[2][0] = tsopt->HF[2][0] ? PETSC_TRUE : PETSC_FALSE;
+  has[2][1] = tsopt->HF[2][1] ? PETSC_TRUE : PETSC_FALSE;
+  has[2][2] = tsopt->HF[2][2] ? PETSC_TRUE : PETSC_FALSE;
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSOptEvalHessianDAE(TSOpt tsopt, PetscInt w0, PetscInt w1, PetscReal t, Vec U, Vec Udot, Vec M, Vec L, Vec X, Vec Y)
+{
+  TSTrajectory   tj;
+  Vec            W[2];
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = PetscLogEventBegin(TSOPT_Opt_Eval_Hess_DAE,0,0,0,0);CHKERRQ(ierr);
+  W[0] = U;
+  W[1] = Udot;
+  ierr = TSGetTrajectory(tsopt->ts,&tj);CHKERRQ(ierr);
+  if (!U || !Udot) {
+    ierr = TSTrajectoryGetUpdatedHistoryVecs(tj,tsopt->ts,t,U ? NULL : &W[0],Udot ? NULL : &W[1]);CHKERRQ(ierr);
+  }
+  ierr = (*tsopt->HF[w0][w1])(tsopt->ts,t,W[0],W[1],M,L,X,Y,tsopt->HFctx);CHKERRQ(ierr);
+  if (!U || !Udot) {
+    ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,U ? NULL : &W[0],Udot ? NULL : &W[1]);CHKERRQ(ierr);
+  }
+  ierr = PetscLogEventEnd(TSOPT_Opt_Eval_Hess_DAE,0,0,0,0);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSOptHasHessianIC(TSOpt tsopt, PetscBool has[2][2])
+{
+  PetscFunctionBegin;
+  has[0][0] = tsopt->HG[0][0] ? PETSC_TRUE : PETSC_FALSE;
+  has[0][1] = tsopt->HG[0][1] ? PETSC_TRUE : PETSC_FALSE;
+  has[1][0] = tsopt->HG[1][0] ? PETSC_TRUE : PETSC_FALSE;
+  has[1][1] = tsopt->HG[1][1] ? PETSC_TRUE : PETSC_FALSE;
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSOptEvalHessianIC(TSOpt tsopt, PetscInt w0, PetscInt w1, PetscReal t, Vec U, Vec M, Vec L, Vec X, Vec Y)
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = PetscLogEventBegin(TSOPT_Opt_Eval_Hess_IC,0,0,0,0);CHKERRQ(ierr);
+  ierr = (*tsopt->HG[w0][w1])(tsopt->ts,t,U,M,L,X,Y,tsopt->HGctx);CHKERRQ(ierr);
+  ierr = PetscLogEventEnd(TSOPT_Opt_Eval_Hess_IC,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -132,10 +267,14 @@ PetscErrorCode TSSetGradientDAE(TS ts, Mat J, TSEvalGradientDAE f, void *ctx)
   }
   ierr = TSGetTSOpt(ts,&tsopt);CHKERRQ(ierr);
 
+  ierr           = MatDestroy(&tsopt->adjF_m);CHKERRQ(ierr);
   ierr           = MatDestroy(&tsopt->F_m);CHKERRQ(ierr);
   tsopt->F_m     = J;
-  tsopt->F_m_f   = f;
-  tsopt->F_m_ctx = ctx;
+  tsopt->F_m_f   = J ? f : NULL;
+  tsopt->F_m_ctx = J ? ctx : NULL;
+  if (tsopt->F_m) { /* TODO ADJ: need a placeholder and a setup for the adjoint matrix */
+    ierr = MatCreateTranspose(tsopt->F_m,&tsopt->adjF_m);CHKERRQ(ierr);
+  }
   PetscFunctionReturn(0);
 }
 
@@ -413,6 +552,7 @@ PetscErrorCode TSSetUpFromDesign(TS ts,Vec x0,Vec design)
   TSOpt          tsopt;
 
   PetscFunctionBegin;
+  ierr = PetscLogEventBegin(TSOPT_Opt_SetUp,0,0,0,0);CHKERRQ(ierr);
   ierr = TSGetTSOpt(ts,&tsopt);CHKERRQ(ierr);
   if (tsopt->setupfromdesign) {
 
@@ -420,5 +560,6 @@ PetscErrorCode TSSetUpFromDesign(TS ts,Vec x0,Vec design)
     ierr = (*tsopt->setupfromdesign)(ts,x0,design,tsopt->setupfromdesignctx);CHKERRQ(ierr);
     ierr = VecLockPop(design);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(TSOPT_Opt_SetUp,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
