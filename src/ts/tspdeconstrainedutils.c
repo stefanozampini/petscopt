@@ -102,7 +102,7 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
   TSOpt          tsopt;
   Vec            FWDH[2],FOAH;
   PetscReal      adjt  = q->tf - t + q->t0;
-  PetscBool      AXPY, rest = PETSC_FALSE;
+  PetscBool      AXPY, rest = PETSC_FALSE, Hhas[3][3];
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -122,29 +122,30 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
     }
   }
   ierr = TSGetTSOpt(fwdts,&tsopt);CHKERRQ(ierr);
-  if (tsopt->HF[2][0] || (tsopt->HF[2][1] && q->init) || tsopt->HF[2][2]) {
+  ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
+  if (Hhas[2][0] || (Hhas[2][1] && q->init) || Hhas[2][2]) {
     rest = PETSC_TRUE;
     ierr = TSTrajectoryGetUpdatedHistoryVecs(atj,adjts,adjt,&FOAH,NULL);CHKERRQ(ierr);
   }
-  if (tsopt->HF[2][2]) { /* (L^T \otimes I_M) H_MM direction */
+  if (Hhas[2][2]) { /* (L^T \otimes I_M) H_MM direction */
     if (AXPY) {
-      ierr = (*tsopt->HF[2][2])(fwdts,t,FWDH[0],FWDH[1],q->design,FOAH,q->direction,q->work1,tsopt->HFctx);CHKERRQ(ierr);
+      ierr = TSOptEvalHessianDAE(tsopt,2,2,t,FWDH[0],FWDH[1],q->design,FOAH,q->direction,q->work1);CHKERRQ(ierr);
       ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
     } else {
-      ierr = (*tsopt->HF[2][2])(fwdts,t,FWDH[0],FWDH[1],q->design,FOAH,q->direction,F,tsopt->HFctx);CHKERRQ(ierr);
+      ierr = TSOptEvalHessianDAE(tsopt,2,2,t,FWDH[0],FWDH[1],q->design,FOAH,q->direction,F);CHKERRQ(ierr);
       AXPY = PETSC_TRUE;
     }
   }
-  if (tsopt->HF[2][0]) { /* (L^T \otimes I_M) H_MX \eta, \eta (=U) the TLM solution */
+  if (Hhas[2][0]) { /* (L^T \otimes I_M) H_MX \eta, \eta (=U) the TLM solution */
     if (AXPY) {
-      ierr = (*tsopt->HF[2][0])(fwdts,t,FWDH[0],FWDH[1],q->design,FOAH,U,q->work1,tsopt->HFctx);CHKERRQ(ierr);
+      ierr = TSOptEvalHessianDAE(tsopt,2,0,t,FWDH[0],FWDH[1],q->design,FOAH,U,q->work1);CHKERRQ(ierr);
       ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
     } else {
-      ierr = (*tsopt->HF[2][0])(fwdts,t,FWDH[0],FWDH[1],q->design,FOAH,U,F,tsopt->HFctx);CHKERRQ(ierr);
+      ierr = TSOptEvalHessianDAE(tsopt,2,0,t,FWDH[0],FWDH[1],q->design,FOAH,U,F);CHKERRQ(ierr);
       AXPY = PETSC_TRUE;
     }
   }
-  if (tsopt->HF[2][1] && q->init) { /* (L^T \otimes I_M) H_MXdot \etadot, \eta the TLM solution */
+  if (Hhas[2][1] && q->init) { /* (L^T \otimes I_M) H_MXdot \etadot, \eta the TLM solution */
     Vec TLMHdot;
     DM  dm;
 
@@ -152,10 +153,10 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
     ierr = DMGetGlobalVector(dm,&TLMHdot);CHKERRQ(ierr);
     ierr = TSTrajectoryGetVecs(ltj,NULL,PETSC_DECIDE,&t,NULL,TLMHdot);CHKERRQ(ierr);
     if (AXPY) {
-      ierr = (*tsopt->HF[2][1])(fwdts,t,FWDH[0],FWDH[1],q->design,FOAH,TLMHdot,q->work1,tsopt->HFctx);CHKERRQ(ierr);
+      ierr = TSOptEvalHessianDAE(tsopt,2,1,t,FWDH[0],FWDH[1],q->design,FOAH,TLMHdot,q->work1);CHKERRQ(ierr);
       ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
     } else {
-      ierr = (*tsopt->HF[2][1])(fwdts,t,FWDH[0],FWDH[1],q->design,FOAH,TLMHdot,F,tsopt->HFctx);CHKERRQ(ierr);
+      ierr = TSOptEvalHessianDAE(tsopt,2,1,t,FWDH[0],FWDH[1],q->design,FOAH,TLMHdot,F);CHKERRQ(ierr);
     }
     ierr = DMRestoreGlobalVector(dm,&TLMHdot);CHKERRQ(ierr);
   }
@@ -273,6 +274,7 @@ PetscErrorCode TSQuadraturePostStep_Private(TS ts)
 PetscErrorCode TSLinearizedICApply_Private(TS ts, PetscReal t0, Vec x0, Vec design, Vec x, Vec y, PetscBool transpose, PetscBool useGm)
 {
   KSP            ksp = NULL;
+  Mat            G_x, G_m = NULL;
   Vec            workvec = NULL;
   TSOpt          tsopt;
   PetscErrorCode ierr;
@@ -286,14 +288,12 @@ PetscErrorCode TSLinearizedICApply_Private(TS ts, PetscReal t0, Vec x0, Vec desi
   PetscValidHeaderSpecific(y,VEC_CLASSID,6);
   PetscValidLogicalCollectiveBool(ts,transpose,7);
   ierr = TSGetTSOpt(ts,&tsopt);CHKERRQ(ierr);
-  if (useGm && !tsopt->G_m) {
+  ierr = TSOptEvalGradientIC(tsopt,t0,x0,design,&G_x,useGm ? &G_m : NULL);CHKERRQ(ierr);
+  if (useGm && !G_m) {
     ierr = VecSet(y,0.);CHKERRQ(ierr);
     PetscFunctionReturn(0);
   }
-  if (tsopt->Ggrad) {
-    ierr = (*tsopt->Ggrad)(ts,t0,x0,design,tsopt->G_x,tsopt->G_m,tsopt->Ggrad_ctx);CHKERRQ(ierr);
-  }
-  if (tsopt->G_x) { /* this is optional. If not provided, identity is assumed */
+  if (G_x) { /* this is optional. If not provided, identity is assumed */
     ierr = PetscObjectQuery((PetscObject)ts,"_ts_gradientIC_G",(PetscObject*)&ksp);CHKERRQ(ierr);
     if (!ksp) {
       const char *prefix;
@@ -307,10 +307,10 @@ PetscErrorCode TSLinearizedICApply_Private(TS ts, PetscReal t0, Vec x0, Vec desi
       ierr = PetscObjectCompose((PetscObject)ts,"_ts_gradientIC_G",(PetscObject)ksp);CHKERRQ(ierr);
       ierr = PetscObjectDereference((PetscObject)ksp);CHKERRQ(ierr);
     }
-    ierr = KSPSetOperators(ksp,tsopt->G_x,tsopt->G_x);CHKERRQ(ierr);
+    ierr = KSPSetOperators(ksp,G_x,G_x);CHKERRQ(ierr);
     ierr = PetscObjectQuery((PetscObject)ts,"_ts_gradientIC_GW",(PetscObject*)&workvec);CHKERRQ(ierr);
     if (!workvec) {
-      ierr = MatCreateVecs(tsopt->G_x,&workvec,NULL);CHKERRQ(ierr);
+      ierr = MatCreateVecs(G_x,&workvec,NULL);CHKERRQ(ierr);
       ierr = PetscObjectCompose((PetscObject)ts,"_ts_gradientIC_GW",(PetscObject)workvec);CHKERRQ(ierr);
       ierr = PetscObjectDereference((PetscObject)workvec);CHKERRQ(ierr);
     }
@@ -319,13 +319,13 @@ PetscErrorCode TSLinearizedICApply_Private(TS ts, PetscReal t0, Vec x0, Vec desi
     if (ksp) {
       if (useGm) {
         ierr = KSPSolveTranspose(ksp,x,workvec);CHKERRQ(ierr);
-        ierr = MatMultTranspose(tsopt->G_m,workvec,y);CHKERRQ(ierr);
+        ierr = MatMultTranspose(G_m,workvec,y);CHKERRQ(ierr);
       } else {
         ierr = KSPSolveTranspose(ksp,x,y);CHKERRQ(ierr);
       }
     } else {
       if (useGm) {
-        ierr = MatMultTranspose(tsopt->G_m,x,y);CHKERRQ(ierr);
+        ierr = MatMultTranspose(G_m,x,y);CHKERRQ(ierr);
       } else {
         ierr = VecCopy(x,y);CHKERRQ(ierr);
       }
@@ -333,14 +333,14 @@ PetscErrorCode TSLinearizedICApply_Private(TS ts, PetscReal t0, Vec x0, Vec desi
   } else {
     if (ksp) {
       if (useGm) {
-        ierr = MatMult(tsopt->G_m,x,workvec);CHKERRQ(ierr);
+        ierr = MatMult(G_m,x,workvec);CHKERRQ(ierr);
         ierr = KSPSolve(ksp,workvec,y);CHKERRQ(ierr);
       } else {
         ierr = KSPSolve(ksp,x,y);CHKERRQ(ierr);
       }
     } else {
       if (useGm) {
-        ierr = MatMult(tsopt->G_m,x,y);CHKERRQ(ierr);
+        ierr = MatMult(G_m,x,y);CHKERRQ(ierr);
       } else {
         ierr = VecCopy(x,y);CHKERRQ(ierr);
       }
@@ -461,13 +461,14 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     PetscBool has;
 
     if (direction) { /* Hessian computations */
-      PetscBool has1,has2;
+      PetscBool has1,has2,Hhas[3][3];
       TSOpt     tsopt;
 
       ierr = TSGetTSOpt(model,&tsopt);CHKERRQ(ierr);
       ierr = TSObjHasObjectiveIntegrand(funchead,NULL,NULL,NULL,NULL,&has1,&has2);CHKERRQ(ierr);
       has  = (PetscBool)(has1 || has2);
-      if (tsopt->HF[2][0] || tsopt->HF[2][1] || tsopt->HF[2][2]) has = PETSC_TRUE;
+      ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
+      if (Hhas[2][0] || Hhas[2][1] || Hhas[2][2]) has = PETSC_TRUE;
     } else {
       ierr = TSObjHasObjectiveIntegrand(funchead,NULL,NULL,&has,NULL,NULL,NULL);CHKERRQ(ierr);
     }
