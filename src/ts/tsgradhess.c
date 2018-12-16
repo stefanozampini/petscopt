@@ -255,7 +255,6 @@ static PetscErrorCode TSComputeHessianMFFD_Private(void* ctx, Vec P, Vec G)
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  ierr = TSSetUpFromDesign(mffd->ts,mffd->X,P);CHKERRQ(ierr);
   ierr = TSComputeObjectiveAndGradient(mffd->ts,mffd->t0,mffd->dt,mffd->tf,mffd->X,P,G,NULL);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
