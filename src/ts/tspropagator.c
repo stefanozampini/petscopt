@@ -66,6 +66,18 @@ static PetscErrorCode MatMultTranspose_Propagator(Mat A, Vec x, Vec y)
   PetscFunctionBegin;
   ierr = VecSet(y,0.0);CHKERRQ(ierr);
   ierr = MatShellGetContext(A,(void **)&prop);CHKERRQ(ierr);
+  if (!prop->adjlts) {
+    Vec L;
+
+    ierr = TSCreateAdjointTS(prop->lts,&prop->adjlts);CHKERRQ(ierr);
+    ierr = TSSetFromOptions(prop->adjlts);CHKERRQ(ierr);
+    ierr = TSGetSolution(prop->adjlts,&L);CHKERRQ(ierr);
+    if (!L) {
+      ierr = VecDuplicate(prop->x0,&L);CHKERRQ(ierr);
+      ierr = TSSetSolution(prop->adjlts,L);CHKERRQ(ierr);
+      ierr = VecDestroy(&L);CHKERRQ(ierr);
+    }
+  }
   otrj = prop->model->trajectory;
   prop->model->trajectory = prop->tj;
   prop->lts->trajectory = prop->tj;
@@ -326,11 +338,6 @@ static PetscErrorCode TSCreatePropagatorMat_Private(TS ts, PetscReal t0, PetscRe
   }
   ierr = VecDuplicate(prop->x0,&X);CHKERRQ(ierr);
   ierr = TSSetSolution(prop->lts,X);CHKERRQ(ierr);
-  ierr = VecDestroy(&X);CHKERRQ(ierr);
-  ierr = TSCreateAdjointTS(prop->lts,&prop->adjlts);CHKERRQ(ierr);
-  ierr = TSSetFromOptions(prop->adjlts);CHKERRQ(ierr);
-  ierr = VecDuplicate(x0,&X);CHKERRQ(ierr);
-  ierr = TSSetSolution(prop->adjlts,X);CHKERRQ(ierr);
   ierr = VecDestroy(&X);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
