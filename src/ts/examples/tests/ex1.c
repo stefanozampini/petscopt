@@ -904,7 +904,7 @@ int main(int argc, char* argv[])
   TS             ts;
   Mat            J,pJ,G_M,F_M,G_X;
   Mat            checkTLM,Phi,PhiExpl,PhiT,PhiTExpl;
-  Mat            H_MM,H_UU,H,He;
+  Mat            H_MM,H_UU,H;
   Vec            U,M,Mgrad,sol,tlmsol;
   UserObjective  userobj;
   UserDAE        userdae;
@@ -928,12 +928,12 @@ int main(int argc, char* argv[])
   PetscBool      testgeneral_final_double = PETSC_FALSE;
   PetscBool      testgeneral_double = PETSC_FALSE;
   PetscBool      testfwdevent = PETSC_FALSE;
-  PetscBool      testtlmgrad = PETSC_FALSE;
   PetscBool      testps = PETSC_TRUE;
   PetscBool      userobjective = PETSC_TRUE;
   PetscBool      usefd = PETSC_FALSE, usetaylor = PETSC_FALSE;
   PetscBool      testm = PETSC_TRUE;
   PetscBool      testremove_multadd = PETSC_FALSE;
+  PetscBool      flg;
   PetscReal      dx = PETSC_SMALL;
   PetscReal      testfwdeventctx;
   PetscInt       dsize;
@@ -976,7 +976,6 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsBool("-test_general","Test general functional","",testgeneral,&testgeneral,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_general_double","Test general functional (twice)","",testgeneral_double,&testgeneral_double,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_forward_event","Test event handling in forward solve","",testfwdevent,&testfwdevent,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsBool("-test_tlm_gradient","Test TLM for gradient computation","",testtlmgrad,&testtlmgrad,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_poststep","Test with TS having a poststep method","",testps,&testps,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_mass","Test with parameter dependent mass matrix","",testm,&testm,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-use_fd","Use finite differencing to test gradient evaluation","",usefd,&usefd,NULL);CHKERRQ(ierr);
@@ -986,6 +985,7 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsEnd();CHKERRQ(ierr);
 
   problemtype = TS_LINEAR;
+  if (!testifunc && !testmix) m = 0.0;
 
   userdae.a  = a;
   userdae.b  = b;
@@ -1001,15 +1001,6 @@ int main(int argc, char* argv[])
     testrhsjacconst = PETSC_FALSE;
   }
   if (testmix) testifunc = PETSC_TRUE;
-  if (testtlmgrad) {
-    userobjective     = PETSC_FALSE;
-    testeventfinal    = PETSC_TRUE;
-    testeventconst    = PETSC_FALSE;
-    testevent         = PETSC_FALSE;
-    testgeneral_fixed = PETSC_FALSE;
-    testgeneral_final = PETSC_FALSE;
-    testgeneral       = PETSC_FALSE;
-  }
 
   /* state vectors */
   ierr = VecCreate(PETSC_COMM_WORLD,&U);CHKERRQ(ierr);
@@ -1378,131 +1369,27 @@ int main(int argc, char* argv[])
   /* Test Hessian evaluation */
   ierr = MatCreate(PETSC_COMM_WORLD,&H);CHKERRQ(ierr);
   ierr = TSComputeHessian(ts,t0,dt,tf,U,M,H);CHKERRQ(ierr);
-  ierr = MatComputeExplicitOperator(H,&He);CHKERRQ(ierr);
-  ierr = MatViewFromOptions(He,NULL,"-tshessian_view");CHKERRQ(ierr);
+  ierr = PetscOptionsHasName(NULL,NULL,"-tshessian_view",&flg);CHKERRQ(ierr);
+  if (flg) {
+    Mat He;
 
-  /* Test gradient and Hessian using Taylor series (Taylor API ONLY) */
-  if (usetaylor || testtlmgrad) {
-    /* Test also the public API for the Taylor test */
-    /* we skip the cases when we use the static variable store_Event */
-    if (!testtlmgrad && !testgeneral_fixed && !testevent) {
-      ierr = PetscOptionsSetValue(NULL,"-taylor_ts_hessian","1");CHKERRQ(ierr);
-      ierr = VecSetValue(M,0,a,INSERT_VALUES);CHKERRQ(ierr);
-      ierr = VecSetValue(M,1,b,INSERT_VALUES);CHKERRQ(ierr);
-      ierr = VecSetValue(M,2,p,INSERT_VALUES);CHKERRQ(ierr);
-      if (dsize > 3) {
-        ierr = VecSetValue(M,3,m,INSERT_VALUES);CHKERRQ(ierr);
-      }
-      ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
-      ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
-      ierr = TSTaylorTest(ts,t0,dt,tf,NULL,M,NULL);CHKERRQ(ierr);
-    } else {
-      PetscRandom rand;
-      PetscReal   h = 0.125, ra,rb,rp,rm;
-      PetscScalar oa = a, ob = b, om = m;
-      PetscReal   op = p;
-      PetscReal   tG[4],tH[4],tT[4];
-      PetscInt    i;
+    ierr = MatComputeExplicitOperator(H,&He);CHKERRQ(ierr);
+    ierr = MatViewFromOptions(He,NULL,"-tshessian_view");CHKERRQ(ierr);
+    ierr = MatDestroy(&He);CHKERRQ(ierr);
+  }
 
-      ierr = PetscRandomCreate(PETSC_COMM_SELF,&rand);CHKERRQ(ierr);
-      ierr = PetscRandomGetValueReal(rand,&ra);CHKERRQ(ierr);
-      ierr = PetscRandomGetValueReal(rand,&rb);CHKERRQ(ierr);
-      ierr = PetscRandomGetValueReal(rand,&rp);CHKERRQ(ierr);
-      ierr = PetscRandomGetValueReal(rand,&rm);CHKERRQ(ierr);
-      ierr = PetscRandomDestroy(&rand);CHKERRQ(ierr);
-
-      for (i = 0 ; i < 4; i++) {
-        PetscScalar val;
-
-        store_Event = 0.0;
-        userdae.a = oa + h*ra;
-        userdae.b = ob + h*rb;
-        userdae.p = op + h*rp;
-        ierr = VecSetValue(M,0,userdae.a,INSERT_VALUES);CHKERRQ(ierr);
-        ierr = VecSetValue(M,1,userdae.b,INSERT_VALUES);CHKERRQ(ierr);
-        ierr = VecSetValue(M,2,userdae.p,INSERT_VALUES);CHKERRQ(ierr);
-        if (dsize > 3) {
-          userdae.mm = om + h*rm;
-          ierr = VecSetValue(M,3,userdae.mm,INSERT_VALUES);CHKERRQ(ierr);
-        }
-        ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
-        ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
-        ierr = TSComputeObjectiveAndGradient(ts,t0,dt,tf,U,M,NULL,&objtest);CHKERRQ(ierr);
-        ierr = VecSetValue(M,0,ra,INSERT_VALUES);CHKERRQ(ierr);
-        ierr = VecSetValue(M,1,rb,INSERT_VALUES);CHKERRQ(ierr);
-        ierr = VecSetValue(M,2,rp,INSERT_VALUES);CHKERRQ(ierr);
-        if (dsize > 3) {
-          ierr = VecSetValue(M,3,rm,INSERT_VALUES);CHKERRQ(ierr);
-        }
-        ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
-        ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
-        if (usetaylor) {
-          Vec         M2;
-          PetscScalar val2;
-
-          ierr  = MatCreateVecs(He,&M2,NULL);CHKERRQ(ierr);
-          ierr  = VecDot(Mgrad,M,&val);CHKERRQ(ierr);
-          tG[i] = PetscAbsReal(objtest-obj-h*PetscRealPart(val));
-          ierr  = MatMult(He,M,M2);CHKERRQ(ierr);
-          ierr  = VecDot(M2,M,&val2);CHKERRQ(ierr);
-          tH[i] = PetscAbsReal(objtest-obj-h*PetscRealPart(val)-0.5*h*h*PetscRealPart(val2));
-          ierr  = VecDestroy(&M2);CHKERRQ(ierr);
-        }
-        if (testtlmgrad) {
-          Vec J_U,tU;
-
-          ierr = VecDuplicate(U,&J_U);CHKERRQ(ierr);
-          ierr = VecDuplicate(U,&tU);CHKERRQ(ierr);
-          /* XXX is it ok? */
-          ierr = VecSetValue(M,0,oa,INSERT_VALUES);CHKERRQ(ierr);
-          ierr = VecSetValue(M,1,ob,INSERT_VALUES);CHKERRQ(ierr);
-          ierr = VecSetValue(M,2,op,INSERT_VALUES);CHKERRQ(ierr);
-          if (dsize > 3) {
-            ierr = VecSetValue(M,3,om,INSERT_VALUES);CHKERRQ(ierr);
-          }
-          ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
-          ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
-          if (testeventfinal) {
-            ierr = EvalObjectiveGradient_U_Event(tlmsol,M,tf,J_U,NULL);CHKERRQ(ierr);
-          }
-          ierr = VecSetValue(M,0,ra,INSERT_VALUES);CHKERRQ(ierr);
-          ierr = VecSetValue(M,1,rb,INSERT_VALUES);CHKERRQ(ierr);
-          ierr = VecSetValue(M,2,rp,INSERT_VALUES);CHKERRQ(ierr);
-          if (dsize > 3) {
-            ierr = VecSetValue(M,3,rm,INSERT_VALUES);CHKERRQ(ierr);
-          }
-          ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
-          ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
-          ierr = MatMult(Phi,M,tU);CHKERRQ(ierr);
-          ierr = VecDot(J_U,tU,&val);CHKERRQ(ierr);
-          tT[i] = PetscAbsReal(objtest-obj-h*PetscRealPart(val));
-          ierr = VecDestroy(&J_U);CHKERRQ(ierr);
-          ierr = VecDestroy(&tU);CHKERRQ(ierr);
-        }
-        h = h/2.0;
-      }
-
-      if (usetaylor) {
-        PetscReal rate;
-
-        ierr = PetscPrintf(PETSC_COMM_WORLD,"Taylor test: gradient\n");CHKERRQ(ierr);
-        for (i=0;i<4;i++) {
-          rate = i > 0 ? -PetscLogReal(tG[i]/tG[i-1])/PetscLogReal(2.0) : 0.0;
-          ierr = PetscPrintf(PETSC_COMM_WORLD,"%g %g (order %d)\n",(double)tG[i],(double)rate,(PetscInt)PetscRoundReal(rate));CHKERRQ(ierr);
-        }
-        ierr = PetscPrintf(PETSC_COMM_WORLD,"Taylor test: Hessian\n");CHKERRQ(ierr);
-        for (i=0;i<4;i++) {
-          rate = i > 0 ? -PetscLogReal(tH[i]/tH[i-1])/PetscLogReal(2.0) : 0.0;
-          ierr = PetscPrintf(PETSC_COMM_WORLD,"%g %g (order %d)\n",(double)tH[i],(double)rate,(PetscInt)PetscRoundReal(rate));CHKERRQ(ierr);
-        }
-      }
-      if (testtlmgrad) {
-        ierr = PetscPrintf(PETSC_COMM_WORLD,"Taylor test: TLM gradient\n");CHKERRQ(ierr);
-        for (i=0;i<4;i++) {
-          ierr = PetscPrintf(PETSC_COMM_WORLD,"%g\n",(double)tT[i]);CHKERRQ(ierr);
-        }
-      }
+  /* Test gradient and Hessian using Taylor series */
+  if (usetaylor) {
+    ierr = PetscOptionsSetValue(NULL,"-taylor_ts_hessian","1");CHKERRQ(ierr);
+    ierr = VecSetValue(M,0,a,INSERT_VALUES);CHKERRQ(ierr);
+    ierr = VecSetValue(M,1,b,INSERT_VALUES);CHKERRQ(ierr);
+    ierr = VecSetValue(M,2,p,INSERT_VALUES);CHKERRQ(ierr);
+    if (dsize > 3) {
+      ierr = VecSetValue(M,3,m,INSERT_VALUES);CHKERRQ(ierr);
     }
+    ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
+    ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
+    ierr = TSTaylorTest(ts,t0,dt,tf,NULL,M,NULL);CHKERRQ(ierr);
   }
 
   ierr = VecScatterDestroy(&userdae.Msct);CHKERRQ(ierr);
@@ -1511,9 +1398,10 @@ int main(int argc, char* argv[])
   ierr = MatDestroy(&userdae.F_MM);CHKERRQ(ierr);
   ierr = MatDestroy(&userdae.F_UM);CHKERRQ(ierr);
   ierr = VecDestroy(&tlmsol);CHKERRQ(ierr);
+  /* XXX coverage */
+  ierr = TSSetGradientIC(ts,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
   ierr = TSDestroy(&ts);CHKERRQ(ierr);
   ierr = MatDestroy(&H);CHKERRQ(ierr);
-  ierr = MatDestroy(&He);CHKERRQ(ierr);
   ierr = VecDestroy(&U);CHKERRQ(ierr);
   ierr = VecDestroy(&M);CHKERRQ(ierr);
   ierr = VecDestroy(&Mgrad);CHKERRQ(ierr);
@@ -1542,50 +1430,49 @@ int main(int argc, char* argv[])
   test:
     requires: !single
     suffix: 2
-    args: -t0 1.6 -tf 1.7 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -use_taylor
+    args: -t0 1.6 -tf 1.7 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -use_taylor -ts_trajectory_type memory
 
   test:
     requires: !single
     suffix: 3
-    args: -t0 1.6 -tf 1.7 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -test_ifunc -test_nulljac_IC -test_nullgrad_M -use_taylor
+    args: -t0 1.6 -tf 1.7 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -test_ifunc -test_nulljac_IC -test_nullgrad_M -use_taylor -ts_trajectory_type memory
 
   test:
     requires: !single
     suffix: 4
-    args: -t0 1.1 -tf 1.2 -ts_type rk -ts_adapt_type none -test_event_constant -test_rhsjacconst -ts_trajectory_reconstruction_order 3 -use_taylor
+    args: -t0 1.1 -tf 1.15 -ts_type rk -ts_adapt_type none -test_event_constant -test_rhsjacconst -ts_trajectory_reconstruction_order 3 -use_taylor -dt 0.001 -ts_trajectory_type memory
 
   test:
     requires: !single
-    timeoutfactor: 2
     suffix: 5
-    args: -t0 0.7 -tf 0.8 -ts_type cn -test_event_constant -p 0.8 -test_ifunc -ts_trajectory_reconstruction_order 2 -test_pjac 0 -tsgradient_adjoint_ts_adapt_type history -tshessian_tlm_ts_adapt_type history -tshessian_foadjoint_ts_adapt_type history -tshessian_soadjoint_ts_adapt_type {{none history}} -tshessian_tlm_userijacobian -use_taylor -m 0.4
+    args: -t0 0.7 -tf 0.8 -ts_type cn -test_event_constant -p 0.8 -test_ifunc -ts_trajectory_reconstruction_order 2 -test_pjac 0 -tsgradient_adjoint_ts_adapt_type history -tshessian_tlm_ts_adapt_type history -tshessian_foadjoint_ts_adapt_type history -tshessian_soadjoint_ts_adapt_type {{none history}} -tshessian_tlm_userijacobian -use_taylor -m 0.1 -dt 0.005 -ts_trajectory_type memory -b 0.01
 
   test:
     requires: !single
     suffix: 6
-    args: -t0 0.01 -tf 0.1 -b 0.3 -a 1.7 -p 1 -ts_type rk -ts_adapt_type none -test_event_func -ts_trajectory_reconstruction_order 4 -tshessian_mffd -use_taylor
+    args: -t0 0.01 -tf 0.1 -b 0.3 -a 1.7 -p 1 -ts_type rk -dt 0.01 -ts_adapt_type none -test_event_func -tshessian_mffd -use_taylor -ts_trajectory_type memory -tsgradient_adjoint_ts_adapt_type history
 
   test:
     requires: !single
     suffix: 7
-    args: -t0 0 -tf 0.02 -dt 0.0001 -b 0.3 -a 1.7 -p 1 -ts_type rosw -test_ifunc -test_event_func -ts_adapt_type none -tshessian_mffd -use_taylor
+    args: -t0 0 -tf 0.02 -dt 0.001 -b 0.3 -a 1.7 -p 1 -ts_type rosw -test_ifunc -test_event_func -ts_adapt_type none -tshessian_mffd -use_taylor -ts_trajectory_type memory
 
   test:
     requires: !single
     suffix: 8
-    args: -t0 0 -tf 0.07 -b 0.5 -a 1.1 -p 0.4 -ts_type bdf -test_mix -test_pjac 0 -test_event_constant -ts_rtol 1.e-12 -ts_atol 1.e-12 -use_taylor
+    args: -t0 0 -tf 0.07 -b -0.5 -a -1.1 -p 0.4 -ts_type bdf -test_mix -test_pjac 0 -test_event_constant -ts_adapt_type none -use_taylor -ts_trajectory_type memory -dt 0.005 -test_objective_norm -m 0.8
 
   test:
     requires: !single
     suffix: 9
-    nsize: 4
-    args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type rk -test_general_fixed -test_general_final -test_general -test_event_func -test_event_constant -test_event_final -ts_rtol 1.e-12 -ts_atol 1.e-12 -tshessian_mffd -use_taylor
+    nsize: 2
+    args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type rk -test_general_fixed -test_general_final -test_general -test_event_func -test_event_constant -test_event_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -tshessian_mffd -use_taylor -ts_trajectory_type memory
 
   test:
     requires: !single
     suffix: 10
-    nsize: 4
-    args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type bdf -test_general_fixed -test_general_final -test_general -test_event_func -test_event_constant -test_event_final -ts_rtol 1.e-10 -ts_atol 1.e-10 -tshessian_mffd -use_taylor
+    nsize: 2
+    args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type bdf -test_general_fixed -test_general_final -test_general -test_event_func -test_event_constant -test_event_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -tshessian_mffd -use_taylor -ts_trajectory_type memory
 
   test:
     requires: !single

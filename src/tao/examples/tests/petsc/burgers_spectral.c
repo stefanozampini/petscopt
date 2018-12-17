@@ -736,6 +736,7 @@ PetscErrorCode MonitorError(Tao tao,void *ctx)
         output_file: output/burgers_spectral_ao.out
 
     testset:
+      timeoutfactor: 3
       nsize: 2
       args: -tao_max_it 5 -tao_gatol 1.e-4
       requires: !single

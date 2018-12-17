@@ -572,7 +572,7 @@ int main(int argc,char **argv)
   Mat            H,J;
   Vec            x,G,M;
   AppCtx         appctx;
-  PetscReal      Ain[2][2],tf;
+  PetscReal      Ain[2][2],tf,dt;
   PetscInt       n,np,nc;
   PetscBool      wsnes = PETSC_TRUE, test[2] = { PETSC_TRUE, PETSC_FALSE };
   PetscErrorCode ierr;
@@ -625,6 +625,7 @@ int main(int argc,char **argv)
   ierr = TSSetTimeStep(ts,0.0625);CHKERRQ(ierr);
   ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_MATCHSTEP);CHKERRQ(ierr);
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
+  ierr = TSGetTimeStep(ts,&dt);CHKERRQ(ierr);
   {
     PetscReal satol,srtol;
     Vec       vatol,vrtol;
@@ -679,7 +680,7 @@ int main(int argc,char **argv)
   ierr = MatDestroy(&J);CHKERRQ(ierr);
   ierr = TSSetSetUpFromDesign(ts,MyTSSetUpFromDesign,&wsnes);CHKERRQ(ierr);
 
-  appctx.initdt = 0.0625;
+  appctx.initdt = dt;
   appctx.tf = tf;
   ierr = VecSetValue(M,0,appctx.d1,INSERT_VALUES);CHKERRQ(ierr);
   ierr = VecSetValue(M,1,appctx.d2,INSERT_VALUES);CHKERRQ(ierr);
@@ -708,7 +709,8 @@ int main(int argc,char **argv)
 
    test:
       suffix: 1
-      nsize: 4
-      args: -ts_max_time 0.01 -da_grid_x 10 -da_grid_y 10 -ts_trajectory_type memory -ic_snes {{0 1}separate output} -ts_rtol 1.e-8 -ts_atol 1.e-8 -test {{0,0 1,0 0,1 1,1}separate output} -tao_test_gradient -taylor_ts_hessian  -tshessian_mffd
+      filter: sed -e "s/-nan/nan/g"
+      nsize: 2
+      args: -ts_max_time 0.01 -da_grid_x 20 -da_grid_y 20 -ts_trajectory_type memory -ic_snes {{0 1}separate output} -ts_rtol 1.e-6 -ts_atol 1.e-6 -test {{0,0 1,0 0,1 1,1}separate output} -tao_test_gradient -taylor_ts_hessian  -tshessian_mffd  -tsgradient_adjoint_ts_adapt_type history
 
 TEST*/

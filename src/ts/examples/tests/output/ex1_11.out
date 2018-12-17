@@ -3,9 +3,9 @@ Objective function: time [0.41,0.4367], val 1.53382
 Termination event 0 detected at time 0.4367
 Vec Object: 1 MPI processes
   type: seq
-0.0610788
-0.0461241
-0.369395
+0.0610813
+0.0461203
+0.369394
 Termination event 0 detected at time 0.4367
 Termination event 0 detected at time 0.4367
 Termination event 0 detected at time 0.4367
