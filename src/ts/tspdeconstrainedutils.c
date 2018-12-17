@@ -381,7 +381,6 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
   if (direction && !quadvec) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Cannot compute Hessian without quadrature vector");
   if (direction) { /* when the direction is present, the ts need to be a TLMTS */
     ierr = TLMTSGetModelTS(ts,&model);CHKERRQ(ierr);
-
     ierr = TSGetTSObj(model,&funchead);CHKERRQ(ierr);
   } else {
     ierr = TSGetTSObj(ts,&funchead);CHKERRQ(ierr);
@@ -545,23 +544,22 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     PetscReal tt;
 
     ierr = TSGetTime(ts,&t0);CHKERRQ(ierr);
-    if (seval_fixed || veval_fixed) {
-      if (direction && veval_fixed) {
-        PetscBool has1,has2;
+    if (direction) { /* we always stop at the selected times */
+      PetscBool has1,has2;
 
-        ierr  = TSObjHasObjectiveFixed(funchead,t0,tf,NULL,NULL,NULL,NULL,&has1,&has2,&tfup);CHKERRQ(ierr);
-        has_m = (PetscBool)(has1 || has2);
-      } else {
-        ierr = TSObjHasObjectiveFixed(funchead,t0,tf,seval_fixed ? &has_f : NULL,NULL,veval_fixed ? &has_m : NULL,NULL,NULL,NULL,&tfup);CHKERRQ(ierr);
-      }
+      ierr  = TSObjHasObjectiveFixed(funchead,t0,tf,NULL,NULL,NULL,NULL,&has1,&has2,&tfup);CHKERRQ(ierr);
+      has_m = (PetscBool)(has1 || has2);
+    } else {
+      ierr = TSObjHasObjectiveFixed(funchead,t0,tf,&has_f,NULL,&has_m,NULL,NULL,NULL,&tfup);CHKERRQ(ierr);
     }
     ierr = TSSetMaxTime(ts,tfup);CHKERRQ(ierr);
     tt   = tfup;
     ierr = TSSolve(ts,NULL);CHKERRQ(ierr);
-    /* determine if TS stopped before max time requested */
+
+    /* determine if TS finised before the max time requested */
     ierr = TSGetTime(ts,&tfup);CHKERRQ(ierr);
     stop = (PetscAbsReal(tt-tfup) < PETSC_SMALL) ? PETSC_FALSE : PETSC_TRUE;
-    if (has_f) {
+    if (has_f && seval_fixed) {
       Vec       sol;
       PetscReal v;
 
@@ -571,7 +569,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
       PetscStackPop;
       qeval_ctx->squad += v;
     }
-    if (has_m) { /* we use wquad[4] since wquad[3] can be used by the TLM quadrature */
+    if (has_m && veval_fixed) { /* we use wquad[4] since wquad[3] can be used by the TLM quadrature */
       Vec sol;
 
       ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
