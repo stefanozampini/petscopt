@@ -1,0 +1,112 @@
+# http://travis-ci.org/stefanozampini/petscopt
+
+#notifications:
+#  email: false
+
+language: cpp
+
+compiler:
+  - gcc
+  - clang
+
+os: linux
+sudo: required
+dist: trusty
+#osx_image: xcode8
+
+cache:
+  directories:
+    - $HOME/.ccache
+    - $TRAVIS_BUILD_DIR/../petsc
+
+env:
+
+  global:
+    - PETSC_DIR=${TRAVIS_BUILD_DIR}/../petsc
+    - PETSCOPT_DIR=${TRAVIS_BUILD_DIR}
+    - PETSCOPT_ARCH=arch-popt #test different arch names
+    - BLASLAPACK=
+    - PETSC_OPTIONS='-check_pointer_intensity 0 -malloc_test'
+    - OPTFLAGS='-O'
+    - CPPFLAGS="-Wno-unused-command-line-argument"
+
+  matrix:
+
+    - MPI=mpich  INT64=0  SCALAR=real     PRECISION=double
+#    - MPI=mpich  INT64=0  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
+    - MPI=mpich  INT64=0  SCALAR=complex  PRECISION=double     LANGUAGE=C++
+    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=double
+#    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
+    - MPI=mpich  INT64=1  SCALAR=complex  PRECISION=double     LANGUAGE=C++
+
+matrix:
+
+  include:
+
+   - env: MPI=mpich INT64=0 SCALAR=real LANGUAGE=C
+     compiler: clang
+     os: osx
+   - env: MPI=mpich INT64=1 SCALAR=complex LANGUAGE=C++
+     compiler: clang
+     os: osx
+
+git:
+  depth: 3
+
+branches:
+  only:
+    - master
+    - /^ci\/.*$/
+
+addons:
+  apt:
+    packages:
+      - realpath
+      - ccache
+      - libblas-dev
+      - liblapack-dev
+      - mpich
+      - libmpich-dev
+  homebrew:
+    packages:
+      - ccache
+      - mpich
+
+
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export PATH=/usr/local/opt/ccache/libexec:$PATH; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export CCACHE_BINDIR=/usr/local/bin; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export CCACHE_BINLIB=/usr/local/bin; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export TMPDIR=/tmp; fi
+#  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
+#  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install mpich ccache; fi
+#  - sudo update-ccache-symlinks -> does not work with clang
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then export PATH=/usr/lib/ccache:$PATH; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then export CCACHE_BINDIR=/usr/bin; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then export CCACHE_BINLIB=/usr/lib/ccache; fi
+
+install:
+  - sudo rm -rf ${CCACHE_BINLIB}/${CC}
+  - sudo rm -rf ${CCACHE_BINLIB}/${CXX}
+  - sudo ln -s  ${CCACHE_BINDIR}/ccache ${CCACHE_BINLIB}/${CC}
+  - sudo ln -s  ${CCACHE_BINDIR}/ccache ${CCACHE_BINLIB}/${CXX}
+  - echo $PETSC_DIR
+  - export MPICH_CC=$CC
+  - export MPICH_CXX=$CXX
+  - mpicc -show
+  - which $CC
+  - if [[ ! "$(ls -A $PETSC_DIR)" ]]; then git clone https://bitbucket.org/petsc/petsc.git $PETSC_DIR; fi
+  - cd $PETSC_DIR
+  - git fetch
+  - git clean -q -d -x -f
+  - git reset --hard origin/stefano_zampini/fix-tsevent
+  - if [[ $(./configure PETSC_ARCH=arch-test --with-cc=mpicc --with-cxx=mpicxx --with-fc=0 --with-clanguage=${LANGUAGE:-C} --with-64-bit-indices=${INT64:-0} --with-scalar-type=${SCALAR:-real} --with-precision=${PRECISION:-double} $BLASLAPACK COPTFLAGS="$OPTFLAGS" CXXOPTFLAGS="$OPTFLAGS" FOPTFLAGS="$OPTFLAGS" --CPPFLAGS="$CPPFLAGS" --CXXCPPFLAGS="$CPPFLAGS") ]]; then tail -2500 configure.log; fi
+  - make -j$(nproc) PETSC_ARCH=arch-test
+  - cd $PETSCOPT_DIR
+  - make MAKE_NP=$(nproc) PETSC_ARCH=arch-test
+
+script:
+  - cd $PETSCOPT_DIR
+  - make -j1 PETSC_ARCH=arch-test test | tee alltests.log
+  - test -z "$(grep FAILED alltests.log)"
+  - cd $PETSC_DIR && git clean -q -x -d -f
