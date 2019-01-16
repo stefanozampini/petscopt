@@ -1,9 +1,7 @@
-# http://travis-ci.org/stefanozampini/petscopt
+language: cpp
 
 #notifications:
 #  email: false
-
-language: cpp
 
 compiler:
   - gcc
