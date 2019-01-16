@@ -12,7 +12,6 @@ all-parallel:
 	-@echo "Using PETSCOPT_ARCH=$(PETSCOPT_ARCH)"
 	-@echo "Using PETSC_DIR=$(PETSC_DIR)"
 	-@echo "Using PETSC_ARCH=$(PETSC_ARCH)"
-	-@echo "Using fast=$(fast) debug=$(debug)"
 	-@echo $(ruler)
 	 @$(OMAKE) -j $(MAKE_NP) all
 	-@echo $(ruler)
@@ -25,7 +24,7 @@ LIBDIR := $(abspath $(PETSCOPT_ARCH)/lib)
 libpetscopt_shared := $(LIBDIR)/libpetscopt.$(SL_LINKER_SUFFIX)
 libpetscopt_static := $(LIBDIR)/libpetscopt.$(AR_LIB_SUFFIX)
 libpetscopt := $(if $(filter-out no,$(BUILDSHAREDLIB)),$(libpetscopt_shared),$(libpetscopt_static))
-alllib : $(generated) $(libpetscopt)
+alllib : config $(generated) $(libpetscopt)
 .PHONY: alllib
 
 all : alllib
@@ -41,7 +40,7 @@ endif
 
 pcc = $(if $(findstring CONLY,$(PETSC_LANGUAGE)),CC,CXX)
 COMPILE.cc = $(call quiet,$(pcc)) $(PCC_FLAGS) $(CFLAGS) $(CCPPFLAGS) $(C_DEPFLAGS) -c
-COMPILE.cxx = $(call quiet,CXX) $(CXX_FLAGS) $(CFLAGS) $(CCPPFLAGS) $(CXX_DEPFLAGS) -c
+COMPILE.cpp = $(call quiet,CXX) $(CXX_FLAGS) $(CFLAGS) $(CCPPFLAGS) $(CXX_DEPFLAGS) -c
 ifneq ($(FC_MODULE_OUTPUT_FLAG),)
 COMPILE.fc = $(call quiet,FC) $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) $(FC_DEPFLAGS) $(FC_MODULE_OUTPUT_FLAG)$(MODDIR) -c
 else
@@ -54,34 +53,52 @@ generated := $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib/petscopt/conf/files
 .SECONDEXPANSION: # to expand $$(@D)/.DIR
 
 write-variable = @printf "override $2 = $($2)\n" >> $1;
+write-confheader-pre    = @printf "\#if !defined(__PETSCOPTCONF_H)\n\#define __PETSCOPTCONF_H\n" >> $1;
+write-confheader-define = printf "\n\#if !defined(PETSCOPT_HAVE_$2)\n\#define PETSCOPT_HAVE_$2 1\n\#endif\n" >> $1;
+write-confheader-post = @printf "\n\#endif\n" >> $1;
 petscopt-conf-root = $(PETSCOPT_ARCH)
-config-petsc  := $(petscopt-conf-root)/lib/petscopt/conf/config-petsc
+config-petsc      := $(petscopt-conf-root)/lib/petscopt/conf/config-petsc
 config-petscopt   := $(petscopt-conf-root)/lib/petscopt/conf/config-petscopt
+config-mfem       := $(petscopt-conf-root)/lib/petscopt/conf/config-mfem
+config-confheader := $(petscopt-conf-root)/include/petscoptconf.h
 $(config-petsc) : | $$(@D)/.DIR
 	$(call write-variable,$@,PETSC_DIR)
 	$(call write-variable,$@,PETSC_ARCH)
 $(config-petscopt) : | $$(@D)/.DIR
 	$(call write-variable,$@,CFLAGS)
-	$(call write-variable,$@,fast)
-	$(call write-variable,$@,debug)
-config-clean :
-	@$(RM) $(config-petsc) $(config-petscopt)
-config-check :
-	@if [ -e $(config-petsc) ]; then echo "Already configured" && false; fi
-	@if [ -e $(config-petscopt)  ]; then echo "Already configured" && false; fi
+	$(call write-variable,$@,CXXFLAGS)
+$(config-mfem) : | $$(@D)/.DIR
+	$(call write-variable,$@,with_mfem)
+	$(call write-variable,$@,with_mfem_install)
+	$(call write-variable,$@,MFEM_DIR)
+$(config-confheader) : $$(@D)/.DIR
+	$(call write-confheader-pre,$@)
+	@if [ "${with_mfem}" == "1" ]; then \
+	  $(call write-confheader-define,$@,MFEMOPT) \
+	fi
+	$(call write-confheader-post,$@)
 
 config-petsc : $(config-petsc)
 config-petscopt : $(config-petscopt)
-config : config-petsc config-petscopt
-.PHONY:  config-petsc config-petscopt config
+config-mfem : $(config-mfem)
+config-confheader : config-vars $(config-confheader)
 
-$(generated) : | $$(@D)/.DIR
-	$(PYTHON) $(PETSC_DIR)/config/gmakegen.py --petsc-arch=$(PETSC_ARCH) --pkg-dir=$(PETSCOPT_DIR) --pkg-name=petscopt --pkg-arch=$(PETSCOPT_ARCH)
+config-vars : config-petsc config-petscopt config-mfem
+config : config-confheader
+config-clean : clean
+	$(RM) $(config-confheader) $(config-petsc) $(config-petscopt) $(config-mfem)
+	$(RM) $(generated)
+.PHONY:  config-petsc config-petscopt config-mfem config-vars config-confheader config
+
+spkgs := ts,tao,mfemopt
+pkgs := ts tao mfemopt
+langs := c cpp
+
+$(generated) : $(config-confheader) | $$(@D)/.DIR
+	$(PYTHON) $(PETSC_DIR)/config/gmakegen.py --petsc-arch=$(PETSC_ARCH) --pkg-dir=$(PETSCOPT_DIR) --pkg-name=petscopt --pkg-arch=$(PETSCOPT_ARCH) --pkg-pkgs=$(spkgs)
 
 -include $(generated)
 
-langs := c
-pkgs := ts
 concatlang = $(foreach lang, $(langs), $(srcs-$(1).$(lang):src/%.$(lang)=$(OBJDIR)/%.o))
 srcs.o := $(foreach pkg, $(pkgs), $(call concatlang,$(pkg)))
 
@@ -114,8 +131,8 @@ endif
 $(OBJDIR)/%.o : src/%.c | $$(@D)/.DIR
 	$(COMPILE.cc) $(abspath $<) -o $@
 
-$(OBJDIR)/%.o : src/%.cxx | $$(@D)/.DIR
-	$(COMPILE.cxx) $(abspath $<) -o $@
+$(OBJDIR)/%.o : src/%.cpp | $$(@D)/.DIR
+	$(COMPILE.cpp) $(abspath $<) -o $@
 
 $(OBJDIR)/%.o : src/%.F90 | $$(@D)/.DIR $(MODDIR)/.DIR
 	$(COMPILE.fc) $(abspath $<) -o $(if $(FCMOD),$(abspath $@),$@)

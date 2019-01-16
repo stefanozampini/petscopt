@@ -1,5 +1,5 @@
 
-DIRS     = ts tao
+DIRS     = ts tao mfemopt
 LOCDIR   = src/
 
 include ${PETSCOPT_DIR}/lib/petsc/conf/variables

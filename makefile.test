@@ -11,12 +11,10 @@ include $(PETSC_DIR)/$(PETSC_ARCH)/lib/petsc/conf/petscvariables
 include $(PETSC_DIR)/lib/petsc/conf/variables
 include $(PETSCOPT_DIR)/lib/petscopt/conf/testvariables
 
-TESTDIR ?= ./$(PETSC_ARCH)/tests
+TESTDIR ?= ./$(PETSCOPT_ARCH)/tests
 MODDIR := $(PETSC_DIR)/$(PETSC_ARCH)/include
-TESTLOGFILE ?= $(TESTDIR)/examples_$(PETSC_ARCH).log
+TESTLOGFILE ?= $(TESTDIR)/examples_$(PETSCOPT_ARCH).log
 EXAMPLESDIR := $(TESTSRCDIR)
-
-pkgs := sys vec mat dm ksp snes ts tao
 
 petscconf      := $(PETSC_DIR)/$(PETSC_ARCH)/include/petscconf.h
 petscvariables := $(PETSC_DIR)/$(PETSC_ARCH)/lib/petsc/conf/petscvariables
@@ -76,8 +74,11 @@ ifdef TIMEOUT
   TESTFLAGS += -t $(TIMEOUT)  # Override the default timeout
 endif
 
+spkgs := ts,tao,mfemopt
+pkgs := ts tao mfemopt
+testlangs := c cpp
 $(generatedtest) : $(petscconf) $(petscvariables) $(CONFIGDIR)/gmakegentest.py $(TESTDIR)/.DIR | $$(@D)/.DIR
-	$(PYTHON) $(CONFIGDIR)/gmakegentest.py --petsc-dir=$(PETSC_DIR) --petsc-arch=$(PETSC_ARCH) --testdir=$(TESTDIR) --srcdir=$(EXAMPLESDIR)
+	$(PYTHON) $(CONFIGDIR)/gmakegentest.py --petsc-dir=$(PETSC_DIR) --petsc-arch=$(PETSC_ARCH) --testdir=$(TESTDIR) --srcdir=$(EXAMPLESDIR) --pkg-dir=$(PETSCOPT_DIR) --pkg-name=petscopt --pkg-arch=$(PETSCOPT_ARCH) --pkg-pkgs=$(spkgs)
 
 -include $(generatedtest)
 
@@ -88,12 +89,11 @@ else
 endif
 
 PETSC_COMPILE.c = $(call quiet,$(cc_name)) -c $(PCC_FLAGS) $(CFLAGS) $(CCPPFLAGS) $(C_DEPFLAGS)
-PETSC_COMPILE.cxx = $(call quiet,CXX) -c $(CXX_FLAGS) $(CFLAGS) $(CCPPFLAGS) $(CXX_DEPFLAGS)
+PETSC_COMPILE.cpp = $(call quiet,CXX) -c $(CXX_FLAGS) $(CFLAGS) $(CCPPFLAGS) $(CXX_DEPFLAGS)
 PETSC_COMPILE.cu = $(call quiet,CUDAC) -c $(CUDAC_FLAGS) --compiler-options="$(PCC_FLAGS) $(CXXFLAGS) $(CCPPFLAGS)"
 PETSC_GENDEPS.cu = $(call quiet,CUDAC,.dep) --generate-dependencies --output-directory=$(@D) $(CUDAC_FLAGS) --compiler-options="$(PCC_FLAGS) $(CXXFLAGS) $(CCPPFLAGS)"
 PETSC_COMPILE.F = $(call quiet,FC) -c $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) $(FC_DEPFLAGS)
 
-testlangs := c cu cxx F F90
 $(foreach lang, $(testlangs), $(eval \
   testexe.$(lang) = $(foreach pkg, $(pkgs), $(testsrcs-$(pkg).$(lang):%.$(lang)=$(TESTDIR)/%))))
 concattestlang = $(foreach lang, $(2), $(testsrcs-$(1).$(lang):%.$(lang)=$(TESTDIR)/%.o))
@@ -108,8 +108,8 @@ $(testsrcs) :
 $(TESTDIR)/%.o : $(EXAMPLESDIR)/%.c | $$(@D)/.DIR
 	$(PETSC_COMPILE.c) $(abspath $<) -o $@
 
-$(TESTDIR)/%.o : $(EXAMPLESDIR)/%.cxx | $$(@D)/.DIR
-	$(PETSC_COMPILE.cxx) $(abspath $<) -o $@
+$(TESTDIR)/%.o : $(EXAMPLESDIR)/%.cpp | $$(@D)/.DIR
+	$(PETSC_COMPILE.cpp) $(abspath $<) -o $@
 
 $(TESTDIR)/%.o : $(EXAMPLESDIR)/%.cu | $$(@D)/.DIR
 	$(PETSC_COMPILE.cu) $(abspath $<) -o $@ # Compile first so that if there is an error, it comes from a normal compile
@@ -157,7 +157,7 @@ $(testexe.F) $(testexe.F90) : $(TESTDIR)/% : $(TESTDIR)/%.o $$^ $(libpetscall)
 $(testexe.c) $(testexe.cu) : $(TESTDIR)/% : $(TESTDIR)/%.o $$^ $(libpetscall)
 	$(call quiet,CLINKER) -o $@ $^ $(PETSC_TEST_LIB)
 
-$(testexe.cxx) : $(TESTDIR)/% : $(TESTDIR)/%.o $$^ $(libpetscall)
+$(testexe.cpp) : $(TESTDIR)/% : $(TESTDIR)/%.o $$^ $(libpetscall)
 	$(call quiet,CXXLINKER) -o $@ $^ $(PETSC_TEST_LIB)
 
 # Fortran source files need petsc*.mod, which isn't explicitly managed in the makefile.
