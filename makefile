@@ -40,7 +40,7 @@ endif
 
 pcc = $(if $(findstring CONLY,$(PETSC_LANGUAGE)),CC,CXX)
 COMPILE.cc = $(call quiet,$(pcc)) $(PCC_FLAGS) $(CFLAGS) $(CCPPFLAGS) $(C_DEPFLAGS) -c
-COMPILE.cpp = $(call quiet,CXX) $(CXX_FLAGS) $(CFLAGS) $(CCPPFLAGS) $(CXX_DEPFLAGS) -c
+COMPILE.cpp = $(call quiet,CXX) $(CXX_FLAGS) $(CXXFLAGS) $(CCPPFLAGS) $(CXX_DEPFLAGS) -c
 ifneq ($(FC_MODULE_OUTPUT_FLAG),)
 COMPILE.fc = $(call quiet,FC) $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) $(FC_DEPFLAGS) $(FC_MODULE_OUTPUT_FLAG)$(MODDIR) -c
 else
@@ -71,9 +71,9 @@ $(config-mfem) : | $$(@D)/.DIR
 	$(call write-variable,$@,with_mfem)
 	$(call write-variable,$@,with_mfem_install)
 	$(call write-variable,$@,MFEM_DIR)
-$(config-confheader) : $$(@D)/.DIR
+$(config-confheader) : | $$(@D)/.DIR
 	$(call write-confheader-pre,$@)
-	@if [ "${with_mfem}" == "1" ]; then \
+	@if [ "${with_mfem}" = "1" ]; then \
 	  $(call write-confheader-define,$@,MFEMOPT) \
 	fi
 	$(call write-confheader-post,$@)
