@@ -670,6 +670,7 @@ PetscErrorCode TSTaylorTest(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec
     ierr = VecSetRandom(dM,r);CHKERRQ(ierr);
     ierr = PetscRandomDestroy(&r);CHKERRQ(ierr);
     ierr = VecRealPart(dM);CHKERRQ(ierr);
+    ierr = VecViewFromOptions(dM,NULL,"-taylor_ts_rand_vec_view");CHKERRQ(ierr);
   } else dM = ddesign;
   ierr = VecDuplicate(design,&M);CHKERRQ(ierr);
   ierr = VecDuplicate(design,&G);CHKERRQ(ierr);
