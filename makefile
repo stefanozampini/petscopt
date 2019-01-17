@@ -54,8 +54,8 @@ generated := $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib/petscopt/conf/files
 
 write-variable = @printf "override $2 = $($2)\n" >> $1;
 write-confheader-pre    = @printf "\#if !defined(__PETSCOPTCONF_H)\n\#define __PETSCOPTCONF_H\n" >> $1;
-write-confheader-define = printf "\n\#if !defined(PETSCOPT_HAVE_$2)\n\#define PETSCOPT_HAVE_$2 1\n\#endif\n" >> $1;
-write-confheader-post = @printf "\n\#endif\n" >> $1;
+write-confheader-define = @printf "\n\#if !defined(PETSCOPT_HAVE_$2)\n\#define PETSCOPT_HAVE_$2 1\n\#endif\n" >> $1;
+write-confheader-post   = @printf "\n\#endif\n" >> $1;
 petscopt-conf-root = $(PETSCOPT_ARCH)
 config-petsc      := $(petscopt-conf-root)/lib/petscopt/conf/config-petsc
 config-petscopt   := $(petscopt-conf-root)/lib/petscopt/conf/config-petscopt
@@ -73,9 +73,9 @@ $(config-mfem) : | $$(@D)/.DIR
 	$(call write-variable,$@,MFEM_DIR)
 $(config-confheader) : | $$(@D)/.DIR
 	$(call write-confheader-pre,$@)
-	@if [ "${with_mfem}" = "1" ]; then \
-	  $(call write-confheader-define,$@,MFEMOPT) \
-	fi
+ifeq ($(with_mfem),1)
+	$(call write-confheader-define,$@,MFEMOPT)
+endif
 	$(call write-confheader-post,$@)
 
 config-petsc : $(config-petsc)
@@ -107,11 +107,18 @@ objects.o := $(srcs.o)
 
 $(libpetscopt_static) : objs := $(objects.o)
 $(libpetscopt_shared) : objs := $(objects.o)
+ifeq ($(with_mfem),1)
+$(libpetscopt_shared) : libs := $(PETSC_LIB) $(MFEM_LIBS)
+else
 $(libpetscopt_shared) : libs := $(PETSC_LIB)
-$(libpetscopt_shared) : LDSL := CLINKER
+endif
 
 %.$(SL_LINKER_SUFFIX) : $$(objs) | $$(@D)/.DIR
-	$(call quiet,$(LDSL)) -shared -o $@ $^ $(libs)
+ifeq ($(with_mfem),1)
+	$(call quiet,CXXLINKER) -shared -o $@ $^ $(libs)
+else
+	$(call quiet,CLINKER) -shared -o $@ $^ $(libs)
+endif
 ifneq ($(DSYMUTIL),true)
 	$(call quiet,DSYMUTIL) $@
 endif

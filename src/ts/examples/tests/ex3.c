@@ -708,6 +708,7 @@ int main(int argc,char **argv)
 /*TEST
 
    test:
+      requires: !complex
       timeoutfactor: 3
       suffix: 1
       filter: sed -e "s/-nan/nan/g"

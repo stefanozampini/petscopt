@@ -1423,70 +1423,70 @@ int main(int argc, char* argv[])
 /*TEST
 
   test:
-    requires: !single
+    requires: !complex !single
     suffix: 1
     args: -t0 1.1 -tf 1.2 -ts_type rk -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -ts_trajectory_type memory -use_taylor
 
   test:
-    requires: !single
+    requires: !complex !single
     suffix: 2
     args: -t0 1.6 -tf 1.7 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -use_taylor -ts_trajectory_type memory
 
   test:
-    requires: !single
+    requires: !complex !single
     suffix: 3
     args: -t0 1.6 -tf 1.7 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -test_ifunc -test_nulljac_IC -test_nullgrad_M -use_taylor -ts_trajectory_type memory
 
   test:
-    requires: !single
+    requires: !complex !single
     suffix: 4
     args: -t0 1.1 -tf 1.15 -ts_type rk -ts_adapt_type none -test_event_constant -test_rhsjacconst -ts_trajectory_reconstruction_order 3 -use_taylor -dt 0.001 -ts_trajectory_type memory
 
   test:
-    requires: !single
+    requires: !complex !single
     suffix: 5
     args: -t0 0.7 -tf 0.8 -ts_type cn -test_event_constant -p 0.8 -test_ifunc -ts_trajectory_reconstruction_order 2 -test_pjac 0 -tsgradient_adjoint_ts_adapt_type history -tshessian_tlm_ts_adapt_type history -tshessian_foadjoint_ts_adapt_type history -tshessian_soadjoint_ts_adapt_type {{none history}} -tshessian_tlm_userijacobian -use_taylor -m 0.1 -dt 0.005 -ts_trajectory_type memory -b 0.01
 
   test:
-    requires: !single
+    requires: !complex !single
     suffix: 6
     args: -t0 0.01 -tf 0.1 -b 0.3 -a 1.7 -p 1 -ts_type rk -dt 0.01 -ts_adapt_type none -test_event_func -tshessian_mffd -use_taylor -ts_trajectory_type memory -tsgradient_adjoint_ts_adapt_type history
 
   test:
-    requires: !single
+    requires: !complex !single
     suffix: 7
     args: -t0 0 -tf 0.02 -dt 0.001 -b 0.3 -a 1.7 -p 1 -ts_type rosw -test_ifunc -test_event_func -ts_adapt_type none -tshessian_mffd -use_taylor -ts_trajectory_type memory
 
   test:
-    requires: !single
+    requires: !complex !single
     suffix: 8
     args: -t0 0 -tf 0.07 -b -0.5 -a -1.1 -p 0.4 -ts_type bdf -test_mix -test_pjac 0 -test_event_constant -ts_adapt_type none -use_taylor -ts_trajectory_type memory -dt 0.005 -test_objective_norm -m 0.8
 
   test:
-    requires: !single
+    requires: !complex !single
     suffix: 9
     nsize: 2
     args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type rk -test_general_fixed -test_general_final -test_general -test_event_func -test_event_constant -test_event_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -tshessian_mffd -use_taylor -ts_trajectory_type memory
 
   test:
-    requires: !single
+    requires: !complex !single
     suffix: 10
     nsize: 2
     args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type bdf -test_general_fixed -test_general_final -test_general -test_event_func -test_event_constant -test_event_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -tshessian_mffd -use_taylor -ts_trajectory_type memory
 
   test:
-    requires: !single
+    requires: !complex !single
     suffix: 11
     args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type rk -test_general_final -test_general -test_event_constant -test_event_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -ts_trajectory_type memory -test_forward_event -use_taylor
 
   test:
-    requires: !single
+    requires: !complex !single
     timeoutfactor: 2
     suffix: 12
     args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type bdf -test_general_final -test_general -test_event_constant -test_event_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -ts_trajectory_type memory -test_forward_event -use_taylor -test_ifunc -m 1.1
 
   test:
-    requires: !single
+    requires: !complex !single
     timeoutfactor: 2
     suffix: 13
     args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type bdf -test_general_final -test_general -ts_rtol 1.e-4 -ts_atol 1.e-4 -ts_trajectory_type memory -use_taylor -test_ifunc -m 1.1 -test_general_double {{0 1}separate output} -test_general_final_double {{0 1}separate output} -test_remove_multadd {{0 1}separate output}
