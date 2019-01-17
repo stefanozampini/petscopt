@@ -5,7 +5,7 @@ language: cpp
 
 compiler:
   - gcc
-  - clang
+##  - clang
 
 os: linux
 sudo: required
@@ -31,22 +31,22 @@ env:
   matrix:
 
     - MPI=mpich  INT64=0  SCALAR=real     PRECISION=double MFEM=1
-#    - MPI=mpich  INT64=0  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
-    - MPI=mpich  INT64=0  SCALAR=complex  PRECISION=double     LANGUAGE=C++
-    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=double
-#    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
-    - MPI=mpich  INT64=1  SCALAR=complex  PRECISION=double     LANGUAGE=C++
+###    - MPI=mpich  INT64=0  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
+##    - MPI=mpich  INT64=0  SCALAR=complex  PRECISION=double     LANGUAGE=C++
+##    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=double
+###    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
+##    - MPI=mpich  INT64=1  SCALAR=complex  PRECISION=double     LANGUAGE=C++
 
-matrix:
-
-  include:
-
-   - env: MPI=mpich INT64=0 SCALAR=real LANGUAGE=C MFEM=1
-     compiler: clang
-     os: osx
-   - env: MPI=mpich INT64=1 SCALAR=complex LANGUAGE=C++
-     compiler: clang
-     os: osx
+##matrix:
+##
+##  include:
+##
+##   - env: MPI=mpich INT64=0 SCALAR=real LANGUAGE=C MFEM=1
+##     compiler: clang
+##     os: osx
+##   - env: MPI=mpich INT64=1 SCALAR=complex LANGUAGE=C++
+##     compiler: clang
+##     os: osx
 
 git:
   depth: 3
@@ -99,7 +99,7 @@ install:
   - git clean -q -d -x -f
   - git reset --hard origin/stefano_zampini/feature-gmakegen-pkgs
   - if [[ $(./configure PETSC_ARCH=arch-test --with-cc=mpicc --with-cxx=mpicxx --with-fc=0 --with-clanguage=${LANGUAGE:-C} --with-64-bit-indices=${INT64:-0} --with-scalar-type=${SCALAR:-real} --with-precision=${PRECISION:-double} --download-mfem=${MFEM:-0} --download-hypre=${MFEM:-0} --download-metis=${MFEM:-0} $BLASLAPACK COPTFLAGS="$OPTFLAGS" CXXOPTFLAGS="$OPTFLAGS" FOPTFLAGS="$OPTFLAGS" --CPPFLAGS="$CPPFLAGS" --CXXCPPFLAGS="$CPPFLAGS") ]]; then tail -2500 configure.log; fi
-  - make -j$(nproc) PETSC_ARCH=arch-test
+  - if [[ $(make -j$(nproc) PETSC_ARCH=arch-test) ]]; then cat arch-test/lib/petsc/conf/mfem.log; fi
   - cd $PETSCOPT_DIR
   - make with_mfem=${MFEM:-0} with_mfem_install=${MFEM:-0} MAKE_NP=$(nproc) PETSC_ARCH=arch-test
 
