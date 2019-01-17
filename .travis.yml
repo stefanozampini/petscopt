@@ -5,7 +5,7 @@ language: cpp
 
 compiler:
   - gcc
-##  - clang
+  - clang
 
 os: linux
 sudo: required
@@ -31,22 +31,22 @@ env:
   matrix:
 
     - MPI=mpich  INT64=0  SCALAR=real     PRECISION=double MFEM=1
-###    - MPI=mpich  INT64=0  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
-##    - MPI=mpich  INT64=0  SCALAR=complex  PRECISION=double     LANGUAGE=C++
-##    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=double
-###    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
-##    - MPI=mpich  INT64=1  SCALAR=complex  PRECISION=double     LANGUAGE=C++
+#    - MPI=mpich  INT64=0  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
+    - MPI=mpich  INT64=0  SCALAR=complex  PRECISION=double     LANGUAGE=C++
+    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=double
+#    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
+    - MPI=mpich  INT64=1  SCALAR=complex  PRECISION=double     LANGUAGE=C++
 
-##matrix:
-##
-##  include:
-##
-##   - env: MPI=mpich INT64=0 SCALAR=real LANGUAGE=C MFEM=1
-##     compiler: clang
-##     os: osx
-##   - env: MPI=mpich INT64=1 SCALAR=complex LANGUAGE=C++
-##     compiler: clang
-##     os: osx
+matrix:
+
+  include:
+
+   - env: MPI=mpich INT64=0 SCALAR=real LANGUAGE=C MFEM=1
+     compiler: clang
+     os: osx
+   - env: MPI=mpich INT64=1 SCALAR=complex LANGUAGE=C++
+     compiler: clang
+     os: osx
 
 git:
   depth: 3
