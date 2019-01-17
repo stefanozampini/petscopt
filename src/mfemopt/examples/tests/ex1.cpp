@@ -114,7 +114,8 @@ void Image::ReadBMP(const char* filename, bool grayscale)
 
    // Read 54-bytes header
    unsigned char info[54];
-   fread(info, sizeof(unsigned char), 54, f);
+   size_t bread = fread(info, sizeof(unsigned char), 54, f);
+   MFEM_VERIFY(54 == bread,"Error in fread: 54 expected items, read instead: " << bread);
    int nx = *(int*)&info[18];
    int ny = *(int*)&info[22];
    short bits = *(short*)&info[28];
