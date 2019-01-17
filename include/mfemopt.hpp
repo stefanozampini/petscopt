@@ -10,5 +10,6 @@
 #include <mfemopt/pdbilininteg.hpp>
 #include <mfemopt/receiver.hpp>
 #include <mfemopt/coefficients.hpp>
+#include <mfemopt/modelproblems.hpp>
 
 #endif
