@@ -52,6 +52,8 @@ public:
    void SetRHS(mfem::Coefficient*);
 
    /* interface for mfem::TimeDependentOperator */
+   virtual void Mult(const mfem::Vector&,mfem::Vector&) const
+   { mfem::mfem_error("ModelHeat::not for explicit solvers!"); }
    virtual void ImplicitMult(const mfem::Vector&,const mfem::Vector&,mfem::Vector&) const;
    virtual Operator& GetImplicitGradient(const mfem::Vector&,const mfem::Vector&,double) const;
    virtual ~ModelHeat();
