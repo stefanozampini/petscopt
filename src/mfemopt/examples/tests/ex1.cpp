@@ -92,7 +92,7 @@ double Image::Eval(ElementTransformation &T,
 void Image::ReadTXT(const char* filename)
 {
    std::ifstream input(filename);
-   MFEM_VERIFY(!input.fail(),"Missing filename " << filename);
+   MFEM_VERIFY(!input.fail(),"Missing file " << filename);
 
    input >> nex;
    input >> ney;
@@ -436,13 +436,16 @@ int main(int argc, char* argv[])
    /* indent to have stacked objects destroyed before PetscFinalize() is called */
    {
       Image img(PETSC_COMM_WORLD,imgfile,ord,quad);
+      if (viz)
+      {
+         img.Visualize("Image to be reconstructed");
+      }
       if (!flg1 && !flg2)
       {
          Image trueimg(PETSC_COMM_WORLD,trueimgfile,1,PETSC_TRUE);
          if (viz)
          {
             trueimg.Visualize("True image");
-            img.Visualize("Noise image");
          }
       }
       PDCoefficient* imgpd = img.CreatePDCoefficient();
@@ -521,13 +524,11 @@ int main(int argc, char* argv[])
     requires: mfemopt
 
   test:
-    localrunfiles: logo_noise.txt logo.txt
     suffix: tv
-    args: -quad 1 -order 1 -snes_converged_reason -snes_max_it 500 -snes_rtol 1.e-10 -snes_atol 1.e-10 -primaldual 0 -symmetrize 0 -monitor 0 -snes_converged_reason
+    args: -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_max_it 500 -snes_rtol 1.e-10 -snes_atol 1.e-10 -primaldual 0 -symmetrize 0 -monitor 0 -snes_converged_reason
 
   test:
-    localrunfiles: logo_noise.txt logo.txt
     suffix: tv_pd
-    args: -quad 1 -order 1 -snes_converged_reason -snes_max_it 500 -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_type cg -pc_type gamg -primaldual 1 -symmetrize 1 -monitor 0 -snes_converged_reason
+    args: -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_max_it 500 -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_type cg -pc_type gamg -primaldual 1 -symmetrize 1 -monitor 0 -snes_converged_reason
 
 TEST*/
