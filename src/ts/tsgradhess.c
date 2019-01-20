@@ -681,7 +681,7 @@ PetscErrorCode TSTaylorTest(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec
     PetscBool expl;
 
     ierr = PetscOptionsGetBool(((PetscObject)ts)->options,((PetscObject)ts)->prefix,"-taylor_ts_hessian_explicit",(expl=PETSC_FALSE,&expl),NULL);CHKERRQ(ierr);
-    ierr = MatCreate(PETSC_COMM_WORLD,&H);CHKERRQ(ierr);
+    ierr = MatCreate(PetscObjectComm((PetscObject)ts),&H);CHKERRQ(ierr);
     ierr = TSComputeHessian(ts,t0,dt,tf,X,design,H);CHKERRQ(ierr);
     if (expl) {
       Mat He;
