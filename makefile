@@ -88,13 +88,13 @@ config : config-confheader
 config-clean : clean
 	$(RM) $(config-confheader) $(config-petsc) $(config-petscopt) $(config-mfem)
 	$(RM) $(generated)
-.PHONY:  config-petsc config-petscopt config-mfem config-vars config-confheader config
+.PHONY:  config-petsc config-petscopt config-mfem config-vars config-confheader config config-clean
 
 spkgs := ts,tao,mfemopt
 pkgs := ts tao mfemopt
 langs := c cpp
 
-$(generated) : $(config-confheader) | $$(@D)/.DIR
+$(generated) : $(config-confheader) $(petscconf) $(petscvariables) $(PETSC_DIR)/config/gmakegen.py | $$(@D)/.DIR
 	$(PYTHON) $(PETSC_DIR)/config/gmakegen.py --petsc-arch=$(PETSC_ARCH) --pkg-dir=$(PETSCOPT_DIR) --pkg-name=petscopt --pkg-arch=$(PETSCOPT_ARCH) --pkg-pkgs=$(spkgs)
 
 -include $(generated)

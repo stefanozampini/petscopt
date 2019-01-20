@@ -521,7 +521,6 @@ int main(int argc, char* argv[])
     requires: mfemopt
 
   test:
-    requires: !pippo
     localrunfiles: logo_noise.txt logo.txt
     suffix: tv
     args: -quad 1 -order 1 -snes_converged_reason -snes_max_it 500 -snes_rtol 1.e-10 -snes_atol 1.e-10 -primaldual 0 -symmetrize 0 -monitor 0 -snes_converged_reason
