@@ -195,7 +195,7 @@ ReceiverMonitor::ReceiverMonitor(ParGridFunction* _u, const DenseMatrix& _points
       PetscSolverMonitor(true,false), u(_u), points(_points), filename(_filename)
 {
    ParMesh *pmesh = u->ParFESpace()->GetParMesh();
-   pmesh->FindPoints(points,eids,ips,true);
+   pmesh->FindPoints(points,eids,ips,false);
 
    T.reserve(1000);
    int np = 0;

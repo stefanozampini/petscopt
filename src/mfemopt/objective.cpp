@@ -399,7 +399,7 @@ void TDLeastSquares::InitReceivers()
                   " does not match space dim " << sdim)
       for (int k = 0; k < sdim; k++) centers(k,i) = center(k);
    }
-   mesh->FindPoints(centers,receivers_eid,receivers_ip,true);
+   mesh->FindPoints(centers,receivers_eid,receivers_ip,false);
 }
 
 void TDLeastSquares::Eval(const Vector& state, const Vector& m, double time, double *f)
