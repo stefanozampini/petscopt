@@ -72,6 +72,9 @@ ifeq ($(with_mfem),1)
     $(error Unable to find MFEM configuration file in $(MFEM_CONFIG_DIR))
   endif
   include $(MFEM_CONFIG_DIR)/config.mk
+  ifneq ("$(MFEM_USE_PETSC)","YES")
+    $(error MFEM need to be configured with MFEM_USE_PETSC=YES)
+  endif
   override CCPPFLAGS += $(MFEM_INCFLAGS)
   override PETSCOPT_LIB += $(MFEM_LIBS)
   CXX_FLAGS := $(filter-out -fvisibility=hidden,$(CXX_FLAGS))
