@@ -43,7 +43,7 @@ public:
    virtual ~Image() { delete[] data; delete fec; delete pfes; delete pmesh; }
 };
 
-Image::Image(MPI_Comm comm, const char* filename, int ord, bool quad) : Image()
+Image::Image(MPI_Comm comm, const char* filename, int ord, bool quad)
 {
    std::string fname(filename);
    size_t lastdot = fname.find_last_of(".");
