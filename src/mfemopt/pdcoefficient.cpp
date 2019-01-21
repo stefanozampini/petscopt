@@ -120,8 +120,8 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
    {
       *pcoeffgf[0] = 0.0;
       // XXX BUG: GROUPCOMM not created!
-      //pcoeffgf[0]->ProjectDiscCoefficient(*Q,GridFunction::AvgType::ARITHMETIC);
-      pcoeffgf[0]->ProjectCoefficient(*Q);
+      pcoeffgf[0]->ProjectDiscCoefficient(*Q,GridFunction::AvgType::ARITHMETIC);
+      //pcoeffgf[0]->ProjectCoefficient(*Q);
       s_coeff = new GridFunctionCoefficient(pcoeffgf[0]);
       deriv_s_coeff = new GridFunctionCoefficient(deriv_coeffgf[0]);
    }
@@ -377,6 +377,7 @@ MatrixCoefficient* PDCoefficient::GetActiveMatrixCoefficient()
 void PDCoefficient::GetCurrentVector(Vector& m)
 {
    int off = 0;
+   m.SetSize(lsize);
    for (int i=0; i<pgradgf.Size(); i++)
    {
       int n = P->Width();
@@ -398,6 +399,7 @@ void PDCoefficient::GetCurrentVector(Vector& m)
 
 void PDCoefficient::UpdateCoefficient(const Vector& m)
 {
+   MFEM_VERIFY(m.Size() == lsize,"Invalid Vector size " << m.Size() << "!. Should be " << lsize);
    int off = 0;
    for (int i=0; i<pcoeffgf.Size(); i++)
    {
@@ -429,6 +431,7 @@ void PDCoefficient::UpdateCoefficient(const Vector& m)
 void PDCoefficient::UpdateCoefficientWithGF(const Vector& m, Array<ParGridFunction*>& agf)
 {
    MFEM_VERIFY(agf.Size() == pcoeffgf.Size(),"Invalid array size " << agf.Size() << "!. Should be " << pcoeffgf.Size());
+   MFEM_VERIFY(m.Size() == lsize,"Invalid Vector size " << m.Size() << "!. Should be " << lsize);
    int off = 0;
    for (int i=0; i<pcoeffgf.Size(); i++)
    {
@@ -453,6 +456,7 @@ void PDCoefficient::UpdateCoefficientWithGF(const Vector& m, Array<ParGridFuncti
 void PDCoefficient::UpdateGradient(Vector& g)
 {
    int off = 0;
+   g.SetSize(lsize);
    for (int i=0; i<pgradgf.Size(); i++)
    {
       int n = P->Width();
