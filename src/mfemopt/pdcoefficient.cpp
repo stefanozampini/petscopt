@@ -130,7 +130,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
    pcoeffexcl = false;
    for (int i = 0; i < std::min(pcoeffexcl.Size(),excl.Size()); i++) pcoeffexcl[i] = excl[i];
 
-   PetscBool lhas,has;
+   PetscBool lhas = PETSC_FALSE,has;
    for (int i = 0; i < pcoeffexcl.Size(); i++) if (pcoeffexcl[i]) { lhas = PETSC_TRUE; break; }
    MPI_Allreduce(&lhas,&has,1,MPIU_BOOL,MPI_LOR,pfes->GetParMesh()->GetComm());
    if (has)
