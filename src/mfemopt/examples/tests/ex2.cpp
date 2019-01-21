@@ -678,7 +678,7 @@ public:
       Array<ParGridFunction*> gf = m->GetCoeffs();
       pmap = _pmap;
       u = gf[0];
-      vt = 1;
+      vt = _vt;
       name = _name;
       pause = true;
       if (vt > 0)
