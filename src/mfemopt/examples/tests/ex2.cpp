@@ -1128,7 +1128,7 @@ int main(int argc, char *argv[])
 #endif
       NewtonMonitor mymonitor;
       newton.SetMonitor(&mymonitor);
-      UserMonitor solmonitor(mu_pd,&pmap,1,"Newton solution");
+      UserMonitor solmonitor(mu_pd,&pmap,glvis ? 1 : 0,"Newton solution");
       if (glvis) newton.SetMonitor(&solmonitor);
 
       Vector muv;
