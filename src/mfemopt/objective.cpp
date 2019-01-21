@@ -77,7 +77,7 @@ ObjectiveHessianOperatorFD::ObjectiveHessianOperatorFD(MPI_Comm _comm, Objective
    ierr = MatDestroy(&H);CCHKERRQ(_comm,ierr);
 }
 
-void ObjectiveFunction::TestFDGradient(MPI_Comm comm, const Vector& xIn, const Vector& mIn, double t, double delta)
+void ObjectiveFunction::TestFDGradient(MPI_Comm comm, const Vector& xIn, const Vector& mIn, double t, double delta, bool progress)
 {
    PetscErrorCode ierr;
    PetscBool verbose = PETSC_FALSE;
@@ -107,7 +107,10 @@ void ObjectiveFunction::TestFDGradient(MPI_Comm comm, const Vector& xIn, const V
          Array<PetscInt> idx(1);
          Array<PetscScalar> vals(1);
 
-         ierr = PetscPrintf(comm,"\r-> hang tight while computing state gradient : %f\%",(i*100.0)/g.GlobalSize());CCHKERRQ(comm,ierr);
+         if (progress)
+         {
+            ierr = PetscPrintf(comm,"\r-> hang tight while computing state gradient : %f\%",(i*100.0)/g.GlobalSize());CCHKERRQ(comm,ierr);
+         }
 
          x = px;
 
@@ -123,8 +126,14 @@ void ObjectiveFunction::TestFDGradient(MPI_Comm comm, const Vector& xIn, const V
          vals[0] = (f2 - f1)/(2.0*h);
          fdg.SetValues(idx,vals);
       }
-      ierr = PetscPrintf(comm,"\r-> hang tight while computing state gradient : 100.000000\%\n");CCHKERRQ(comm,ierr);
-
+      if (progress)
+      {
+         ierr = PetscPrintf(comm,"\r-> hang tight while computing state gradient : 100.000000\%\n");CCHKERRQ(comm,ierr);
+      }
+      else
+      {
+         ierr = PetscPrintf(comm,"\n");CCHKERRQ(comm,ierr);
+      }
       PetscParVector dg(g);
       dg = g;
       dg -= fdg;
@@ -138,7 +147,7 @@ void ObjectiveFunction::TestFDGradient(MPI_Comm comm, const Vector& xIn, const V
       {
          ierr = PetscPrintf(comm,"FINITE DIFFERENCE\n");CCHKERRQ(comm,ierr);
          fdg.Print();
-         ierr = PetscPrintf(comm,"MINE\n");CCHKERRQ(comm,ierr);
+         ierr = PetscPrintf(comm,"COMPUTED\n");CCHKERRQ(comm,ierr);
          g.Print();
          ierr = PetscPrintf(comm,"DIFFERENCE\n");CCHKERRQ(comm,ierr);
          dg.Print();
@@ -155,7 +164,10 @@ void ObjectiveFunction::TestFDGradient(MPI_Comm comm, const Vector& xIn, const V
       PetscParVector m(pm);
       for (PetscInt i = 0; i < g.GlobalSize(); i++)
       {
-         ierr = PetscPrintf(comm,"\r-> hang tight while computing design gradient : %f\%",(i*100.0)/g.GlobalSize());CCHKERRQ(comm,ierr);
+         if (progress)
+         {
+            ierr = PetscPrintf(comm,"\r-> hang tight while computing design gradient : %f\%",(i*100.0)/g.GlobalSize());CCHKERRQ(comm,ierr);
+         }
          double f1,f2;
          Array<PetscInt> idx(1);
          Array<PetscScalar> vals(1);
@@ -172,7 +184,14 @@ void ObjectiveFunction::TestFDGradient(MPI_Comm comm, const Vector& xIn, const V
          vals[0] = (f2 - f1)/(2.0*h);
          fdg.SetValues(idx,vals);
       }
-      ierr = PetscPrintf(comm,"\r-> hang tight while computing design gradient : 100.000000\%\n");CCHKERRQ(comm,ierr);
+      if (progress)
+      {
+         ierr = PetscPrintf(comm,"\r-> hang tight while computing state gradient : 100.000000\%\n");CCHKERRQ(comm,ierr);
+      }
+      else
+      {
+         ierr = PetscPrintf(comm,"\n");CCHKERRQ(comm,ierr);
+      }
 
       PetscParVector dg(g);
       dg = g;
@@ -187,7 +206,7 @@ void ObjectiveFunction::TestFDGradient(MPI_Comm comm, const Vector& xIn, const V
       {
          ierr = PetscPrintf(comm,"FINITE DIFFERENCE\n");CCHKERRQ(comm,ierr);
          fdg.Print();
-         ierr = PetscPrintf(comm,"MINE\n");CCHKERRQ(comm,ierr);
+         ierr = PetscPrintf(comm,"COMPUTED\n");CCHKERRQ(comm,ierr);
          g.Print();
          ierr = PetscPrintf(comm,"DIFFERENCE\n");CCHKERRQ(comm,ierr);
          dg.Print();

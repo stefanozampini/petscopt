@@ -47,7 +47,7 @@ public:
    virtual void SetUpHessian_MM(const mfem::Vector&,const mfem::Vector&,double) {}
    virtual mfem::Operator* GetHessianOperator_MM() { return NULL; }
 
-   void TestFDGradient(MPI_Comm,const mfem::Vector&,const mfem::Vector&,double,double);
+   void TestFDGradient(MPI_Comm,const mfem::Vector&,const mfem::Vector&,double,double,bool=true);
    void TestFDHessian(MPI_Comm,const mfem::Vector&,const mfem::Vector&,double);
    virtual ~ObjectiveFunction() {}
 };

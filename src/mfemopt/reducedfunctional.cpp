@@ -39,7 +39,7 @@ void ReducedFunctional::GetBounds(mfem::Vector& l, mfem::Vector& u)
    u = std::numeric_limits<double>::max();
 }
 
-void ReducedFunctional::TestFDGradient(MPI_Comm comm, const mfem::Vector& mIn, double delta)
+void ReducedFunctional::TestFDGradient(MPI_Comm comm, const mfem::Vector& mIn, double delta, bool progress)
 {
    PetscErrorCode ierr;
 
@@ -68,8 +68,10 @@ void ReducedFunctional::TestFDGradient(MPI_Comm comm, const mfem::Vector& mIn, d
       Array<PetscInt> idx(1);
       Array<PetscScalar> vals(1);
 
-      ierr = PetscPrintf(comm,"\r-> hang tight while computing state gradient : %f\%",(i*100.0)/g.GlobalSize());CCHKERRQ(comm,ierr);
-
+      if (progress)
+      {
+         ierr = PetscPrintf(comm,"\r-> hang tight while computing state gradient : %f\%",(i*100.0)/g.GlobalSize());CCHKERRQ(comm,ierr);
+      }
       m = pm;
 
       idx[0] = i;
@@ -84,8 +86,14 @@ void ReducedFunctional::TestFDGradient(MPI_Comm comm, const mfem::Vector& mIn, d
       vals[0] = (f2 - f1)/(2.0*h);
       fdg.SetValues(idx,vals);
    }
-   ierr = PetscPrintf(comm,"\r-> hang tight while computing state gradient : 100.000000\%\n");CCHKERRQ(comm,ierr);
-
+   if (progress)
+   {
+      ierr = PetscPrintf(comm,"\r-> hang tight while computing state gradient : 100.000000\%\n");CCHKERRQ(comm,ierr);
+   }
+   else
+   {
+      ierr = PetscPrintf(comm,"\n");CCHKERRQ(comm,ierr);
+   }
    PetscParVector dg(g);
    dg = g;
    dg -= fdg;
@@ -99,7 +107,7 @@ void ReducedFunctional::TestFDGradient(MPI_Comm comm, const mfem::Vector& mIn, d
    {
       ierr = PetscPrintf(comm,"FINITE DIFFERENCE\n");CCHKERRQ(comm,ierr);
       fdg.Print();
-      ierr = PetscPrintf(comm,"MINE\n");CCHKERRQ(comm,ierr);
+      ierr = PetscPrintf(comm,"COMPUTED\n");CCHKERRQ(comm,ierr);
       g.Print();
       ierr = PetscPrintf(comm,"DIFFERENCE\n");CCHKERRQ(comm,ierr);
       dg.Print();

@@ -29,7 +29,7 @@ public:
      ComputeGradient(m,g);
    }
    virtual mfem::Operator* GetHessian(const mfem::Vector&) { return NULL; }
-   void TestFDGradient(MPI_Comm,const mfem::Vector&,double);
+   void TestFDGradient(MPI_Comm,const mfem::Vector&,double,bool=true);
    void TestFDHessian(MPI_Comm,const mfem::Vector&);
    virtual ~ReducedFunctional() {};
 };
