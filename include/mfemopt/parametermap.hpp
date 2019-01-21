@@ -19,6 +19,8 @@ protected:
 public:
    ParameterMap(bool so=false) : m(0), cg(0), second_order(so) { }
    virtual void Map(const mfem::Vector&,mfem::Vector&) = 0;
+   virtual void InverseMap(const mfem::Vector&,mfem::Vector&)
+   { mfem::mfem_error("ParameterMap::InverseMap not overloaded!"); }
    /*
       Jacobian of the mapping N x M matrix
       M #optimization parameters, N #model parameters, the boolean indicates the direction, i.e.
@@ -53,12 +55,14 @@ class PointwiseMap : public ParameterMap
 {
 private:
    double (*p)(double);
+   double (*pinv)(double);
    double (*dp_dm)(double);
    double (*d2p_dm2)(double);
 
 public:
-   PointwiseMap(double (*)(double),double (*)(double),double (*)(double));
+   PointwiseMap(double (*)(double),double (*)(double),double (*)(double),double (*)(double));
    virtual void Map(const mfem::Vector&,mfem::Vector&);
+   virtual void InverseMap(const mfem::Vector&,mfem::Vector&);
    virtual void GradientMap(const mfem::Vector&,const mfem::Vector&,bool,mfem::Vector&);
    virtual void HessianMult(const mfem::Vector&,mfem::Vector&);
    virtual ~PointwiseMap() { }
