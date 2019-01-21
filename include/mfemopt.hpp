@@ -12,5 +12,6 @@
 #include <mfemopt/coefficients.hpp>
 #include <mfemopt/modelproblems.hpp>
 #include <mfemopt/monitor.hpp>
+#include <mfemopt/random.hpp>
 
 #endif
