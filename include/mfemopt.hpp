@@ -13,5 +13,6 @@
 #include <mfemopt/modelproblems.hpp>
 #include <mfemopt/monitor.hpp>
 #include <mfemopt/random.hpp>
+#include <mfemopt/mfemextra.hpp>
 
 #endif
