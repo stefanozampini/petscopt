@@ -257,7 +257,7 @@ void ImageFunctional::ComputeGradient(const Vector& u, Vector& g)
 
 Operator* ImageFunctional::GetHessian(const Vector& u)
 {
-   Operator& tH = GetGradient(u); /* MFEM use Gradient for the Jacobian of the PDE */
+   Operator& tH = GetGradient(u); /* MFEM uses Gradient for the Jacobian of the PDE */
    return &tH;
 }
 
@@ -320,7 +320,7 @@ void UglyPostCheckFn(Operator *UglyOp, const Vector& X, Vector& Y, Vector &W, bo
 /* the main routine */
 int main(int argc, char* argv[])
 {
-   MFEMInitializePetsc(&argc,&argv,NULL,NULL);
+   MFEMInitializePetsc(&argc,&argv,NULL,help);
 
    /* process options */
    PetscErrorCode ierr;

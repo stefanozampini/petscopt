@@ -780,8 +780,7 @@ void UglyPostCheckFn(Operator *UglyOp, const Vector& X, Vector& Y, Vector &W, bo
 
 int main(int argc, char *argv[])
 {
-   MFEMInitializePetsc(&argc,&argv,NULL,NULL);
-   PetscErrorCode ierr;
+   MFEMInitializePetsc(&argc,&argv,NULL,help);
 
    PetscInt ord = 1, srl = 0, prl = 0, viz = 0, ncrl = 0;
 
@@ -810,8 +809,9 @@ int main(int argc, char *argv[])
 
    /* Process options */
    {
-      PetscBool flg;
-      PetscInt i,j;
+      PetscBool      flg;
+      PetscInt       i,j;
+      PetscErrorCode ierr;
 
       ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"Options for Heat equation",NULL);CHKERRQ(ierr);
 
