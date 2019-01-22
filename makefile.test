@@ -11,9 +11,10 @@ include $(PETSC_DIR)/$(PETSC_ARCH)/lib/petsc/conf/petscvariables
 include $(PETSC_DIR)/lib/petsc/conf/variables
 include $(PETSCOPT_DIR)/lib/petscopt/conf/testvariables
 
-TESTDIR ?= ./$(PETSCOPT_ARCH)/tests
+TESTDIR := ./$(PETSCOPT_ARCH)/tests
 MODDIR := $(PETSC_DIR)/$(PETSC_ARCH)/include
-TESTLOGFILE ?= $(TESTDIR)/examples_$(PETSCOPT_ARCH).log
+# this is hardcoded inside ${PETSC_DIR}/config/example_template.py
+TESTLOGFILE := $(TESTDIR)/examples_$(PETSCOPT_ARCH).log
 EXAMPLESDIR := $(TESTSRCDIR)
 
 petscconf      := $(PETSC_DIR)/$(PETSC_ARCH)/include/petscconf.h
