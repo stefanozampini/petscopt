@@ -120,7 +120,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
    {
       *pcoeffgf[0] = 0.0;
       // XXX BUG: GROUPCOMM not created!
-      pcoeffgf[0]->ProjectDiscCoefficient(*Q,GridFunction::AvgType::ARITHMETIC);
+      pcoeffgf[0]->ProjectDiscCoefficient(*Q,GridFunction::ARITHMETIC);
       //pcoeffgf[0]->ProjectCoefficient(*Q);
       s_coeff = new GridFunctionCoefficient(pcoeffgf[0]);
       deriv_s_coeff = new GridFunctionCoefficient(deriv_coeffgf[0]);

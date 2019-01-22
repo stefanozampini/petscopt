@@ -175,7 +175,7 @@ void Image::Save(const char* filename)
 
    pmesh->Print(ofs);
    ParGridFunction gf(pfes);
-   gf.ProjectDiscCoefficient(*this,GridFunction::AvgType::ARITHMETIC);
+   gf.ProjectDiscCoefficient(*this,GridFunction::ARITHMETIC);
    gf.Save(ofs);
 }
 
@@ -190,7 +190,7 @@ void Image::Visualize(const char* name)
    ierr = MPI_Comm_size(comm,&size); CCHKERRQ(comm,ierr);
 
    ParGridFunction gf(pfes);
-   gf.ProjectDiscCoefficient(*this,GridFunction::AvgType::ARITHMETIC);
+   gf.ProjectDiscCoefficient(*this,GridFunction::ARITHMETIC);
 
    char vishost[] = "localhost";
    int  visport   = 19916;
