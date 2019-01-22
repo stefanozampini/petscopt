@@ -109,6 +109,6 @@ install:
 
 script:
   - cd $PETSCOPT_DIR
-  - make -j1 PETSC_ARCH=arch-test test | tee alltests.log
+  - make -i -j1 PETSC_ARCH=arch-test test | tee alltests.log
   - test -z "$(grep FAILED alltests.log)"
   - cd $PETSC_DIR && git clean -q -x -d -f
