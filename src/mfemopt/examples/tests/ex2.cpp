@@ -155,6 +155,7 @@ public:
    virtual void ComputeObjective(const Vector&,double*) const;
    virtual void ComputeGradient(const Vector&,Vector&) const;
    virtual Operator& GetHessian(const Vector&) const;
+   virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&) const;
    virtual ~RegularizedMultiSourceMisfit() { delete H; }
 };
 
@@ -468,6 +469,15 @@ Operator& RegularizedMultiSourceMisfit::GetHessian(const Vector& m) const
    return *H;
 }
 
+void RegularizedMultiSourceMisfit::PostCheck(const Vector& X, Vector& Y, Vector &W, bool& cy, bool& cw) const
+{
+   /* we don't change the step (Y) or the updated solution (W = X - lambda*Y) */
+   cy = false;
+   cw = false;
+   double lambda = X.Size() ? (X[0] - W[0])/Y[0] : 0.0;
+   reg->UpdateDual(X,Y,lambda);
+}
+
 /*
    The hessian of the full objective
    - H = H_map + J(mu(m))^T * ( H_tv + H_misfit ) J(mu(m))
@@ -760,25 +770,6 @@ public:
       }
    }
 };
-
-/* As in ex1.cpp, we need a couple of ugly callbacks to perform objective and post-update actions */
-void UglyObjFn(Operator *UglyOp, const Vector& u, double *f)
-{
-   RegularizedMultiSourceMisfit *UglyObj = dynamic_cast<RegularizedMultiSourceMisfit*>(UglyOp);
-   MFEM_VERIFY(UglyObj,"Missing Ugly operator");
-   UglyObj->ComputeObjective(u,f);
-}
-
-void UglyPostCheckFn(Operator *UglyOp, const Vector& X, Vector& Y, Vector &W, bool& cy, bool& cw)
-{
-   RegularizedMultiSourceMisfit *UglyObj = dynamic_cast<RegularizedMultiSourceMisfit*>(UglyOp);
-   MFEM_VERIFY(UglyObj,"Missing Ugly operator");
-   /* we don't change the step (Y) or the updated solution (W = X - lambda*Y) */
-   cy = false;
-   cw = false;
-   double lambda = X.Size() ? (X[0] - W[0])/Y[0] : 0.0;
-   UglyObj->reg->UpdateDual(X,Y,lambda);
-}
 
 int main(int argc, char *argv[])
 {
@@ -1116,11 +1107,9 @@ int main(int argc, char *argv[])
 
    /* Test Newton solver */
    if (test_newton) {
-      PetscNonlinearSolver newton(PETSC_COMM_WORLD,*robj,"newton_");
+      PetscNonlinearSolverOpt newton(PETSC_COMM_WORLD,*robj,"newton_");
 
       newton.SetJacobianType(Operator::PETSC_MATSHELL);
-      newton.SetObjective(UglyObjFn);
-      newton.SetPostCheck(UglyPostCheckFn);
       newton.iterative_mode = true; /* we always use an initial guess, it can be zero */
 
 #if 0

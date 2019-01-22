@@ -223,8 +223,7 @@ public:
    virtual void ComputeObjective(const Vector&,double*) const;
    virtual void ComputeGradient(const Vector&,Vector&) const;
    virtual Operator& GetHessian(const Vector&) const;
-
-   void UpdateDualTV(const Vector&,const Vector&,double);
+   virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&) const;
 };
 
 ImageFunctional::ImageFunctional(Image* _img, TikhonovRegularizer *_tk, TVRegularizer *_tv) : img(_img), H(), tk(_tk), tv(_tv)
@@ -276,29 +275,13 @@ Operator& ImageFunctional::GetHessian(const Vector& u) const
    return H;
 }
 
-void ImageFunctional::UpdateDualTV(const Vector& X,const Vector& Y,double lambda)
+void ImageFunctional::PostCheck(const Vector& X, Vector& Y, Vector &W, bool& cy, bool& cw) const
 {
-   tv->UpdateDual(X,Y,lambda);
-}
-
-/* we need a couple of ugly callbacks to pass objective functions and post-primal-update hooks to PETSc,
-   since the interface of mfem::Operator does not allow to do so */
-void UglyObjFn(Operator *UglyOp, const Vector& u, double *f)
-{
-   ImageFunctional *UglyObj = dynamic_cast<ImageFunctional*>(UglyOp);
-   MFEM_VERIFY(UglyObj,"Missing Ugly operator");
-   UglyObj->ComputeObjective(u,f);
-}
-
-void UglyPostCheckFn(Operator *UglyOp, const Vector& X, Vector& Y, Vector &W, bool& cy, bool& cw)
-{
-   ImageFunctional *UglyObj = dynamic_cast<ImageFunctional*>(UglyOp);
-   MFEM_VERIFY(UglyObj,"Missing Ugly operator");
    /* we don't change the step (Y) or the updated solution (W = X - lambda*Y) */
    cy = false;
    cw = false;
    double lambda = X.Size() ? (X[0] - W[0])/Y[0] : 0.0;
-   UglyObj->UpdateDualTV(X,Y,lambda);
+   tv->UpdateDual(X,Y,lambda);
 }
 
 /* the main routine */
@@ -386,10 +369,7 @@ int main(int argc, char* argv[])
       objective.TestFDHessian(PETSC_COMM_WORLD,u);
       std::cout << "---------------------------------------" << std::endl;
 #endif
-      PetscNonlinearSolver newton(PETSC_COMM_WORLD,objective);
-
-      newton.SetObjective(UglyObjFn);
-      newton.SetPostCheck(UglyPostCheckFn);
+      PetscNonlinearSolverOpt newton(PETSC_COMM_WORLD,objective);
 
       NewtonMonitor mymonitor;
       if (mon) newton.SetMonitor(&mymonitor);
