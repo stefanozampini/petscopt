@@ -16,7 +16,7 @@ namespace mfemopt
 
 using namespace mfem;
 
-void ReducedFunctional::ComputeGuess(mfem::Vector& m)
+void ReducedFunctional::ComputeGuess(mfem::Vector& m) const
 {
    Vector l,u;
 
@@ -31,7 +31,7 @@ void ReducedFunctional::ComputeGuess(mfem::Vector& m)
    }
 }
 
-void ReducedFunctional::GetBounds(mfem::Vector& l, mfem::Vector& u)
+void ReducedFunctional::GetBounds(mfem::Vector& l, mfem::Vector& u) const
 {
    l.SetSize(Height());
    u.SetSize(Height());

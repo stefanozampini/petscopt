@@ -27,7 +27,7 @@ double GaussianNoise::random() const
    {
       r1 = std::rand()*(1.0/RAND_MAX);
       r2 = std::rand()*(1.0/RAND_MAX);
-   } while (r1 <= epsilon); 
+   } while (r1 <= epsilon);
 
    double y1,t;
    t  = std::sqrt(-2.0*std::log(r1));

@@ -31,8 +31,10 @@ public:
       return const_cast<ReducedFunctional&>(*this);
    }
 
-   virtual void ComputeGuess(mfem::Vector&);
-   virtual void GetBounds(mfem::Vector&,mfem::Vector&);
+   virtual void ComputeGuess(mfem::Vector&) const;
+   virtual void GetBounds(mfem::Vector&,mfem::Vector&) const;
+   virtual void PostCheck(const mfem::Vector&,mfem::Vector&,mfem::Vector&,bool &cy,bool &cw) const
+   { cy = false; cw = false; }
 
    /* Default interface for mfem::Operator */
    virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const
