@@ -209,35 +209,30 @@ PDCoefficient* Image::CreatePDCoefficient()
 }
 
 /* the objective functional as a sum of Tikhonov and TV terms */
-class ImageFunctional : public ReducedFunctional, public Operator
+class ImageFunctional : public ReducedFunctional
 {
 private:
    Image *img;
-   mutable PetscParMatrix *H;
-
-public:
+   mutable PetscParMatrix H;
    mutable TikhonovRegularizer *tk;
    mutable TVRegularizer *tv;
 
+public:
    ImageFunctional(Image*,TikhonovRegularizer*,TVRegularizer*);
 
-   virtual int GetParameterSize() {return height;}
-   virtual void ComputeObjective(const Vector&, double*);
-   virtual void ComputeGradient(const Vector&, Vector&);
-   virtual Operator* GetHessian(const Vector&);
+   virtual void ComputeObjective(const Vector&,double*) const;
+   virtual void ComputeGradient(const Vector&,Vector&) const;
+   virtual Operator& GetHessian(const Vector&) const;
 
-   virtual void Mult(const Vector&, Vector&) const;
-   virtual Operator& GetGradient(const Vector&) const;
-   virtual ~ImageFunctional() { delete H; }
+   void UpdateDualTV(const Vector&,const Vector&,double);
 };
 
-ImageFunctional::ImageFunctional(Image* _img, TikhonovRegularizer *_tk, TVRegularizer *_tv) : img(_img), H(NULL), tk(_tk), tv(_tv)
+ImageFunctional::ImageFunctional(Image* _img, TikhonovRegularizer *_tk, TVRegularizer *_tv) : img(_img), H(), tk(_tk), tv(_tv)
 {
    height = width = img->ParFESpace()->GetTrueVSize();
 }
 
-/* interface for MFEMOPT */
-void ImageFunctional::ComputeObjective(const Vector& u, double *f)
+void ImageFunctional::ComputeObjective(const Vector& u, double *f) const
 {
    Vector dummy;
    double f1,f2;
@@ -246,7 +241,7 @@ void ImageFunctional::ComputeObjective(const Vector& u, double *f)
    *f = f1 + f2;
 }
 
-void ImageFunctional::ComputeGradient(const Vector& u, Vector& g)
+void ImageFunctional::ComputeGradient(const Vector& u, Vector& g) const
 {
    Vector dummy,g1;
    g1.SetSize(g.Size());
@@ -255,46 +250,35 @@ void ImageFunctional::ComputeGradient(const Vector& u, Vector& g)
    g += g1;
 }
 
-Operator* ImageFunctional::GetHessian(const Vector& u)
-{
-   Operator& tH = GetGradient(u); /* MFEM uses Gradient for the Jacobian of the PDE */
-   return &tH;
-}
-
-/* interface for Newton based solvers provided by mfem::PetscNonlinearSolver */
-void ImageFunctional::Mult(const Vector& u, Vector& g) const
-{
-   Vector dummy,g1;
-
-   g1.SetSize(g.Size());
-   tk->EvalGradient_M(dummy,u,0.,g);
-   tv->EvalGradient_M(dummy,u,0.,g1);
-   g += g1;
-}
-
-Operator& ImageFunctional::GetGradient(const Vector& u) const
+Operator& ImageFunctional::GetHessian(const Vector& u) const
 {
    MPI_Comm comm = img->ParFESpace()->GetParMesh()->GetComm();
+
    Vector dummy;
    tk->SetUpHessian_MM(dummy,u,0.);
    tv->SetUpHessian_MM(dummy,u,0.);
    Operator* Htk = tk->GetHessianOperator_MM();
    Operator* Htv = tv->GetHessianOperator_MM();
-   PetscParMatrix *pHtk = new PetscParMatrix(comm,Htk,Operator::PETSC_MATAIJ);
-   PetscParMatrix *pHtv = new PetscParMatrix(comm,Htv,Operator::PETSC_MATAIJ);
+   PetscParMatrix *pHtk = dynamic_cast<mfem::PetscParMatrix *>(Htk);
+   PetscParMatrix *pHtv = dynamic_cast<mfem::PetscParMatrix *>(Htv);
+   MFEM_VERIFY(pHtk,"Unsupported operator type");
+   MFEM_VERIFY(pHtv,"Unsupported operator type");
 
-   PetscErrorCode ierr;
-   if (!H)
+   /* Pointers to operators returned by the ObjectiveFunction class should not be
+      deleted or modified */
+   H = *pHtk;
+
+   /* These matrices have the same pattern, the MFEM overloaded += operator uses DIFFERENT_NONZERO_PATTERN */
    {
-      H = new PetscParMatrix();
+      PetscErrorCode ierr;
+      ierr = MatAXPY(H,1.0,*pHtv,SAME_NONZERO_PATTERN); CCHKERRQ(comm,ierr);
    }
-   *H = *pHtv;
+   return H;
+}
 
-   /* matrices have the same pattern, the MFEM overloaded += operator uses DIFFERENT_NONZERO_PATTERN */
-   ierr = MatAXPY(*H,1.0,*pHtk,SAME_NONZERO_PATTERN); CCHKERRQ(comm,ierr);
-   delete pHtk;
-   delete pHtv;
-   return *H;
+void ImageFunctional::UpdateDualTV(const Vector& X,const Vector& Y,double lambda)
+{
+   tv->UpdateDual(X,Y,lambda);
 }
 
 /* we need a couple of ugly callbacks to pass objective functions and post-primal-update hooks to PETSc,
@@ -314,7 +298,7 @@ void UglyPostCheckFn(Operator *UglyOp, const Vector& X, Vector& Y, Vector &W, bo
    cy = false;
    cw = false;
    double lambda = X.Size() ? (X[0] - W[0])/Y[0] : 0.0;
-   UglyObj->tv->UpdateDual(X,Y,lambda);
+   UglyObj->UpdateDualTV(X,Y,lambda);
 }
 
 /* the main routine */

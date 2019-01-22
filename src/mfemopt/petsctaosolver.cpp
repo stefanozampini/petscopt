@@ -85,7 +85,7 @@ void PetscOptimizationSolver::SetMonitor(PetscSolverMonitor *ctx)
 
 void PetscOptimizationSolver::Solve(Vector& sol)
 {
-   sol.SetSize(objective->GetParameterSize());
+   sol.SetSize(objective->Height());
    objective->ComputeGuess(sol);
 
    PetscParVector X(PetscObjectComm((PetscObject)tao),sol);
@@ -148,11 +148,20 @@ static PetscErrorCode __mfem_tao_hessian(Tao tao, Vec x, Mat H, Mat Hpre, void* 
 
    PetscFunctionBeginUser;
    mfem::PetscParVector xx(x,true);
-   mfem::Operator *HH = tao_ctx->objective->GetHessian(xx);
-   mfem::PetscParMatrix *pH = new mfem::PetscParMatrix(PetscObjectComm((PetscObject)tao),HH,mfem::Operator::PETSC_MATSHELL);
-   Mat B = pH->ReleaseMat(false);
+   mfem::Operator& HH = tao_ctx->objective->GetHessian(xx);
+   mfem::PetscParMatrix *pHH = const_cast<mfem::PetscParMatrix *>
+                               (dynamic_cast<const mfem::PetscParMatrix *>(&HH));
+   bool delete_mat = false;
+   if (!pHH)
+   {
+      pHH = new mfem::PetscParMatrix(PetscObjectComm((PetscObject)tao),&HH);
+      delete_mat = true;
+   }
+
+   // Avoid unneeded copy of the matrix by hacking
+   Mat B = pHH->ReleaseMat(false);
    ierr = MatHeaderReplace(H,&B);CHKERRQ(ierr);
-   delete pH;
+   if (delete_mat) delete pHH;
    PetscFunctionReturn(0);
 }
 

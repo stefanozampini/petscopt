@@ -21,7 +21,7 @@ void ReducedFunctional::ComputeGuess(mfem::Vector& m)
    Vector l,u;
 
    (*this).GetBounds(l,u);
-   m.SetSize((*this).GetParameterSize());
+   m.SetSize(Height());
    MFEM_VERIFY(m.Size() <= l.Size(),"Wrong sizes: m" << m.Size() << ", l " << l.Size());
    MFEM_VERIFY(m.Size() <= u.Size(),"Wrong sizes: m" << m.Size() << ", u " << u.Size());
    for (int i = 0; i < m.Size(); i++)
@@ -33,8 +33,8 @@ void ReducedFunctional::ComputeGuess(mfem::Vector& m)
 
 void ReducedFunctional::GetBounds(mfem::Vector& l, mfem::Vector& u)
 {
-   l.SetSize((*this).GetParameterSize());
-   u.SetSize((*this).GetParameterSize());
+   l.SetSize(Height());
+   u.SetSize(Height());
    l = std::numeric_limits<double>::min();
    u = std::numeric_limits<double>::max();
 }
@@ -120,34 +120,31 @@ void ReducedFunctional::TestFDHessian(MPI_Comm comm, const Vector& mIn)
    PetscBool verbose = PETSC_FALSE;
    ierr = PetscOptionsGetBool(NULL,NULL,"-fd_hessian_verbose",&verbose,NULL); CCHKERRQ(comm,ierr);
 
-   Operator *H = GetHessian(mIn);
-   if (H)
+   Operator &H = GetHessian(mIn);
+   ierr = PetscPrintf(comm,"ReducedFunctional::TestFDHessian\n");CCHKERRQ(comm,ierr);
+   ReducedFunctionalHessianOperatorFD fdH(comm,this,mIn);
+   PetscParMatrix *pfdH = new PetscParMatrix(comm,&fdH,Operator::PETSC_MATAIJ);
+   PetscParMatrix *pH = new PetscParMatrix(comm,&H,Operator::PETSC_MATAIJ);
+   if (verbose)
    {
-      ierr = PetscPrintf(comm,"ReducedFunctional::TestFDHessian\n");CCHKERRQ(comm,ierr);
-      ReducedFunctionalHessianOperatorFD fdH(comm,this,mIn);
-      PetscParMatrix *pfdH = new PetscParMatrix(comm,&fdH,Operator::PETSC_MATAIJ);
-      PetscParMatrix *pH = new PetscParMatrix(comm,H,Operator::PETSC_MATAIJ);
-      if (verbose)
-      {
-         pfdH->Print();
-         pH->Print();
-      }
-      PetscReal nrm,nrmd,nrminf;
-      PetscParMatrix *diff = new PetscParMatrix();
-      *diff = *pH;
-      *diff -= *pfdH;
-      if (verbose)
-      {
-         diff->Print();
-      }
-      ierr = MatNorm(*pH,NORM_INFINITY,&nrm);CCHKERRQ(comm,ierr);
-      ierr = MatNorm(*pfdH,NORM_INFINITY,&nrmd);CCHKERRQ(comm,ierr);
-      ierr = MatNorm(*diff,NORM_INFINITY,&nrminf);CCHKERRQ(comm,ierr);
-      ierr = PetscPrintf(comm,"||H||_inf = %g, ||H_fd||_inf = %g, ||H - H_fd||_inf = %g, ||H-H_fd||_inf/||H_fd||_inf = %g\n",nrm,nrmd,nrminf,nrminf/nrmd);CCHKERRQ(comm,ierr);
-      delete diff;
-      delete pH;
-      delete pfdH;
+      pfdH->Print();
+      pH->Print();
    }
+   PetscReal nrm,nrmd,nrminf;
+   PetscParMatrix *diff = new PetscParMatrix();
+   *diff = *pH;
+   *diff -= *pfdH;
+   if (verbose)
+   {
+      diff->Print();
+   }
+   ierr = MatNorm(*pH,NORM_INFINITY,&nrm);CCHKERRQ(comm,ierr);
+   ierr = MatNorm(*pfdH,NORM_INFINITY,&nrmd);CCHKERRQ(comm,ierr);
+   ierr = MatNorm(*diff,NORM_INFINITY,&nrminf);CCHKERRQ(comm,ierr);
+   ierr = PetscPrintf(comm,"||H||_inf = %g, ||H_fd||_inf = %g, ||H - H_fd||_inf = %g, ||H-H_fd||_inf/||H_fd||_inf = %g\n",nrm,nrmd,nrminf,nrminf/nrmd);CCHKERRQ(comm,ierr);
+   delete diff;
+   delete pH;
+   delete pfdH;
 }
 
 ReducedFunctionalHessianOperatorFD::ReducedFunctionalHessianOperatorFD(MPI_Comm _comm, ReducedFunctional *_obj, const Vector& _mIn) : PetscParMatrix()

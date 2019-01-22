@@ -91,7 +91,7 @@ private:
    Array<PetscODESolver*> arrayS;
 
 public:
-   MultiSourceMisfitHessian(MultiSourceMisfit*,const Vector&);
+   MultiSourceMisfitHessian(const MultiSourceMisfit*,const Vector&);
    virtual void Mult(const Vector&,Vector&) const;
    ~MultiSourceMisfitHessian();
 };
@@ -115,8 +115,10 @@ private:
    mutable PetscParVector *U, *G;
 
    double t0, dt, tf;
-   PetscBCHandler* bchandler;
+   PetscBCHandler *bchandler;
    PetscODESolver *odesolver;
+
+   mutable Operator *H;
 
    MPI_Comm comm;
 
@@ -127,21 +129,21 @@ protected:
 public:
    MultiSourceMisfit(ParFiniteElementSpace*,PDCoefficient*,MatrixCoefficient*,PetscBCHandler*,DenseMatrix&,DenseMatrix&,double,double,double,const char*);
 
-   MPI_Comm GetComm() { return comm; }
+   MPI_Comm GetComm() const { return comm; }
 
-   virtual int GetParameterSize();
-   virtual void ComputeObjective(const Vector&,double*);
+   virtual void ComputeObjective(const Vector&,double*) const;
+   virtual void ComputeGradient(const Vector&,Vector&) const;
+   virtual void ComputeObjectiveAndGradient(const Vector&,double*,Vector&) const;
+
+   virtual Operator& GetHessian(const Vector&) const;
+
    virtual void ComputeGuess(Vector&);
-   virtual void ComputeGradient(const Vector&,Vector&);
-   virtual void ComputeObjectiveAndGradient(const Vector&,double*,Vector&);
-
-   virtual Operator* GetHessian(const Vector&);
 
    virtual ~MultiSourceMisfit();
 };
 
 /* Misfit function plus total variation regularizer */
-class RegularizedMultiSourceMisfit : public Operator
+class RegularizedMultiSourceMisfit : public ReducedFunctional
 {
 public:
    mutable Operator *H;
@@ -150,9 +152,9 @@ public:
    ParameterMap *pmap;
 
    RegularizedMultiSourceMisfit(MultiSourceMisfit*,TVRegularizer*,ParameterMap* = NULL);
-   void ComputeObjective(const Vector&,double*);
-   virtual void Mult(const Vector&,Vector&) const;
-   virtual Operator& GetGradient(const Vector&) const;
+   virtual void ComputeObjective(const Vector&,double*) const;
+   virtual void ComputeGradient(const Vector&,Vector&) const;
+   virtual Operator& GetHessian(const Vector&) const;
    virtual ~RegularizedMultiSourceMisfit() { delete H; }
 };
 
@@ -166,7 +168,6 @@ public:
    RegularizedMultiSourceMisfitHessian(const RegularizedMultiSourceMisfit*,const Vector&);
    virtual void Mult(const Vector&,Vector&) const;
    virtual void MultTranspose(const Vector&,Vector&) const;
-   virtual ~RegularizedMultiSourceMisfitHessian() { delete Hobj; }
 };
 
 MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient* mu, MatrixCoefficient* sigma, PetscBCHandler* _bchandler,
@@ -185,6 +186,9 @@ MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient*
    /* mfem::TimeDependent operator (as PDOperator) */
    heat = new ModelHeat(mu,sigma,_fes,Operator::PETSC_MATAIJ);
    heat->SetBCHandler(*_bchandler);
+
+   /* ReducedFunctional base class is mfem::Operator */
+   height = width = heat->GetParameterSize();
 
    /* We use the same solver for objective and gradient computations */
    odesolver = new PetscODESolver(comm,"worker_");
@@ -215,6 +219,8 @@ MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient*
    g.SetSize(heat->GetParameterSize());
    G = new PetscParVector(comm,g);
    M = new PetscParVector(comm,g);
+
+   H = NULL;
 }
 
 MultiSourceMisfit::~MultiSourceMisfit()
@@ -227,6 +233,7 @@ MultiSourceMisfit::~MultiSourceMisfit()
    delete G;
    delete M;
    delete odesolver;
+   delete H;
 }
 
 void MultiSourceMisfit::ComputeGuess(Vector& m)
@@ -235,12 +242,7 @@ void MultiSourceMisfit::ComputeGuess(Vector& m)
    m = 1.0;
 }
 
-int MultiSourceMisfit::GetParameterSize()
-{
-   return heat->GetParameterSize();
-}
-
-void MultiSourceMisfit::ComputeObjective(const Vector& m, double *f)
+void MultiSourceMisfit::ComputeObjective(const Vector& m, double *f) const
 {
    odesolver->Init(*heat,PetscODESolver::ODE_SOLVER_LINEAR);
 
@@ -273,7 +275,7 @@ void MultiSourceMisfit::ComputeObjective(const Vector& m, double *f)
    M->ResetArray();
 }
 
-void MultiSourceMisfit::ComputeGradient(const Vector& m, Vector& g)
+void MultiSourceMisfit::ComputeGradient(const Vector& m, Vector& g) const
 {
    odesolver->Init(*heat,PetscODESolver::ODE_SOLVER_LINEAR);
 
@@ -308,7 +310,7 @@ void MultiSourceMisfit::ComputeGradient(const Vector& m, Vector& g)
    M->ResetArray();
 }
 
-void MultiSourceMisfit::ComputeObjectiveAndGradient(const Vector& m, double *f, Vector& g)
+void MultiSourceMisfit::ComputeObjectiveAndGradient(const Vector& m, double *f, Vector& g) const
 {
    odesolver->Init(*heat,PetscODESolver::ODE_SOLVER_LINEAR);
 
@@ -347,18 +349,18 @@ void MultiSourceMisfit::ComputeObjectiveAndGradient(const Vector& m, double *f, 
    M->ResetArray();
 }
 
-Operator* MultiSourceMisfit::GetHessian(const Vector& m)
+Operator& MultiSourceMisfit::GetHessian(const Vector& m) const
 {
-   return new MultiSourceMisfitHessian(this,m);
+   delete H;
+   H = new MultiSourceMisfitHessian(this,m);
+   return *H;
 }
 
-MultiSourceMisfitHessian::MultiSourceMisfitHessian(MultiSourceMisfit* _msobj, const Vector& _m) : Operator(_m.Size(),_m.Size())
+MultiSourceMisfitHessian::MultiSourceMisfitHessian(const MultiSourceMisfit* _msobj, const Vector& _m) : Operator(_m.Size(),_m.Size())
 {
    MPI_Comm comm = _msobj->GetComm();
 
-   for (int i = 0; i < arrayH.Size(); i++) { delete arrayH[i]; }
    arrayH.SetSize(_msobj->lsobj.Size());
-   for (int i = 0; i < arrayS.Size(); i++) { delete arrayS[i]; }
    arrayS.SetSize(_msobj->lsobj.Size());
 
    PetscParMatrix *A = new PetscParMatrix(comm,_msobj->heat->GetGradientOperator(),Operator::PETSC_MATSHELL);
@@ -420,15 +422,15 @@ MultiSourceMisfitHessian::~MultiSourceMisfitHessian()
 
 RegularizedMultiSourceMisfit::RegularizedMultiSourceMisfit(MultiSourceMisfit *_obj, TVRegularizer *_reg, ParameterMap *_pmap)
 {
-   H    = NULL;
    obj  = _obj;
    reg  = _reg;
    pmap = _pmap;
+   H    = NULL;
 
-   height = width = _obj->GetParameterSize();
+   height = width = _obj->Height();
 }
 
-void RegularizedMultiSourceMisfit::ComputeObjective(const Vector& m, double *f)
+void RegularizedMultiSourceMisfit::ComputeObjective(const Vector& m, double *f) const
 {
    Vector pm;
    if (pmap) pmap->Map(m,pm);
@@ -441,7 +443,7 @@ void RegularizedMultiSourceMisfit::ComputeObjective(const Vector& m, double *f)
    *f = f1 + f2;
 }
 
-void RegularizedMultiSourceMisfit::Mult(const Vector& m, Vector& g) const
+void RegularizedMultiSourceMisfit::ComputeGradient(const Vector& m, Vector& g) const
 {
    Vector pm;
    if (pmap) pmap->Map(m,pm);
@@ -459,8 +461,7 @@ void RegularizedMultiSourceMisfit::Mult(const Vector& m, Vector& g) const
    else g = g1;
 }
 
-/* MFEM Newton nomenclature Gradient == Jacobian of the residual -> Hessian for the objective */
-Operator& RegularizedMultiSourceMisfit::GetGradient(const Vector& m) const
+Operator& RegularizedMultiSourceMisfit::GetHessian(const Vector& m) const
 {
    delete H;
    H = new RegularizedMultiSourceMisfitHessian(this,m);
@@ -471,15 +472,16 @@ Operator& RegularizedMultiSourceMisfit::GetGradient(const Vector& m) const
    The hessian of the full objective
    - H = H_map + J(mu(m))^T * ( H_tv + H_misfit ) J(mu(m))
 */
-RegularizedMultiSourceMisfitHessian::RegularizedMultiSourceMisfitHessian(const RegularizedMultiSourceMisfit* _rmsobj, const Vector& _m) : Operator(_m.Size(),_m.Size())
+RegularizedMultiSourceMisfitHessian::RegularizedMultiSourceMisfitHessian(const RegularizedMultiSourceMisfit* _rmsobj, const Vector& _m)
 {
+   height = width = _m.Size();
    pmap = _rmsobj->pmap;
 
    Vector pm;
    if (pmap) pmap->Map(_m,pm);
    else pm = _m;
 
-   Hobj = _rmsobj->obj->GetHessian(pm);
+   Hobj = &( _rmsobj->obj->GetHessian(pm));
 
    Vector dummy;
    _rmsobj->reg->SetUpHessian_MM(dummy,pm,0.);
@@ -1001,7 +1003,6 @@ int main(int argc, char *argv[])
       delete u;
       delete U;
    }
-
 
    /* Optimization space */
    FiniteElementCollection *mu_fec = NULL;
