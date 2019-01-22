@@ -137,7 +137,7 @@ public:
 
    virtual Operator& GetHessian(const Vector&) const;
 
-   virtual void ComputeGuess(Vector&);
+   virtual void ComputeGuess(Vector&) const;
 
    virtual ~MultiSourceMisfit();
 };
