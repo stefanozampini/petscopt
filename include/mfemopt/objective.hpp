@@ -160,7 +160,6 @@ public:
    virtual void SetUpHessian_MM(const mfem::Vector&,const mfem::Vector&,double);
    virtual mfem::Operator* GetHessianOperator_MM();
 
-   void PrimalToDual(const mfem::Vector&);
    void UpdateDual(const mfem::Vector&,const mfem::Vector&,double);
 
    virtual ~TVRegularizer();

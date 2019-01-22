@@ -612,35 +612,6 @@ TVRegularizer::TVRegularizer(PDCoefficient* _m_pd, double _alpha, double _beta, 
    delete pH;
 }
 
-void TVRegularizer::PrimalToDual(const Vector& m)
-{
-   if (!m_pd) return;
-   if (!wkgf.Size()) return;
-   int off = 0;
-   for (int i=0; i<wkgf.Size(); i++)
-   {
-      int n = P2D->Width();
-      Vector pmi(m.GetData()+off,n);
-      P2D->Mult(pmi,*wkgf[i]);
-      off += n;
-   }
-#if 0
-  {
-      std::ostringstream mesh_name, sol_name;
-      mesh_name << "dmesh" ;
-      sol_name << "dual";
-
-      std::ofstream mesh_ofs(mesh_name.str().c_str());
-      mesh_ofs.precision(8);
-      wkgf[i]->ParFESpace()->GetParMesh()->Print(mesh_ofs);
-
-      std::ofstream sol_ofs(sol_name.str().c_str());
-      sol_ofs.precision(8);
-      wkgf[i]->Save(sol_ofs);
-   }
-#endif
-}
-
 void TVRegularizer::UpdateDual(const mfem::Vector& m, const mfem::Vector& dm, double lambda)
 {
    Vector mk,dmk,wk,dwk;
