@@ -26,8 +26,11 @@ private:
    double teval;
    bool has_x,has_m;
 
+protected:
+   mfem::Operator *H_XX, *H_MM; /* Hessian operators, owned by the base class */
+
 public:
-   ObjectiveFunction(bool _has_x = true, bool _has_m = true, double _teval = std::numeric_limits<double>::min()) : teval(_teval), has_x(_has_x), has_m(_has_m) {}
+   ObjectiveFunction(bool _has_x = true, bool _has_m = true, double _teval = std::numeric_limits<double>::min()) : teval(_teval), has_x(_has_x), has_m(_has_m), H_XX(NULL), H_MM(NULL) {}
 
    double GetEvalTime() { return teval; }
 
@@ -42,14 +45,18 @@ public:
    virtual void EvalGradient_M(const mfem::Vector&,const mfem::Vector&,double,mfem::Vector&)
    { mfem::mfem_error("ObjectiveFunction::EvalGradient_M not overloaded!"); }
 
+   /* Unlike the mfem::Operator::GetGradient and mfemopt::ReducedFunctional::GetHessian methods
+      the Operator returned by these methods are owned by the base class and they
+      should not be modified or deleted.
+      Modifications can only happen through the SetUpHessian_?? methods */
+   mfem::Operator* GetHessianOperator_XX() { return H_XX; }
+   mfem::Operator* GetHessianOperator_MM() { return H_MM; }
    virtual void SetUpHessian_XX(const mfem::Vector&,const mfem::Vector&,double) {}
-   virtual mfem::Operator* GetHessianOperator_XX() { return NULL; }
    virtual void SetUpHessian_MM(const mfem::Vector&,const mfem::Vector&,double) {}
-   virtual mfem::Operator* GetHessianOperator_MM() { return NULL; }
 
    void TestFDGradient(MPI_Comm,const mfem::Vector&,const mfem::Vector&,double,double,bool=true);
    void TestFDHessian(MPI_Comm,const mfem::Vector&,const mfem::Vector&,double);
-   virtual ~ObjectiveFunction() {}
+   virtual ~ObjectiveFunction() { delete H_XX; delete H_MM; }
 };
 
 class ObjectiveHessianOperatorFD : public mfem::PetscParMatrix
@@ -72,14 +79,12 @@ class TikhonovRegularizer : public ObjectiveFunction
 {
 private:
    mfem::PetscParVector* u0;
-   mfem::PetscParMatrix* M;
 
 public:
-   TikhonovRegularizer() : ObjectiveFunction(false,true), u0(NULL), M(NULL) {}
+   TikhonovRegularizer() : ObjectiveFunction(false,true), u0(NULL) {}
    TikhonovRegularizer(PDCoefficient*);
    virtual void Eval(const mfem::Vector&,const mfem::Vector&,double,double*);
    virtual void EvalGradient_M(const mfem::Vector&,const mfem::Vector&,double,mfem::Vector&);
-   virtual mfem::Operator* GetHessianOperator_MM() { return M; }
    ~TikhonovRegularizer();
 };
 
@@ -99,8 +104,6 @@ protected:
    mfem::Array<mfem::VectorDeltaCoefficient*> deltacoeffs_x;
    mfem::ParLinearForm *rhsform_x;
 
-   TDLeastSquaresHessian *H;
-
    void InitReceivers();
    void InitDeltaCoefficients();
    void ResetDeltaCoefficients();
@@ -116,7 +119,6 @@ public:
 
    virtual void Eval(const mfem::Vector&,const mfem::Vector&,double,double*);
    virtual void EvalGradient_X(const mfem::Vector&,const mfem::Vector&,double, mfem::Vector&);
-   virtual mfem::Operator* GetHessianOperator_XX();
 
    virtual ~TDLeastSquares();
 };
@@ -137,7 +139,6 @@ public:
 class TVRegularizer : public ObjectiveFunction
 {
 private:
-   mfem::Operator *H;
    double alpha;
    double beta;
    TVIntegrator tvInteg;
@@ -158,7 +159,6 @@ public:
    virtual void Eval(const mfem::Vector&,const mfem::Vector&,double,double*);
    virtual void EvalGradient_M(const mfem::Vector&,const mfem::Vector&,double,mfem::Vector&);
    virtual void SetUpHessian_MM(const mfem::Vector&,const mfem::Vector&,double);
-   virtual mfem::Operator* GetHessianOperator_MM();
 
    void UpdateDual(const mfem::Vector&,const mfem::Vector&,double);
 

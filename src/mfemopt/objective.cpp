@@ -301,7 +301,7 @@ TikhonovRegularizer::TikhonovRegularizer(PDCoefficient *_u0) : ObjectiveFunction
    PetscParMatrix *P = _u0->GetP();
    Array<PetscInt> &global_cols = _u0->GetGlobalCols();
 
-   M = RAP(tM,P);
+   H_MM = RAP(tM,P);
    delete tM;
 
    PetscParVector *tu0  = new PetscParVector(pgf[0]->ParFESpace());
@@ -317,24 +317,23 @@ TikhonovRegularizer::TikhonovRegularizer(PDCoefficient *_u0) : ObjectiveFunction
 
 void TikhonovRegularizer::Eval(const mfem::Vector& u,const mfem::Vector& m,double t,double* f)
 {
-   Vector x(m),Mx;
+   Vector x(m),Mx; /* XXX work array */
    x -= *u0;
-   Mx.SetSize(M->Height());
-   M->Mult(x,Mx);
-   *f = 0.5*InnerProduct(M->GetComm(),x,Mx);
+   Mx.SetSize(H_MM->Height());
+   H_MM->Mult(x,Mx);
+   *f = 0.5*InnerProduct(u0->GetComm(),x,Mx);
 }
 
 void TikhonovRegularizer::EvalGradient_M(const mfem::Vector& u,const mfem::Vector& m,double t,mfem::Vector &g)
 {
    Vector x(m);
    x -= *u0;
-   M->Mult(x,g);
+   H_MM->Mult(x,g);
 }
 
 TikhonovRegularizer::~TikhonovRegularizer()
 {
    delete u0;
-   delete M;
 }
 
 // least squares sampling : 1/2 || E - D ||^2
@@ -356,7 +355,6 @@ void TDLeastSquares::Init()
    u = NULL;
    rhsform_x = NULL;
    own_recv = false;
-   H = NULL;
 }
 
 TDLeastSquares::TDLeastSquares() : ObjectiveFunction(true,false)
@@ -369,6 +367,7 @@ TDLeastSquares::TDLeastSquares(const Array<Receiver*>& _receivers, ParFiniteElem
    Init();
    SetReceivers(_receivers,_own_recv);
    SetParFiniteElementSpace(_fe);
+   H_XX = new TDLeastSquaresHessian(this);
 }
 
 void TDLeastSquares::SetReceivers(const Array<Receiver*>& _receivers, bool _own_recv)
@@ -506,12 +505,6 @@ void TDLeastSquares::ResetDeltaCoefficients()
    delete rhsform_x;
 }
 
-Operator *TDLeastSquares::GetHessianOperator_XX()
-{
-   if (!H) H = new TDLeastSquaresHessian(this);
-   return H;
-}
-
 TDLeastSquares::~TDLeastSquares()
 {
    delete u;
@@ -523,7 +516,6 @@ TDLeastSquares::~TDLeastSquares()
       }
    }
    ResetDeltaCoefficients();
-   delete H;
 }
 
 TDLeastSquaresHessian::TDLeastSquaresHessian(TDLeastSquares *ls)
@@ -552,7 +544,7 @@ void TDLeastSquaresHessian::Mult(const Vector& x, Vector& y) const
    ls->rhsform_x->ParallelAssemble(y);
 }
 
-TVRegularizer::TVRegularizer(PDCoefficient* _m_pd, double _alpha, double _beta, bool _primal_dual) : ObjectiveFunction(false,true), H(NULL), alpha(_alpha), beta(_beta), tvInteg(beta), wkgf(), P2D(NULL), ljacs(), primal_dual(_primal_dual), m_pd(_m_pd)
+TVRegularizer::TVRegularizer(PDCoefficient* _m_pd, double _alpha, double _beta, bool _primal_dual) : ObjectiveFunction(false,true), alpha(_alpha), beta(_beta), tvInteg(beta), wkgf(), P2D(NULL), ljacs(), primal_dual(_primal_dual), m_pd(_m_pd)
 {
    if (!m_pd) return;
    Array<ParGridFunction*> &pgf = m_pd->GetDerivCoeffs();
@@ -711,7 +703,6 @@ TVRegularizer::~TVRegularizer()
       delete ljacs[i];
    }
    delete P2D;
-   delete H;
 }
 
 void TVRegularizer::Eval(const Vector& state, const Vector& m, double time, double *f)
@@ -797,19 +788,7 @@ void TVRegularizer::SetUpHessian_MM(const Vector& x,const Vector& m,double t)
    Array<ParGridFunction*> &pgf = m_pd->GetDerivCoeffs();
    if (!pgf.Size()) return;
    m_pd->UpdateCoefficientWithGF(m,pgf);
-}
 
-Operator* TVRegularizer::GetHessianOperator_MM()
-{
-   DenseMatrix elmat;
-   Vector      mk;
-   Array<int>  vdofs;
-
-   if (H) delete H;
-   H = NULL;
-   if (!m_pd) return H;
-   Array<ParGridFunction*> &pgf = m_pd->GetDerivCoeffs();
-   if (!pgf.Size()) return NULL;
    ParFiniteElementSpace *fes = pgf[0]->ParFESpace();
    ParMesh *mesh = fes->GetParMesh();
    for (int i = 0; i < pgf.Size(); i++)
@@ -841,6 +820,10 @@ Operator* TVRegularizer::GetHessianOperator_MM()
       /* For multiple: SetDenominator */
       for (int pg = 0; pg < pgf.Size(); pg++)
       {
+         DenseMatrix elmat;
+         Vector      mk;
+         Array<int>  vdofs;
+
          ParFiniteElementSpace *fes = pgf[pg]->ParFESpace();
          fes->GetElementVDofs(e, vdofs);
          pgf[pg]->GetSubVector(vdofs, mk);
@@ -859,13 +842,24 @@ Operator* TVRegularizer::GetHessianOperator_MM()
    }
 
    PetscParMatrix *uH = new PetscParMatrix(mesh->GetComm(),fes->GlobalVSize(),
-                                           fes->GetDofOffsets(), ljacs[0],
+                                           fes->GetDofOffsets(),ljacs[0], /* XXX */
                                            Operator::PETSC_MATAIJ);
 
-   PetscParMatrix *P = m_pd->GetP();
-   H = RAP(uH,P);
+   PetscParMatrix *H = RAP(uH,m_pd->GetP());
+   if (!H_MM) H_MM = H;
+   else
+   {
+      PetscParMatrix *pH_MM = dynamic_cast<mfem::PetscParMatrix *>(H_MM);
+      MFEM_VERIFY(pH_MM,"Unsupported operator type");
+
+      Mat B;
+      B = H->ReleaseMat(false);
+
+      PetscErrorCode ierr;
+      ierr = MatHeaderReplace(*pH_MM,&B); CCHKERRQ(mesh->GetComm(),ierr);
+      delete H;
+   }
    delete uH;
-   return H;
 }
 
 PetscErrorCode mfemopt_eval_tdobj(Vec U,Vec M,PetscReal t,PetscReal* f,void* ctx)
