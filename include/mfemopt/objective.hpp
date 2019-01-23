@@ -74,7 +74,7 @@ public:
    ObjectiveHessianOperatorFD(MPI_Comm,ObjectiveFunction*,const mfem::Vector&,const mfem::Vector&,double,int,int);
 };
 
-// Simple Tikhonov misfit : 1/2 \int_\Omega |u - u_0|^2 dx
+// Simple Tikhonov misfit : 1/2 \int_\Omega ||u - u_0||^2 dx
 class TikhonovRegularizer : public ObjectiveFunction
 {
 private:
@@ -90,7 +90,7 @@ public:
 
 class TDLeastSquaresHessian;
 
-// time dependent least squares
+// time dependent least squares : 1/2 sum^nreceivers_i=0 || u(x_i,t) - r_i(t) ||^2
 class TDLeastSquares : public ObjectiveFunction
 {
 protected:
