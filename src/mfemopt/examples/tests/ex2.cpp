@@ -237,7 +237,7 @@ MultiSourceMisfit::~MultiSourceMisfit()
    delete H;
 }
 
-void MultiSourceMisfit::ComputeGuess(Vector& m)
+void MultiSourceMisfit::ComputeGuess(Vector& m) const
 {
    m.SetSize(heat->GetParameterSize());
    m = 1.0;
