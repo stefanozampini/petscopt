@@ -7,6 +7,19 @@ namespace mfemopt
 {
 using namespace mfem;
 
+ParMesh* ParMeshTest(MPI_Comm comm, Mesh &mesh)
+{
+   int size;
+   MPI_Comm_size(comm,&size);
+   int nel = mesh.GetNE();
+   int *test_partitioning = new int[nel];
+   for (int i = 0; i < nel; i++) test_partitioning[i] = (int)((1.0*i*size)/(1.0*nel));
+
+   ParMesh *pmesh = new ParMesh(comm,mesh,test_partitioning);
+   delete[] test_partitioning;
+   return pmesh;
+}
+
 PetscNonlinearSolverOpt::PetscNonlinearSolverOpt(MPI_Comm comm, ReducedFunctional &rf,
                          const std::string &prefix, bool obj) : PetscNonlinearSolver(comm,rf,prefix)
 {

@@ -4,13 +4,23 @@ Sources matrix
 Receivers matrix
 [row +0]
 +0.000000e+00
-Misfit objective 1.48861e-23
+---------------------------------------
+TDLeastSquares tests
+ObjectiveFunction::TestFDGradient, delta: 1e-06
+-> hang tight while computing state gradient
+||g|| = 2.90873, ||g_fd|| = 2.90873, ||g - g_fd|| = 2.77616e-10, ||g-g_fd||/||g_fd|| = 9.54422e-11, cos() = 1.
+ObjectiveFunction::TestFDHessian state x state
+||H||_inf = 1., ||H_fd||_inf = 1., ||H - H_fd||_inf = 2.8481e-09, ||H-H_fd||_inf/||H_fd||_inf = 2.8481e-09
+---------------------------------------
+PDOperator::TestFDGradient wrt design
+||G|| = 0.738006, ||G^T|| = 0.738006, ||G - (G^T)^T||/||G|| = 3.76089e-17, ||G_fd|| = 0.738006, ||G_fd - G|| = 9.67902e-09
+Misfit objective 1.48866e-23
 ReducedFunctional::TestFDGradient, delta: 1e-08
 -> hang tight while computing state gradient
-||g|| = 2.06369e-12, ||g_fd|| = 2.18255e-12, ||g - g_fd|| = 1.18868e-13, ||g-g_fd||/||g_fd|| = 0.054463, cos() = 1.
+||g|| = 2.06507e-12, ||g_fd|| = 2.1817e-12, ||g - g_fd|| = 1.1663e-13, ||g-g_fd||/||g_fd|| = 0.0534585, cos() = 1.
 ReducedFunctional::TestFDHessian
-||H||_inf = 6.60925, ||H_fd||_inf = 6.61478, ||H - H_fd||_inf = 0.00553657, ||H-H_fd||_inf/||H_fd||_inf = 0.000836999
-Regularized objective 1.48861e-23
+||H||_inf = 6.60925, ||H_fd||_inf = 6.61478, ||H - H_fd||_inf = 0.00553701, ||H-H_fd||_inf/||H_fd||_inf = 0.000837066
+Regularized objective 1.48866e-23
 Number of dofs 11
 it	lit	energy		(g,du)		||g||_l2	step
-0	0	1.488611e-23	-0.000000e+00	0.000000e+00	0.000000e+00
+0	0	1.488663e-23	-0.000000e+00	0.000000e+00	0.000000e+00

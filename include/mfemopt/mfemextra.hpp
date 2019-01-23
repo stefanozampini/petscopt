@@ -5,10 +5,13 @@
 
 #if defined(PETSCOPT_HAVE_MFEMOPT)
 #include <mfemopt/reducedfunctional.hpp>
+#include <mfem/mesh/pmesh.hpp>
 #include <mfem/linalg/petsc.hpp>
 
 namespace mfemopt
 {
+
+mfem::ParMesh* ParMeshTest(MPI_Comm,mfem::Mesh&);
 
 class PetscNonlinearSolverOpt : public mfem::PetscNonlinearSolver
 {

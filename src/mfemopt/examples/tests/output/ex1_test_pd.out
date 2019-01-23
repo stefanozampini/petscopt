@@ -1,0 +1,23 @@
+---------------------------------------
+TV tests
+ObjectiveFunction::TestFDGradient, delta: 1e-06
+-> hang tight while computing design gradient
+||g|| = 3.46132e-17, ||g_fd|| = 0., ||g - g_fd|| = 3.46132e-17, ||g-g_fd||/||g_fd|| = inf., cos() = -nan.
+ObjectiveFunction::TestFDHessian design x design
+||H||_inf = 0.0501748, ||H_fd||_inf = 0.0501748, ||H - H_fd||_inf = 1.50886e-10, ||H-H_fd||_inf/||H_fd||_inf = 3.00721e-09
+---------------------------------------
+Tikhonov tests
+ObjectiveFunction::TestFDGradient, delta: 1e-06
+-> hang tight while computing design gradient
+||g|| = 0.010989, ||g_fd|| = 0.010989, ||g - g_fd|| = 3.20219e-12, ||g-g_fd||/||g_fd|| = 2.91398e-10, cos() = 1.
+ObjectiveFunction::TestFDHessian design x design
+||H||_inf = 0.00590278, ||H_fd||_inf = 0.00590278, ||H - H_fd||_inf = 6.30971e-11, ||H-H_fd||_inf/||H_fd||_inf = 1.06894e-08
+---------------------------------------
+Image tests
+ReducedFunctional::TestFDGradient, delta: 1e-06
+-> hang tight while computing state gradient
+||g|| = 0.010989, ||g_fd|| = 0.010989, ||g - g_fd|| = 3.20219e-12, ||g-g_fd||/||g_fd|| = 2.91398e-10, cos() = 1.
+ReducedFunctional::TestFDHessian
+||H||_inf = 0.0532998, ||H_fd||_inf = 0.0532998, ||H - H_fd||_inf = 2.12562e-10, ||H-H_fd||_inf/||H_fd||_inf = 3.98804e-09
+---------------------------------------
+Nonlinear  solve converged due to CONVERGED_FNORM_RELATIVE iterations 9

@@ -8,56 +8,10 @@ Number of dofs 5
 it	lit	energy		(g,du)		||g||_l2	step
 0	0	1.399645e-02	-0.000000e+00	0.000000e+00	0.000000e+00
   ---------- Testing Jacobian -------------
+  Run with -snes_test_jacobian_view and optionally -snes_test_jacobian <threshold> to show difference
+    of hand-coded and finite difference Jacobian entries greater than <threshold>.
   Testing hand-coded Jacobian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Jacobian is probably correct.
-  ||J - Jfd||_F/||J||_F = 0.000980619, ||J - Jfd||_F = 0.00790892
-  Hand-coded Jacobian ----------
-Mat Object: 1 MPI processes
-  type: shell
-  Finite difference Jacobian ----------
-Mat Object: 1 MPI processes
-  type: seqdense
-9.5715988209121833e-02 -8.4268446153146197e-03 2.7645173395285377e-04 -6.4545748980890480e-02 -1.0236119560431687e-03 
--8.4263833705335838e-03 7.7804637445369718e+00 -8.4263832541182620e-03 1.0468683376675469e+00 1.0468682398786766e+00 
-2.7645049704005936e-04 -8.4254966131993552e-03 9.5715985909919227e-02 -1.0234144938294774e-03 -6.4545563225692590e-02 
--6.4545674889814095e-02 1.0468685674713922e+00 -1.0235576773993669e-03 2.9076774243731046e-01 1.6090958754648452e-01 
--1.0235575609840451e-03 1.0468690693669485e+00 -6.4545676577836261e-02 1.6090968306525608e-01 2.9076778926537367e-01 
-  Hand-coded minus finite-difference Jacobian with tolerance 1e-05 ----------
-Mat Object: 1 MPI processes
-  type: seqdense
-0.0000000000000000e+00 4.5004372803570530e-05 0.0000000000000000e+00 0.0000000000000000e+00 0.0000000000000000e+00 
--4.5675234685923702e-05 -7.5910714296476556e-03 -4.5675375525659409e-05 -1.1277730402328157e-03 -1.1276755847511311e-03 
-0.0000000000000000e+00 4.3656638661078440e-05 0.0000000000000000e+00 0.0000000000000000e+00 0.0000000000000000e+00 
-0.0000000000000000e+00 -1.0665877523270417e-03 0.0000000000000000e+00 -1.5560566724281966e-04 -1.5814690644799789e-04 
-0.0000000000000000e+00 -1.0670883109304974e-03 0.0000000000000000e+00 -1.5824234921352209e-04 -1.5565261670452690e-04 
-1	3	1.396081e-02	-7.038808e-05	1.498015e-02	1.000000e+00
+  ||J - Jfd||_F/||J||_F = 0.00098056, ||J - Jfd||_F = 0.00790845
+1	3	1.396081e-02	-7.038806e-05	1.498014e-02	1.000000e+00
 Nonlinear newton_ solve did not converge due to DIVERGED_MAX_IT iterations 1
-SNES Object: (newton_) 1 MPI processes
-  type: newtonls
-  maximum iterations=1, maximum function evaluations=10000
-  tolerances: relative=1e-06, absolute=1e-06, solution=1e-08
-  total number of linear solver iterations=3
-  total number of function evaluations=9
-  norm schedule ALWAYS
-  SNESLineSearch Object: (newton_) 1 MPI processes
-    type: bt
-      interpolation: cubic
-      alpha=1.000000e-04
-    maxstep=1.000000e+08, minlambda=1.000000e-12
-    tolerances: relative=1.000000e-08, absolute=1.000000e-15, lambda=1.000000e-08
-    maximum iterations=40
-    using user-defined postcheck step
-  KSP Object: (newton_) 1 MPI processes
-    type: fgmres
-      restart=30, using Classical (unmodified) Gram-Schmidt Orthogonalization with no iterative refinement
-      happy breakdown tolerance 1e-30
-    maximum iterations=10000, initial guess is zero
-    tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
-    right preconditioning
-    using UNPRECONDITIONED norm type for convergence test
-  PC Object: (newton_) 1 MPI processes
-    type: none
-    linear system matrix = precond matrix:
-    Mat Object: 1 MPI processes
-      type: shell
-      rows=5, cols=5

@@ -130,6 +130,7 @@ public:
    MultiSourceMisfit(ParFiniteElementSpace*,PDCoefficient*,MatrixCoefficient*,PetscBCHandler*,DenseMatrix&,DenseMatrix&,double,double,double,const char*);
 
    MPI_Comm GetComm() const { return comm; }
+   void RunTests(bool=true);
 
    virtual void ComputeObjective(const Vector&,double*) const;
    virtual void ComputeGradient(const Vector&,Vector&) const;
@@ -188,7 +189,7 @@ MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient*
    heat = new ModelHeat(mu,sigma,_fes,Operator::PETSC_MATAIJ);
    heat->SetBCHandler(*_bchandler);
 
-   /* ReducedFunctional base class is mfem::Operator */
+   /* ReducedFunctional base class is an mfem::Operator */
    height = width = heat->GetParameterSize();
 
    /* We use the same solver for objective and gradient computations */
@@ -215,13 +216,43 @@ MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient*
       sources.Append(new RickerSource(x,10,1.1,1.0e3));
    }
 
-   /* XXX No constructor with given local size */
+   /* XXX No PetscParVector constructor with a given local size */
    Vector g;
    g.SetSize(heat->GetParameterSize());
    G = new PetscParVector(comm,g);
    M = new PetscParVector(comm,g);
 
    H = NULL;
+}
+
+void MultiSourceMisfit::RunTests(bool progress)
+{
+   double t = t0 + 0.5*(tf - t0);
+
+   /* Test least-squares objective */
+   if (lsobj.Size())
+   {
+      Vector dummy;
+      double f;
+      PetscErrorCode ierr;
+
+      U->Randomize();
+
+      ierr = PetscPrintf(comm,"---------------------------------------\n");CCHKERRQ(comm,ierr);
+      ierr = PetscPrintf(comm,"TDLeastSquares tests\n");CCHKERRQ(comm,ierr);
+      lsobj[0]->Eval(*U,dummy,t,&f);
+      lsobj[0]->TestFDGradient(comm,*U,dummy,t,1.e-6,progress);
+      lsobj[0]->TestFDHessian(comm,*U,dummy,t);
+      ierr = PetscPrintf(comm,"---------------------------------------\n");CCHKERRQ(comm,ierr);
+   }
+
+   /* Test PDOperator */
+   PetscParVector Xdot(*U);
+   PetscParVector X(*U);
+   Xdot.Randomize();
+   X.Randomize();
+   heat->GetCurrentVector(*M);
+   heat->TestFDGradient(comm,Xdot,X,*M,t);
 }
 
 MultiSourceMisfit::~MultiSourceMisfit()
@@ -263,7 +294,7 @@ void MultiSourceMisfit::ComputeObjective(const Vector& m, double *f) const
       ierr = TSResetObjective(*odesolver);PCHKERRQ(*odesolver,ierr);
       ierr = TSAddObjective(*odesolver,PETSC_MIN_REAL,
                             mfemopt_eval_tdobj,
-                            mfemopt_eval_tdobj_x,NULL,
+                            NULL,NULL,
                             NULL,NULL,NULL,NULL,NULL,NULL,lsobj[i]);PCHKERRQ(*odesolver,ierr);
 
       heat->SetRHS(sources[i]);
@@ -388,7 +419,7 @@ MultiSourceMisfitHessian::MultiSourceMisfitHessian(const MultiSourceMisfit* _mso
       ierr = TSAddObjective(*odesolver,PETSC_MIN_REAL,
                             mfemopt_eval_tdobj,
                             mfemopt_eval_tdobj_x,NULL,
-                            *Hls,NULL,NULL,NULL,NULL,NULL,_msobj->lsobj[i]);CCHKERRQ(comm,ierr);
+                            *Hls,mfemopt_eval_tdobj_xx,NULL,NULL,NULL,NULL,_msobj->lsobj[i]);CCHKERRQ(comm,ierr);
       delete Hls;
 
       _msobj->heat->SetRHS(_msobj->sources[i]);
@@ -795,8 +826,8 @@ int main(int argc, char *argv[])
    PetscReal tva = 1.0, tvb = 0.1;
    PetscBool tvpd = PETSC_TRUE, tvsy = PETSC_FALSE, tvpr = PETSC_FALSE;
 
-   PetscBool test_null = PETSC_FALSE, test_newton = PETSC_TRUE, test_progress = PETSC_TRUE;
-   PetscBool test_misfit[3] = {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}, test_misfit_reg[2] = {PETSC_FALSE,PETSC_FALSE};
+   PetscBool test_part = PETSC_FALSE, test_null = PETSC_FALSE, test_newton = PETSC_TRUE, test_progress = PETSC_TRUE;
+   PetscBool test_misfit[3] = {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}, test_misfit_reg[2] = {PETSC_FALSE,PETSC_FALSE}, test_misfit_internal = PETSC_FALSE;
    PetscReal test_newton_noise = 0.0;
    PetscBool glvis = PETSC_TRUE;
 
@@ -846,6 +877,7 @@ int main(int argc, char *argv[])
       ierr = PetscOptionsBool("-tv_symm","",NULL,tvsy,&tvsy,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-tv_proj","",NULL,tvpr,&tvpr,NULL);CHKERRQ(ierr);
 
+      ierr = PetscOptionsBool("-test_partitioning","Test with a fixed element partition",NULL,test_part,&test_part,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-test_newton","Test Newton solver",NULL,test_newton,&test_newton,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsReal("-test_newton_noise","Test Newton solver: noise level",NULL,test_newton_noise,&test_newton_noise,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-test_null","Use exact solution when testing",NULL,test_null,&test_null,NULL);CHKERRQ(ierr);
@@ -854,6 +886,7 @@ int main(int argc, char *argv[])
       for (int j=i; j<3; j++) test_misfit[j] = test_misfit[i > 0 ? i-1 : 0];
       ierr = PetscOptionsBoolArray("-test_misfit_reg","Test regularized misfit function callbacks",NULL,test_misfit_reg,(i=2,&i),NULL);CHKERRQ(ierr);
       for (int j=i; j<2; j++) test_misfit_reg[j] = test_misfit_reg[i > 0 ? i-1 : 0];
+      ierr = PetscOptionsBool("-test_misfit_internal","Tests internal objects inside misfit function",NULL,test_misfit_internal,&test_misfit_internal,NULL);CHKERRQ(ierr);
 
       ierr = PetscOptionsEnd();CHKERRQ(ierr);
    }
@@ -872,7 +905,14 @@ int main(int argc, char *argv[])
       }
       mesh->EnsureNCMesh();
 
-      pmesh = new ParMesh(PETSC_COMM_WORLD, *mesh);
+      if (test_part)
+      {
+         pmesh = ParMeshTest(PETSC_COMM_WORLD, *mesh);
+      }
+      else
+      {
+         pmesh = new ParMesh(PETSC_COMM_WORLD, *mesh);
+      }
       delete mesh;
       for (int lev = 0; lev < prl; lev++)
       {
@@ -1024,6 +1064,12 @@ int main(int argc, char *argv[])
    /* The misfit function */
    MultiSourceMisfit *obj = new MultiSourceMisfit(fes,mu_pd,sigma,bchandler,srcpoints,recpoints,t0,dt,tf,scratchdir);
 
+   /* Tests internal objects inside the misfit function */
+   if (test_misfit_internal)
+   {
+      obj->RunTests(test_progress);
+   }
+
    /* Test misfit callbacks */
    if (test_misfit[0])
    {
@@ -1164,14 +1210,15 @@ int main(int argc, char *argv[])
      requires: mfemopt
 
    testset:
-     args: -meshfile ${petscopt_dir}/share/petscopt/meshes/segment-m5-5.mesh -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg
+     nsize: {{1 2}}
+     args: -scratch ./ -test_partitioning -meshfile ${petscopt_dir}/share/petscopt/meshes/segment-m5-5.mesh -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg
      test:
        suffix: null_test
-       args: -test_misfit 1 -test_misfit_reg 1 -test_newton -test_progress 0 -tv_alpha 0 -newton_pc_type none -newton_snes_atol 1.e-8 -glvis 0
+       args: -test_misfit_internal -test_misfit 1 -test_misfit_reg 1 -test_newton -test_progress 0 -tv_alpha 0 -newton_pc_type none -newton_snes_atol 1.e-8 -glvis 0
      test:
        suffix: newton_test
-       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 1 -newton_snes_test_jacobian -newton_snes_test_jacobian_view -newton_snes_rtol 1.e-6 -newton_snes_atol 1.e-6 -newton_snes_view -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude_fn -ncrl 1
+       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 1 -newton_snes_test_jacobian -newton_snes_rtol 1.e-6 -newton_snes_atol 1.e-6 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude_fn -ncrl 1
      test:
        suffix: newton_full
-       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 10 -newton_snes_rtol 1.e-6 -newton_snes_atol 1.e-6 -newton_snes_view -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1
+       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 10 -newton_snes_rtol 1.e-6 -newton_snes_atol 1.e-6 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1
 TEST*/

@@ -1,9 +1,11 @@
 static const char help[] = "A simple total-variation based, primal-dual image regularization.";
+// Example runs:
+// - mpiexec -n 4  ./ex1 -image ${PETSCOPT_DIR}/share/petscopt/data/img_medium.bmp -monitor -primaldual -noise 0.1 -tv_alpha 0.001 -tv_beta 0.001 -ksp_type cg -pc_type gamg -primaldual 1 -symmetrize 1
 
 #include <mfemopt.hpp>
 #include <mfemopt/private/mfemoptpetscmacros.h>
-
 #include <mfem.hpp>
+#include <limits>
 
 using namespace mfem;
 using namespace mfemopt;
@@ -26,9 +28,10 @@ private:
    void ReadBMP(const char*,bool=true);
    void ReadTXT(const char*);
 
+
 public:
    Image() : data(NULL), fec(NULL), pfes(NULL), pmesh(NULL) {}
-   Image(MPI_Comm,const char*,int=1,bool=true);
+   Image(MPI_Comm,const char*,int=1,bool=true,bool=false);
 
    virtual double Eval(ElementTransformation&,
                        const IntegrationPoint&);
@@ -36,13 +39,15 @@ public:
    PDCoefficient* CreatePDCoefficient();
    ParFiniteElementSpace* ParFESpace() { return pfes; }
 
+   void AddNoise(double);
+   void Normalize();
    void Save(const char*);
    void Visualize(const char*);
 
    virtual ~Image() { delete[] data; delete fec; delete pfes; delete pmesh; }
 };
 
-Image::Image(MPI_Comm comm, const char* filename, int ord, bool quad)
+Image::Image(MPI_Comm comm, const char* filename, int ord, bool quad, bool test_part)
 {
    std::string fname(filename);
    size_t lastdot = fname.find_last_of(".");
@@ -60,6 +65,7 @@ Image::Image(MPI_Comm comm, const char* filename, int ord, bool quad)
       std::cout << "Unkwnown extension (" << fext << ") in " << fname << std::endl;
       mfem_error("Unsupported filename");
    }
+
    double Lx = double(ney)/double(nex);
    double Ly = 1.0;
 
@@ -67,10 +73,42 @@ Image::Image(MPI_Comm comm, const char* filename, int ord, bool quad)
    hy = Ly/(ney-1.0);
 
    Mesh *mesh = new Mesh(nex,ney,quad ? Element::QUADRILATERAL : Element::TRIANGLE,1,Lx,Ly);
-   pmesh = new ParMesh(comm,*mesh);
+
+   /* For testing purposes, we speficy a partitioning */
+   if (test_part)
+   {
+      pmesh = ParMeshTest(comm,*mesh);
+   }
+   else
+   {
+      pmesh = new ParMesh(comm,*mesh);
+   }
    delete mesh;
+
    fec = new H1_FECollection(std::max(ord,1), 2);
    pfes = new ParFiniteElementSpace(pmesh, fec, 1, Ordering::byVDIM);
+
+}
+
+void Image::Normalize()
+{
+   double im = std::numeric_limits<double>::max();
+   double iM = std::numeric_limits<double>::min();
+   for (int i = 0; i < ney*nex; i++)
+   {
+      im = data[i] < im ? data[i] : im;
+      iM = data[i] > iM ? data[i] : iM;
+   }
+   for (int i = 0; i < ney*nex; i++) data[i] = (data[i] - im)/(iM - im);
+}
+
+void Image::AddNoise(double s)
+{
+   GaussianNoise noise;
+   Vector vnoise;
+   noise.random(vnoise,nex*ney);
+   vnoise *= s;
+   for (int i = 0; i < ney*nex; i++) data[i] += vnoise[i];
 }
 
 /* the evaluation routine */
@@ -212,23 +250,21 @@ PDCoefficient* Image::CreatePDCoefficient()
 class ImageFunctional : public ReducedFunctional
 {
 private:
-   Image *img;
    mutable PetscParMatrix H;
    mutable TikhonovRegularizer *tk;
    mutable TVRegularizer *tv;
 
 public:
-   ImageFunctional(Image*,TikhonovRegularizer*,TVRegularizer*);
-
+   ImageFunctional(int,TikhonovRegularizer*,TVRegularizer*);
    virtual void ComputeObjective(const Vector&,double*) const;
    virtual void ComputeGradient(const Vector&,Vector&) const;
    virtual Operator& GetHessian(const Vector&) const;
    virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&) const;
 };
 
-ImageFunctional::ImageFunctional(Image* _img, TikhonovRegularizer *_tk, TVRegularizer *_tv) : img(_img), H(), tk(_tk), tv(_tv)
+ImageFunctional::ImageFunctional(int _lsize, TikhonovRegularizer *_tk, TVRegularizer *_tv) : H(), tk(_tk), tv(_tv)
 {
-   height = width = img->ParFESpace()->GetTrueVSize();
+   height = width = _lsize;
 }
 
 void ImageFunctional::ComputeObjective(const Vector& u, double *f) const
@@ -251,8 +287,6 @@ void ImageFunctional::ComputeGradient(const Vector& u, Vector& g) const
 
 Operator& ImageFunctional::GetHessian(const Vector& u) const
 {
-   MPI_Comm comm = img->ParFESpace()->GetParMesh()->GetComm();
-
    Vector dummy;
    tk->SetUpHessian_MM(dummy,u,0.);
    tv->SetUpHessian_MM(dummy,u,0.);
@@ -270,11 +304,13 @@ Operator& ImageFunctional::GetHessian(const Vector& u) const
    /* These matrices have the same pattern, the MFEM overloaded += operator uses DIFFERENT_NONZERO_PATTERN */
    {
       PetscErrorCode ierr;
-      ierr = MatAXPY(H,1.0,*pHtv,SAME_NONZERO_PATTERN); CCHKERRQ(comm,ierr);
+      ierr = MatAXPY(H,1.0,*pHtv,SAME_NONZERO_PATTERN); PCHKERRQ(pHtv,ierr);
    }
    return H;
 }
 
+/* This method is called after a successful line search
+   We use it to update the dual variable for the TV regularizer */
 void ImageFunctional::PostCheck(const Vector& X, Vector& Y, Vector &W, bool& cy, bool& cw) const
 {
    /* we don't change the step (Y) or the updated solution (W = X - lambda*Y) */
@@ -291,12 +327,12 @@ int main(int argc, char* argv[])
 
    /* process options */
    PetscErrorCode ierr;
-   char imgfile[PETSC_MAX_PATH_LEN] = "./logo_noise.txt";
-   char trueimgfile[PETSC_MAX_PATH_LEN] = "./logo.txt";
-   PetscBool flg1,flg2;
-   PetscBool save = PETSC_FALSE, viz = PETSC_FALSE, mon = PETSC_TRUE;
+   char imgfile[PETSC_MAX_PATH_LEN] = "../../../../share/petscopt/data/logo_noise.txt";
+   PetscBool save = PETSC_FALSE, viz = PETSC_TRUE, mon = PETSC_TRUE;
    PetscBool primal_dual = PETSC_FALSE, symmetrize = PETSC_FALSE, project = PETSC_FALSE, quad = PETSC_FALSE;
-   PetscInt ord = 1;
+   PetscReal noise = 0.0, tv_alpha = 0.0007, tv_beta = 0.1;
+   PetscInt  ord = 1;
+   PetscBool test = PETSC_FALSE, test_progress = PETSC_FALSE, test_part = PETSC_FALSE;
 
    ierr = PetscOptionsGetBool(NULL,NULL,"-save",&save,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetBool(NULL,NULL,"-glvis",&viz,NULL);CHKERRQ(ierr);
@@ -306,69 +342,68 @@ int main(int argc, char* argv[])
    ierr = PetscOptionsGetBool(NULL,NULL,"-project",&project,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetBool(NULL,NULL,"-quad",&quad,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetInt(NULL,NULL,"-order",&ord,NULL);CHKERRQ(ierr);
-   ierr = PetscOptionsGetString(NULL,NULL,"-image",imgfile,sizeof(imgfile),&flg1);CHKERRQ(ierr);
-   ierr = PetscOptionsGetString(NULL,NULL,"-trueimage",trueimgfile,sizeof(imgfile),&flg2);CHKERRQ(ierr);
+   ierr = PetscOptionsGetReal(NULL,NULL,"-noise",&noise,NULL);CHKERRQ(ierr);
+   ierr = PetscOptionsGetReal(NULL,NULL,"-tv_alpha",&tv_alpha,NULL);CHKERRQ(ierr);
+   ierr = PetscOptionsGetReal(NULL,NULL,"-tv_beta",&tv_beta,NULL);CHKERRQ(ierr);
+   ierr = PetscOptionsGetString(NULL,NULL,"-image",imgfile,sizeof(imgfile),NULL);CHKERRQ(ierr);
+   ierr = PetscOptionsGetBool(NULL,NULL,"-test",&test,NULL);CHKERRQ(ierr);
+   ierr = PetscOptionsGetBool(NULL,NULL,"-test_progress",&test_progress,NULL);CHKERRQ(ierr);
+   ierr = PetscOptionsGetBool(NULL,NULL,"-test_partitioning",&test_part,NULL);CHKERRQ(ierr);
 
    /* indent to have stacked objects destroyed before PetscFinalize() is called */
    {
-      Image img(PETSC_COMM_WORLD,imgfile,ord,quad);
+      Image img(PETSC_COMM_WORLD,imgfile,ord,quad,test_part);
+      img.Normalize();
       if (viz)
       {
          img.Visualize("Image to be reconstructed");
       }
-      if (!flg1 && !flg2)
+      img.AddNoise(noise);
+      if (viz && noise != 0.0)
       {
-         Image trueimg(PETSC_COMM_WORLD,trueimgfile,1,PETSC_TRUE);
-         if (viz)
-         {
-            trueimg.Visualize("True image");
-         }
+         img.Visualize("Image to be reconstructed (noisy)");
       }
+
+      /* The optimization variable */
       PDCoefficient* imgpd = img.CreatePDCoefficient();
 
+      /* Regularizers */
       TikhonovRegularizer tk(imgpd);
-      TVRegularizer tv(imgpd,0.0007,0.1,primal_dual);
+      TVRegularizer tv(imgpd,tv_alpha,tv_beta,primal_dual);
       tv.Symmetrize(symmetrize);
       tv.Project(project);
-      ImageFunctional objective(&img,&tk,&tv);
+
+      /* The full objective */
+      ImageFunctional objective(imgpd->GetLocalSize(),&tk,&tv);
 
       Vector dummy;
       Vector u(imgpd->GetLocalSize());
 
-#if 0
-      //u.Randomize();
-      //u = 1.0;
-      //imgpd->Save("test_init_image");
-      imgpd->GetCurrentVector(u);
-      double f;
-      std::cout << "---------------------------------------" << std::endl;
-      //tv.PrimalToDual(u);
-      tv.Eval(dummy,u,0.,&f);
-      std::cout << "TV tests" << std::endl;
-      std::cout << "TV EVAL: " << f << std::endl;
-      std::cout << "TV FD TESTS" << std::endl;
-      tv.TestFDGradient(PETSC_COMM_WORLD,dummy,u,0.0,1.e-6);
-      tv.TestFDHessian(PETSC_COMM_WORLD,dummy,u,0.0);
-      std::cout << "---------------------------------------" << std::endl;
+      /* Testing */
+      if (test)
+      {
+         double f1,f2,f;
+         u = 1.0;
 
-      std::cout << "---------------------------------------" << std::endl;
-      tk.Eval(dummy,u,0.,&f);
-      std::cout << "Tikhonov tests" << std::endl;
-      std::cout << "Tikhonov EVAL: " << f << std::endl;
-      std::cout << "Tikhonov FD TESTS" << std::endl;
-      tk.TestFDGradient(PETSC_COMM_WORLD,dummy,u,0.0,1.e-6);
-      tk.TestFDHessian(PETSC_COMM_WORLD,dummy,u,0.0);
-      std::cout << "---------------------------------------" << std::endl;
+         ierr = PetscPrintf(PETSC_COMM_WORLD,"---------------------------------------\n");CHKERRQ(ierr);
+         ierr = PetscPrintf(PETSC_COMM_WORLD,"TV tests\n");CHKERRQ(ierr);
+         tv.Eval(dummy,u,0.,&f1);
+         tv.TestFDGradient(PETSC_COMM_WORLD,dummy,u,0.0,1.e-6,test_progress);
+         tv.TestFDHessian(PETSC_COMM_WORLD,dummy,u,0.0);
+         ierr = PetscPrintf(PETSC_COMM_WORLD,"---------------------------------------\n");CHKERRQ(ierr);
+         ierr = PetscPrintf(PETSC_COMM_WORLD,"Tikhonov tests\n");CHKERRQ(ierr);
+         tk.Eval(dummy,u,0.,&f2);
+         tk.TestFDGradient(PETSC_COMM_WORLD,dummy,u,0.0,1.e-6,test_progress);
+         tk.TestFDHessian(PETSC_COMM_WORLD,dummy,u,0.0);
+         ierr = PetscPrintf(PETSC_COMM_WORLD,"---------------------------------------\n");CHKERRQ(ierr);
+         ierr = PetscPrintf(PETSC_COMM_WORLD,"Image tests\n");CHKERRQ(ierr);
+         objective.ComputeObjective(u,&f);
+         objective.TestFDGradient(PETSC_COMM_WORLD,u,1.e-6,test_progress);
+         objective.TestFDHessian(PETSC_COMM_WORLD,u);
+         ierr = PetscPrintf(PETSC_COMM_WORLD,"---------------------------------------\n");CHKERRQ(ierr);
+         MFEM_VERIFY(std::abs(f1+f2-f) < PETSC_SMALL,"Error eval " << std::abs(f1+f2-f));
+      }
 
-      std::cout << "---------------------------------------" << std::endl;
-      objective.ComputeObjective(u,&f);
-      std::cout << "Image tests" << std::endl;
-      std::cout << "Image EVAL: " << f << std::endl;
-      std::cout << "Image FD TESTS" << std::endl;
-      objective.TestFDGradient(PETSC_COMM_WORLD,u,1.e-6);
-      objective.TestFDHessian(PETSC_COMM_WORLD,u);
-      std::cout << "---------------------------------------" << std::endl;
-#endif
       PetscNonlinearSolverOpt newton(PETSC_COMM_WORLD,objective);
 
       NewtonMonitor mymonitor;
@@ -394,11 +429,28 @@ int main(int argc, char* argv[])
     requires: mfemopt
 
   test:
-    suffix: tv
-    args: -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_max_it 500 -snes_rtol 1.e-10 -snes_atol 1.e-10 -primaldual 0 -symmetrize 0 -monitor 0 -snes_converged_reason
+    nsize: {{1 2}}
+    suffix: test
+    args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor 0 -snes_converged_reason -quad 0 -order 2
 
   test:
+    nsize: {{1 2}}
+    suffix: test_pd
+    args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor 0 -snes_converged_reason -quad 0 -order 2 -primaldual
+
+  test:
+    nsize: {{1 2}}
+    suffix: tv
+    args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-10 -ksp_atol 1.e-10 -primaldual 0 -symmetrize 0 -monitor 0 -snes_converged_reason
+
+  test:
+    nsize: {{1 2}}
     suffix: tv_pd
-    args: -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_max_it 500 -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_type cg -pc_type gamg -primaldual 1 -symmetrize 1 -monitor 0 -snes_converged_reason
+    args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-10 -ksp_atol 1.e-10 -ksp_type cg -pc_type gamg -primaldual 1 -symmetrize 1 -monitor 0 -snes_converged_reason
+
+  test:
+    nsize: {{1 2}}
+    suffix: tv_pd_project
+    args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-10 -ksp_atol 1.e-10 -ksp_type cg -pc_type gamg -primaldual 1 -symmetrize 1 -project -monitor 0 -snes_converged_reason
 
 TEST*/
