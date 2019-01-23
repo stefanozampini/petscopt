@@ -429,11 +429,13 @@ int main(int argc, char* argv[])
     requires: mfemopt
 
   test:
+    filter: sed -e "s/-nan/nan/g"
     nsize: {{1 2}}
     suffix: test
     args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor 0 -snes_converged_reason -quad 0 -order 2
 
   test:
+    filter: sed -e "s/-nan/nan/g"
     nsize: {{1 2}}
     suffix: test_pd
     args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor 0 -snes_converged_reason -quad 0 -order 2 -primaldual
