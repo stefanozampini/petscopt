@@ -105,7 +105,8 @@ install:
   - make MAKE_NP=$(nproc) PETSC_ARCH=arch-test || /bin/sh -c "if [ -f arch-test/lib/petsc/conf/mfem.errorflg ]; then tail -200 arch-test/lib/petsc/conf/mfem.log; fi; tail -200 make.log; false"
   - cd $PETSCOPT_DIR
   - if [[ "$TRAVIS_OS_NAME" == "linux" && "${MFEM:-0}" == 1 ]]; then export PETSCOPT_CXXFLAGS+=" -std=c++11"; fi # gcc is so old that std::copysign and std::is_string are not part of the stdlib"
-  - make with_mfem=${MFEM:-0} with_mfem_install=${MFEM:-0} MAKE_NP=$(nproc) PETSC_ARCH=arch-test CXXFLAGS="$PETSCOPT_CXXFLAGS"
+  - make with_mfem=${MFEM:-0} MAKE_NP=$(nproc) PETSC_ARCH=arch-test CXXFLAGS="$PETSCOPT_CXXFLAGS"
+  - make check
 
 script:
   - cd $PETSCOPT_DIR

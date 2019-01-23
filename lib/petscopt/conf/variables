@@ -53,19 +53,16 @@ FCPPFLAGS += $(PETSCOPT_FCPPFLAGS)
 #--------------------------------------------------------------------#
 
 with_mfem ?= 0
-with_mfem_install ?= 0
 ifeq ($(with_mfem),1)
   ifeq ($(MFEM_DIR),)
     ifeq ($(wildcard $(PETSC_DIR)/$(PETSC_ARCH)/include/mfem.hpp),)
       $(error MFEM_DIR not defined)
     else
       MFEM_DIR = $(PETSC_DIR)/$(PETSC_ARCH)
-      with_mfem_install = 1
     endif
   endif
-  ifeq ($(with_mfem_install),1)
-    MFEM_CONFIG_DIR = $(MFEM_DIR)/share/mfem
-  else
+  MFEM_CONFIG_DIR = $(MFEM_DIR)/share/mfem
+  ifeq ($(wildcard $(MFEM_CONFIG_DIR)/config.mk),)
     MFEM_CONFIG_DIR = $(MFEM_DIR)/config
   endif
   ifeq ($(wildcard $(MFEM_CONFIG_DIR)/config.mk),)

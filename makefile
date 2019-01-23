@@ -3,8 +3,8 @@
 override PETSCOPT_DIR := $(CURDIR)
 include ./lib/petscopt/conf/variables
 -include makefile.in
+ruler := $(subst -,==========,--------)
 
-all-parallel: ruler := $(subst -,==========,--------)
 all-parallel:
 	-@echo $(ruler)
 	-@echo "Building PETSCOPT (GNU Make - $(MAKE_NP) build jobs)"
@@ -69,7 +69,6 @@ $(config-petscopt) : | $$(@D)/.DIR
 	$(call write-variable,$@,CXXFLAGS)
 $(config-mfem) : | $$(@D)/.DIR
 	$(call write-variable,$@,with_mfem)
-	$(call write-variable,$@,with_mfem_install)
 	$(call write-variable,$@,MFEM_DIR)
 $(config-confheader) : | $$(@D)/.DIR
 	$(call write-confheader-pre,$@)
@@ -153,8 +152,19 @@ $(OBJDIR)/%.o : src/%.F90 | $$(@D)/.DIR $(MODDIR)/.DIR
 .DELETE_ON_ERROR: # Delete likely-corrupt target file if rule fails
 .PHONY: all check clean distclean install
 
-#check :
-#	@$(OMAKE) -C test/ check
+check :
+	-@echo $(ruler)
+	-@echo "Running test examples to verify correct installation"
+	-@echo "Using PETSCOPT_DIR=$(PETSCOPT_DIR)"
+	-@echo "Using PETSCOPT_ARCH=$(PETSCOPT_ARCH)"
+	-@echo "Using PETSC_DIR=$(PETSC_DIR)"
+	-@echo "Using PETSC_ARCH=$(PETSC_ARCH)"
+	-@echo $(ruler)
+	+@cd ${PETSCOPT_DIR}/src/ts/examples/tests >/dev/null && $(RM) -f ex1 && ${OMAKE} PETSCOPT_ARCH=${PETSCOPT_ARCH}  PETSCOPT_DIR=${PETSCOPT_DIR} ex1
+ifeq ($(with_mfem),1)
+	+@cd ${PETSCOPT_DIR}/src/mfemopt/examples/tests >/dev/null && $(RM) -f ex1 && ${OMAKE} PETSCOPT_ARCH=${PETSCOPT_ARCH}  PETSCOPT_DIR=${PETSCOPT_DIR} ex1
+endif
+	-@echo $(ruler)
 
 clean :
 	$(RM) -r $(OBJDIR) $(LIBDIR)/libpetscopt*.*
