@@ -2,10 +2,7 @@
 
 include $(PETSCOPT_DIR)/lib/petscopt/conf/variables
 
-TESTDIR = $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/tests
-TESTLOGFILE = $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/tests/examples.log
-
 # only for the purpose of running tests, we override these variables
-CXX_FLAGS := $(CXX_FLAGS) $(CXXFLAGS)
+# we want to keep makefile.test as close as possible as gmakefile.test in PETSc
 PETSC_LIB := $(PETSCOPT_LIB)
 PETSC_EXTERNAL_LIB_BASIC := $(PETSCOPT_LIB)

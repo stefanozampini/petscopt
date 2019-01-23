@@ -1,9 +1,11 @@
 #!/bin/sh
 set -eu
 
+# Use it e.g.: MAKEFLAGS="with_mfem=1" CFLAGS=whatever ./lib/petscopt/bin/coverage.sh
 export PETSCOPT_ARCH=arch-coverage
-export CFLAGS=--coverage
-export FFLAGS=--coverage
+export CFLAGS+=" --coverage"
+export CXXFLAGS+=" --coverage"
+export FFLAGS+=" --coverage"
 
 make distclean
 make config

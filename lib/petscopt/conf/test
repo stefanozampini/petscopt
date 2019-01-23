@@ -1,5 +1,12 @@
 # -*- makefile -*-
-include $(PETSC_DIR)/lib/petsc/conf/test
+ifeq ($(RM),true)
+.SECONDARY: $(ex%.o) $(ex%f.o) $(ex%f90.o)
+endif
 
-# only for the purpose of running tests, we override these variables
-PETSC_LIB := $(PETSCOPT_LIB)
+ex%f90: ex%f90.o | chkopts
+	-${FLINKER} -o $@ $^  ${PETSCOPT_LIB}
+ex%f: ex%f.o | chkopts
+	-${FLINKER} -o $@ $^  ${PETSCOPT_LIB}
+ex%: ex%.o | chkopts
+	-${CXXLINKER} -o $@ $^  ${PETSCOPT_LIB}
+	${DSYMUTIL} $@
