@@ -376,23 +376,14 @@ MatrixCoefficient* PDCoefficient::GetActiveMatrixCoefficient()
 
 void PDCoefficient::GetCurrentVector(Vector& m)
 {
+   MFEM_VERIFY(!usederiv,"This should not happen");
    int off = 0;
    m.SetSize(lsize);
    for (int i=0; i<pgradgf.Size(); i++)
    {
       int n = P->Width();
       Vector pmi(m.GetData()+off,n);
-      ParGridFunction *gf = pcoeffgf[i];
-      MFEM_VERIFY(!usederiv,"This should not happen");
-      if (usederiv)
-      {
-         gf = deriv_work_coeffgf[i];
-      }
-      else
-      {
-         gf = pcoeffgf[i];
-      }
-      R->Mult(*gf,pmi);
+      R->Mult(*pcoeffgf[i],pmi);
       off += n;
    }
 }
@@ -404,8 +395,7 @@ void PDCoefficient::UpdateCoefficient(const Vector& m)
    for (int i=0; i<pcoeffgf.Size(); i++)
    {
       int n = P->Width();
-      Vector pmi;
-      pmi.SetDataAndSize(m.GetData()+off,n);
+      Vector pmi(m.GetData()+off,n);
       ParGridFunction *gf;
       if (usederiv)
       {
@@ -436,8 +426,7 @@ void PDCoefficient::UpdateCoefficientWithGF(const Vector& m, Array<ParGridFuncti
    for (int i=0; i<pcoeffgf.Size(); i++)
    {
       int n = P->Width();
-      Vector pmi;
-      pmi.SetDataAndSize(m.GetData()+off,n);
+      Vector pmi(m.GetData()+off,n);
 
       ParGridFunction *gf = agf[i];
       P->Mult(pmi,*gf);

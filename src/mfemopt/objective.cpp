@@ -103,7 +103,7 @@ void ObjectiveFunction::TestFDGradient(MPI_Comm comm, const Vector& xIn, const V
       PetscParVector x(px);
       for (PetscInt i = 0; i < g.GlobalSize(); i++)
       {
-         double f1,f2;
+         double f1=0.0,f2=0.0;
          Array<PetscInt> idx(1);
          Array<PetscScalar> vals(1);
 
@@ -168,7 +168,7 @@ void ObjectiveFunction::TestFDGradient(MPI_Comm comm, const Vector& xIn, const V
          {
             ierr = PetscPrintf(comm,"\r-> hang tight while computing design gradient : %f\%",(i*100.0)/g.GlobalSize());CCHKERRQ(comm,ierr);
          }
-         double f1,f2;
+         double f1=0.0,f2=0.0;
          Array<PetscInt> idx(1);
          Array<PetscScalar> vals(1);
          idx[0] = i;
@@ -362,6 +362,7 @@ TDLeastSquares::TDLeastSquares() : ObjectiveFunction(true,false)
    Init();
 }
 
+
 TDLeastSquares::TDLeastSquares(const Array<Receiver*>& _receivers, ParFiniteElementSpace* _fe, bool _own_recv) : ObjectiveFunction(true,false)
 {
    Init();
@@ -449,7 +450,6 @@ void TDLeastSquares::InitDeltaCoefficients()
    ResetDeltaCoefficients();
 
    ParFiniteElementSpace *fes = u->ParFESpace();
-   delete rhsform_x;
    rhsform_x  = new ParLinearForm(fes);
    for (int i=0; i<receivers.Size(); i++)
    {
@@ -502,7 +502,9 @@ void TDLeastSquares::ResetDeltaCoefficients()
    {
       delete deltacoeffs_x[i];
    }
+   deltacoeffs_x.SetSize(0);
    delete rhsform_x;
+   rhsform_x = NULL;
 }
 
 TDLeastSquares::~TDLeastSquares()

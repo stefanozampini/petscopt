@@ -64,7 +64,7 @@ void ReducedFunctional::TestFDGradient(MPI_Comm comm, const mfem::Vector& mIn, d
 
    for (PetscInt i = 0; i < g.GlobalSize(); i++)
    {
-      double f1,f2;
+      double f1=0.0,f2=0.0;
       Array<PetscInt> idx(1);
       Array<PetscScalar> vals(1);
 

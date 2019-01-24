@@ -20,7 +20,7 @@ void ModelHeat::Init(ParFiniteElementSpace *_fe, Operator::Type _oid)
    stgf = new ParGridFunction(fes);
    k = new ParBilinearForm(fes);
    m = new ParBilinearForm(fes);
-   rhsvec = new HypreParVector(fes);
+   rhsvec = new PetscParVector(fes);
 }
 
 void ModelHeat::InitForms(Coefficient* mu, MatrixCoefficient* sigma)
@@ -187,15 +187,14 @@ void ModelHeat::ImplicitMult(const Vector &x, const Vector &xdot, Vector &y) con
 {
    /* Compute forcing term */
    for (int i = 0; i < rhs.Size(); i++) rhs[i]->SetTime(this->GetTime());
-   if (rhsform) rhsform->Assemble();
-   if (!rhsvec)
+   if (rhsform)
    {
-      rhsvec = rhsform->ParallelAssemble();
+      rhsform->Assemble();
+      rhsform->ParallelAssemble(*rhsvec);
    }
    else
    {
       *rhsvec = 0.0;
-      if (rhsform) rhsform->ParallelAssemble(*rhsvec);
    }
 
    /* Get mass and stiffness operators */

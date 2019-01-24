@@ -30,7 +30,7 @@ private:
    mfem::Array<mfem::Coefficient*>    rhs;
 
    mutable mfem::ParLinearForm  *rhsform;
-   mutable mfem::HypreParVector *rhsvec;
+   mutable mfem::PetscParVector *rhsvec;
    mutable mfem::Operator       *Jacobian;
 
    mfem::ParGridFunction *adjgf,*stgf;

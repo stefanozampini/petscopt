@@ -118,7 +118,7 @@ void Receiver::InterpolateLinear(struct signal_data& interp)
   ux = lb->v_x;
   uy = lb->v_y;
   uz = lb->v_z;
-  if (lb == it1) {       t0 = t1;    tt = 1.0;            lx = ux;      ly = uy;      lz = uz; }
+  if (lb == it1) {    /* t0 = t1; */ tt = 1.0;            lx = ux;      ly = uy;      lz = uz; }
   else           { lb--; t0 = lb->t; tt = (t-t0)/(t1-t0); lx = lb->v_x; ly = lb->v_y; lz = lb->v_z; }
   interp.v_x = lx * (1.0 - tt) + ux * tt;
   interp.v_y = ly * (1.0 - tt) + uy * tt;

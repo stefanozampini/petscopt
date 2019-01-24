@@ -29,9 +29,10 @@ void PointwiseMap::Map(const Vector& m, Vector& model_m)
 
 void PointwiseMap::InverseMap(const Vector& model_m, Vector& m)
 {
-   m.SetSize(model_m.Size());
    MFEM_VERIFY(pinv,"Missing the inverse of the mapping function!");
-   for (int i = 0; i < model_m.Size(); i++) m(i) = (*pinv)(model_m(i));
+   m.SetSize(model_m.Size());
+   if (!pinv) m = 0.0;
+   else for (int i = 0; i < model_m.Size(); i++) m(i) = (*pinv)(model_m(i));
 }
 
 void PointwiseMap::GradientMap(const Vector& m, const Vector& gin, bool transpose, Vector& g)
@@ -49,7 +50,8 @@ void PointwiseMap::HessianMult(const Vector& x, Vector& y)
    MFEM_VERIFY(g.Size() == m.Size(),"Wrong sizes! " << m.Size() << " != " << g.Size());
    MFEM_VERIFY(d2p_dm2,"Missing the second derivative of the mapping function!");
    y.SetSize(x.Size());
-   for (int i = 0; i < x.Size(); i++) y(i) = (*d2p_dm2)(m(i))*g(i)*x(i);
+   if (!d2p_dm2) y = 0.0;
+   else for (int i = 0; i < x.Size(); i++) y(i) = (*d2p_dm2)(m(i))*g(i)*x(i);
 }
 
 }

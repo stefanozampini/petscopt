@@ -131,7 +131,7 @@ static PetscErrorCode __mfem_tao_grad(Tao tao, Vec x, Vec g, void* ctx)
 static PetscErrorCode __mfem_tao_objgrad(Tao tao, Vec x, PetscReal *f, Vec g, void* ctx)
 {
    __mfem_tao_ctx *tao_ctx = (__mfem_tao_ctx*)ctx;
-   double lf;
+   double lf = 0.0;
 
    PetscFunctionBeginUser;
    mfem::PetscParVector xx(x,true);

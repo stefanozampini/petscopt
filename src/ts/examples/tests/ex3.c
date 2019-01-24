@@ -249,12 +249,12 @@ static PetscErrorCode FormGradientDAE(TS ts, PetscReal t, Vec U, Vec Udot, Vec M
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser;
+  ierr = MatGetSize(F_M,NULL,&np);CHKERRQ(ierr);
+  if (np <= 0) PetscFunctionReturn(0);
+  ierr = MatGetLocalSize(F_M,&j,NULL);CHKERRQ(ierr);
+  ierr = MatDenseGetArray(F_M,&array);CHKERRQ(ierr);
   ierr = TSGetApplicationContext(ts,(void **)&appctx);CHKERRQ(ierr);
   ierr = TSGetDM(ts,&da);CHKERRQ(ierr);
-
-  ierr = MatDenseGetArray(F_M,&array);CHKERRQ(ierr);
-  ierr = MatGetSize(F_M,NULL,&np);CHKERRQ(ierr);
-  ierr = MatGetLocalSize(F_M,&j,NULL);CHKERRQ(ierr);
   for (i=0;i<np;i++) {
     ierr = DMGetGlobalVector(da,&F_m[i]);CHKERRQ(ierr);
     ierr = VecPlaceArray(F_m[i],array + j*i);CHKERRQ(ierr);

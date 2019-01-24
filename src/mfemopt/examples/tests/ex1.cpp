@@ -30,7 +30,7 @@ private:
 
 
 public:
-   Image() : data(NULL), fec(NULL), pfes(NULL), pmesh(NULL) {}
+   Image() : data(NULL), nex(0), ney(0), fec(NULL), pfes(NULL), pmesh(NULL) {}
    Image(MPI_Comm,const char*,int=1,bool=true,bool=false);
 
    virtual double Eval(ElementTransformation&,
@@ -49,6 +49,7 @@ public:
 
 Image::Image(MPI_Comm comm, const char* filename, int ord, bool quad, bool test_part)
 {
+   nex = ney = 0;
    std::string fname(filename);
    size_t lastdot = fname.find_last_of(".");
    std::string fext = fname.substr(lastdot);
