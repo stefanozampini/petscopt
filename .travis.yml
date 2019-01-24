@@ -33,9 +33,9 @@ env:
     - MPI=mpich  INT64=0  SCALAR=real     PRECISION=double MFEM=1
 ###    - MPI=mpich  INT64=0  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
 ##    - MPI=mpich  INT64=0  SCALAR=complex  PRECISION=double     LANGUAGE=C++
-##    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=double
+    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=double
 ###    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
-##    - MPI=mpich  INT64=1  SCALAR=complex  PRECISION=double     LANGUAGE=C++
+    - MPI=mpich  INT64=1  SCALAR=complex  PRECISION=double     LANGUAGE=C++
 
 matrix:
 
