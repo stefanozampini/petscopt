@@ -894,7 +894,10 @@ int main(int argc, char *argv[])
    }
 
    if (mu_fec_type == FEC_H1 && !mu_ord) mu_ord = 1;
-   Array<int> mu_excl_a(mu_excl,n_mu_excl);
+
+   int imu_excl[n_mu_excl];
+   for (int i = 0; i < n_mu_excl; i++) imu_excl[i] = mu_excl[i];
+   Array<int> mu_excl_a(imu_excl,n_mu_excl);
 
    /* Create mesh and finite element space for the independent variable */
    ParMesh *pmesh = NULL;

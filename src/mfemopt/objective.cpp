@@ -293,7 +293,7 @@ TikhonovRegularizer::TikhonovRegularizer(PDCoefficient *_u0) : ObjectiveFunction
 
    PetscParMatrix *tM = new PetscParMatrix(pgf[0]->ParFESpace()->GetParMesh()->GetComm(),
                                            pgf[0]->ParFESpace()->GlobalVSize(),
-                                           pgf[0]->ParFESpace()->GetDofOffsets(),
+                                           (PetscInt*)pgf[0]->ParFESpace()->GetDofOffsets(),
                                            &(m->SpMat()),
                                            Operator::PETSC_MATAIJ);
    delete m;
@@ -844,7 +844,7 @@ void TVRegularizer::SetUpHessian_MM(const Vector& x,const Vector& m,double t)
    }
 
    PetscParMatrix *uH = new PetscParMatrix(mesh->GetComm(),fes->GlobalVSize(),
-                                           fes->GetDofOffsets(),ljacs[0], /* XXX */
+                                           (PetscInt*)fes->GetDofOffsets(),ljacs[0], /* XXX */
                                            Operator::PETSC_MATAIJ);
 
    PetscParMatrix *H = RAP(uH,m_pd->GetP());
