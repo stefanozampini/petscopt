@@ -70,7 +70,7 @@ void ReducedFunctional::TestFDGradient(MPI_Comm comm, const mfem::Vector& mIn, d
 
       if (progress)
       {
-         ierr = PetscPrintf(comm,"\r-> hang tight while computing state gradient : %f\%",(i*100.0)/g.GlobalSize());CCHKERRQ(comm,ierr);
+         ierr = PetscPrintf(comm,"\r-> hang tight while computing state gradient : %f%%",(i*100.0)/g.GlobalSize());CCHKERRQ(comm,ierr);
       }
       m = pm;
 
@@ -88,7 +88,7 @@ void ReducedFunctional::TestFDGradient(MPI_Comm comm, const mfem::Vector& mIn, d
    }
    if (progress)
    {
-      ierr = PetscPrintf(comm,"\r-> hang tight while computing state gradient : 100.000000\%\n");CCHKERRQ(comm,ierr);
+      ierr = PetscPrintf(comm,"\r-> hang tight while computing state gradient : 100.000000%%\n");CCHKERRQ(comm,ierr);
    }
    else
    {
