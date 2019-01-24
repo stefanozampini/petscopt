@@ -1,6 +1,7 @@
 arch-*/*
 .vimctags
 src/ts/examples/tests/ex?
+src/mfemopt/examples/tests/ex?
 src/ts/examples/tests/petsc/ex16opt_p
 src/ts/examples/tests/petsc/ex16opt_ic
 src/ts/examples/tests/petsc/ex20opt_p
