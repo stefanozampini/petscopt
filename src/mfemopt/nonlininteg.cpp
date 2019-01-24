@@ -152,9 +152,21 @@ void TVIntegrator::AssembleElementGrad(const FiniteElement& el,
    }
 }
 
-static inline double quadratic_roots(double a, double b, double c)
+static inline double __mfemopt_sign(double x) {
+#if 0
+   /* a dummy (portable) implementation of sign */
+   static const char testpz[16] = {'\0'};
+   static const double testpn = +NAN;
+   return x != x ? ( memcmp(&x,&testpn,sizeof(double)) ? -1.0 : +1.0) : ( x == -x ? ( memcmp(&x,testpz,sizeof(double)) ? -1.0 : 1.0) : (x < 0.0 ? -1.0 : +1.0) );
+#else
+   return std::signbit(x) ? -1.0 : 1.0;
+#endif
+}
+
+static inline double larger_quadratic_roots(double a, double b, double c)
 {
-   double temp = -0.5 * (b + std::copysign(1.0, b) * sqrt(b*b - 4*a*c));
+   //double temp = -0.5 * (b + std::copysign(1.0, b) * sqrt(b*b - 4*a*c));
+   double temp = -0.5 * (b + __mfemopt_sign(b) * std::sqrt(b*b - 4*a*c));
    double x1 = temp / a;
    double x2 = c / temp;
    return x1 < x2 ? x2 : x1;
@@ -230,7 +242,7 @@ void TVIntegrator::AssembleElementDualUpdate(const FiniteElement& el,
       double eB = 2.*InnerProduct(lalpha,lbeta);
       double eC = InnerProduct(lbeta,lbeta)-1.0;
 
-      llopt = quadratic_roots(eA,eB,eC);
+      llopt = larger_quadratic_roots(eA,eB,eC);
       *lopt = std::min(llopt,*lopt);
    }
 }

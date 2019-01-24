@@ -6,8 +6,8 @@ static const char help[] = "Tests a parameter dependent one-dimensional diffusio
 
 #include <mfem.hpp>
 
-
 #include <iostream>
+#include <sstream>
 
 using namespace mfem;
 using namespace mfemopt;
@@ -207,7 +207,9 @@ MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient*
       Array<Receiver*> receivers;
       for (int j = 0; j < recpoints.Width(); j++)
       {
-         receivers.Append(new Receiver(std::string(scratch) + "/src-" + std::to_string(i) + "-rec-" + std::to_string(j) + ".txt"));
+         std::stringstream tmp;
+         tmp << scratch << "/src-" << i << "-rec-" << j << ".txt";
+         receivers.Append(new Receiver(tmp.str()));
       }
       lsobj.Append(new TDLeastSquares(receivers,_fes,true));
 
@@ -1008,8 +1010,11 @@ int main(int argc, char *argv[])
       HypreParVector *U = u->GetTrueDofs();
       *U = 0.0;
 
-      UserMonitor *monitor = new UserMonitor(u,viz,"Fwd source - " + std::to_string(i));
-      ReceiverMonitor *rmonitor = new ReceiverMonitor(u,recpoints,std::string(scratchdir) + "/src-" + std::to_string(i) + "-rec");
+      std::stringstream tmp1,tmp2;
+      tmp1 << "Fwd source - " << i;
+      tmp2 << scratchdir << "/src-" << i << "-rec";
+      UserMonitor *monitor = new UserMonitor(u,viz,tmp1.str());
+      ReceiverMonitor *rmonitor = new ReceiverMonitor(u,recpoints,tmp2.str());
 
       ModelHeat *heat = new ModelHeat(mu,sigma,fes,Operator::PETSC_MATAIJ);
 

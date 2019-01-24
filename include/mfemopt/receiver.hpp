@@ -40,8 +40,7 @@ private:
 
    void ASCIILoad(std::istream&);
    void ASCIIDump(std::ostream& = std::cout);
-   bool idataIsSorted();
-   void FinalizeIdata();
+   void FinalizeIData();
 
 public:
    Receiver();

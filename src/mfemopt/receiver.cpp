@@ -1,4 +1,5 @@
 #include <mfemopt/receiver.hpp>
+#include <sstream>
 #include <algorithm>
 #include <limits>
 
@@ -52,15 +53,10 @@ Receiver::Receiver(const Vector& _center, const std::vector<double> & T, const s
       sig.v_z = i < Z.size() ? Z[i] : 0.0;
       idata.push_back(sig);
    }
+   FinalizeIData();
 }
 
-bool Receiver::idataIsSorted()
-{
-   if (!idata_isfinalized) return std::is_sorted(idata.begin(),idata.end(),ltcompare);
-   return true;
-}
-
-void Receiver::FinalizeIdata()
+void Receiver::FinalizeIData()
 {
    if (idata_isfinalized) return;
    std::sort(idata.begin(),idata.end(),ltcompare);
@@ -98,7 +94,7 @@ void Receiver::InterpolateLinear(struct signal_data& interp)
   std::vector<struct signal_data>::iterator it1,it2,lb;
 
   MFEM_VERIFY(idata.size(),"Missing input data");
-  MFEM_VERIFY(idataIsSorted(),"Input data not sorted!");
+  MFEM_VERIFY(idata_isfinalized,"Input data not sorted!");
   /* XXX */ MFEM_VERIFY(interp.t >= idata[0].t,"Cannot extrapolate input data! " << interp.t << " < " << idata[0].t);
   if (interp.t < idata[0].t)
   {
@@ -189,6 +185,7 @@ void Receiver::ASCIILoad(std::istream& f)
       f >> sig.v_z;
       idata.push_back(sig);
    }
+   FinalizeIData();
 }
 
 ReceiverMonitor::ReceiverMonitor(ParGridFunction* _u, const DenseMatrix& _points, const std::string& _filename) :
@@ -229,7 +226,9 @@ ReceiverMonitor::~ReceiverMonitor()
       Vector c;
       points.GetColumn(i,c);
       Receiver r(c,T,Xd[np],Yd[np],Zd[np]);
-      r.Dump(filename + "-" + std::to_string(i) + ".txt");
+      std::stringstream tmp;
+      tmp << filename << "-" << i << ".txt";
+      r.Dump(tmp.str());
       np++;
    }
    MPI_Barrier(u->ParFESpace()->GetParMesh()->GetComm());
