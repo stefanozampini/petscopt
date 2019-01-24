@@ -63,10 +63,7 @@ ifeq ($(with_mfem),1)
   endif
   MFEM_CONFIG_DIR = $(MFEM_DIR)/share/mfem
   ifeq ($(wildcard $(MFEM_CONFIG_DIR)/config.mk),)
-    MFEM_CONFIG_DIR = $(MFEM_DIR)/config
-  endif
-  ifeq ($(wildcard $(MFEM_CONFIG_DIR)/config.mk),)
-    $(error Unable to find MFEM configuration file in $(MFEM_CONFIG_DIR))
+    $(error Incorrect MFEM_DIR: $(MFEM_DIR). Unable to find MFEM configuration file in $(MFEM_CONFIG_DIR))
   endif
   include $(MFEM_CONFIG_DIR)/config.mk
   ifneq ("$(MFEM_USE_PETSC)","YES")
