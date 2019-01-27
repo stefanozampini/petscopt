@@ -9,15 +9,11 @@ ifeq ($(wildcard $(PETSCOPT_DIR)/include/petscopt.h),)
   $(error Incorrect PETSCOPT_DIR: $(PETSCOPT_DIR))
 endif
 
-ifneq ($(wildcard $(PETSCOPT_DIR)/lib/petscopt/conf/arch),)
-  include $(PETSCOPT_DIR)/lib/petscopt/conf/arch
-else ifeq ($(PETSCOPT_ARCH),)
+ifeq ($(PETSCOPT_ARCH),)
   override PETSCOPT_ARCH := $(if $(PETSC_ARCH),$(PETSC_ARCH),arch-default)
 endif
 
 -include $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib/petscopt/conf/config-petsc
--include $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib/petscopt/conf/config-petscopt
--include $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib/petscopt/conf/config-mfem
 
 #--------------------------------------------------------------------#
 
@@ -39,6 +35,8 @@ include $(PETSC_DIR)/lib/petsc/conf/variables
 
 #--------------------------------------------------------------------#
 
+-include $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib/petscopt/conf/config-petscopt
+
 PETSCOPT_INCLUDE = -I$(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/include -I$(PETSCOPT_DIR)/include
 PETSCOPT_LIB_DIR = $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib
 PETSCOPT_RPATH = $(CC_LINKER_SLFLAG)$(PETSCOPT_LIB_DIR)
@@ -50,8 +48,15 @@ PETSCOPT_FCPPFLAGS = $(PETSCOPT_INCLUDE)
 CCPPFLAGS += $(PETSCOPT_CCPPFLAGS)
 FCPPFLAGS += $(PETSCOPT_FCPPFLAGS)
 
+with_develop ?= 0
+ifeq ($(with_develop),1)
+  PETSCOPT_CFLAGS += -Wall -pedantic
+  PETSCOPT_CXXFLAGS += -Wall -pedantic -std=c++98 -Wno-long-long
+endif
+
 #--------------------------------------------------------------------#
 
+-include $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib/petscopt/conf/config-mfem
 with_mfem ?= 0
 ifeq ($(with_mfem),1)
   ifeq ($(MFEM_DIR),)
@@ -69,8 +74,8 @@ ifeq ($(with_mfem),1)
   ifneq ("$(MFEM_USE_PETSC)","YES")
     $(error MFEM need to be configured with MFEM_USE_PETSC=YES)
   endif
-  override CCPPFLAGS += $(MFEM_INCFLAGS)
-  override PETSCOPT_LIB += $(MFEM_LIBS)
+  CCPPFLAGS += $(MFEM_INCFLAGS)
+  PETSCOPT_LIB += $(MFEM_LIBS)
   CXX_FLAGS := $(filter-out -fvisibility=hidden,$(CXX_FLAGS))
 endif
 

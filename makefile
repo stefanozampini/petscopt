@@ -38,21 +38,10 @@ else                   # Show the full command line
   quiet = $($1)
 endif
 
-pcc = $(if $(findstring CONLY,$(PETSC_LANGUAGE)),CC,CXX)
-COMPILE.cc = $(call quiet,$(pcc)) $(PCC_FLAGS) $(CFLAGS) $(CCPPFLAGS) $(C_DEPFLAGS) -c
-COMPILE.cpp = $(call quiet,CXX) $(CXX_FLAGS) $(CXXFLAGS) $(CCPPFLAGS) $(CXX_DEPFLAGS) -c
-ifneq ($(FC_MODULE_OUTPUT_FLAG),)
-COMPILE.fc = $(call quiet,FC) $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) $(FC_DEPFLAGS) $(FC_MODULE_OUTPUT_FLAG)$(MODDIR) -c
-else
-FCMOD = cd $(MODDIR) && $(FC)
-COMPILE.fc = $(call quiet,FCMOD) $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) $(FC_DEPFLAGS) -c
-endif
-
-generated := $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib/petscopt/conf/files
-
 .SECONDEXPANSION: # to expand $$(@D)/.DIR
 
-write-variable = @printf "override $2 = $($2)\n" >> $1;
+write-variable = @printf "override $2 := $($2)\n" >> $1;
+write-variable-name = @printf "override $2 := $($3)\n" >> $1;
 write-confheader-pre    = @printf "\#if !defined(__PETSCOPTCONF_H)\n\#define __PETSCOPTCONF_H\n" >> $1;
 write-confheader-define = @printf "\n\#if !defined(PETSCOPT_HAVE_$2)\n\#define PETSCOPT_HAVE_$2 1\n\#endif\n" >> $1;
 write-confheader-post   = @printf "\n\#endif\n" >> $1;
@@ -65,8 +54,9 @@ $(config-petsc) : | $$(@D)/.DIR
 	$(call write-variable,$@,PETSC_DIR)
 	$(call write-variable,$@,PETSC_ARCH)
 $(config-petscopt) : | $$(@D)/.DIR
-	$(call write-variable,$@,CFLAGS)
-	$(call write-variable,$@,CXXFLAGS)
+	$(call write-variable,$@,with_develop)
+	$(call write-variable,$@,PETSCOPT_CFLAGS)
+	$(call write-variable,$@,PETSCOPT_CXXFLAGS)
 $(config-mfem) : | $$(@D)/.DIR
 	$(call write-variable,$@,with_mfem)
 	$(call write-variable,$@,MFEM_DIR)
@@ -78,16 +68,28 @@ endif
 	$(call write-confheader-post,$@)
 
 config-petsc : $(config-petsc)
-config-petscopt : $(config-petscopt)
+config-petscopt : config-petsc $(config-petscopt)
 config-mfem : $(config-mfem)
 config-confheader : config-vars $(config-confheader)
 
-config-vars : config-petsc config-petscopt config-mfem
+config-vars : config-petscopt config-mfem
 config : config-confheader
 config-clean : clean
 	$(RM) $(config-confheader) $(config-petsc) $(config-petscopt) $(config-mfem)
 	$(RM) $(generated)
 .PHONY:  config-petsc config-petscopt config-mfem config-vars config-confheader config config-clean
+
+pcc = $(if $(findstring CONLY,$(PETSC_LANGUAGE)),CC,CXX)
+COMPILE.cc = $(call quiet,$(pcc)) $(PCC_FLAGS) $(PETSCOPT_CFLAGS) $(CFLAGS) $(CCPPFLAGS) $(C_DEPFLAGS) -c
+COMPILE.cpp = $(call quiet,CXX) $(CXX_FLAGS) $(PETSCOPT_CXXFLAGS) $(CXXFLAGS) $(CCPPFLAGS) $(CXX_DEPFLAGS) -c
+ifneq ($(FC_MODULE_OUTPUT_FLAG),)
+COMPILE.fc = $(call quiet,FC) $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) $(FC_DEPFLAGS) $(FC_MODULE_OUTPUT_FLAG)$(MODDIR) -c
+else
+FCMOD = cd $(MODDIR) && $(FC)
+COMPILE.fc = $(call quiet,FCMOD) $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) $(FC_DEPFLAGS) -c
+endif
+
+generated := $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib/petscopt/conf/files
 
 spkgs := ts,tao,mfemopt
 pkgs := ts tao mfemopt

@@ -4,5 +4,7 @@ include $(PETSCOPT_DIR)/lib/petscopt/conf/variables
 
 # only for the purpose of running tests, we override these variables
 # we want to keep makefile.test as close as possible as gmakefile.test in PETSc
+override PCC_FLAGS := $(PCC_FLAGS) $(PETSCOPT_CFLAGS)
+override CXX_FLAGS := $(CXX_FLAGS) $(PETSCOPT_CXXFLAGS)
 PETSC_LIB := $(PETSCOPT_LIB)
 PETSC_EXTERNAL_LIB_BASIC := $(PETSCOPT_LIB)
