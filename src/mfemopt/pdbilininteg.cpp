@@ -104,7 +104,6 @@ void PDBilinearFormIntegrator::ComputeGradient_Internal(ParGridFunction *sgf, Ve
             /* update deriv_coeff */
             pdcoeff->ElemDeriv(pg,e,k,pvals[k]);
 
-            /* XXX integration rule */
             /* TODO Nonlinear forms (use AssembleElementVector, with slot in residual evaluation for parameter) */
             AssembleElementMatrix(*sel,*eltrans,elmat);
             if (!hessian) /* this is used in F_m */
@@ -173,7 +172,6 @@ void PDBilinearFormIntegrator::ComputeGradientAdjoint_Internal(ParGridFunction *
          {
             pdcoeff->ElemDeriv(pg,e,k,1.0);
 
-            /* XXX check order for integration rule */
             /* TODO Nonlinear forms */
             AssembleElementMatrix2(*ael,*sel,*eltrans,elmat);
             ovals[k] = elmat.InnerProduct(avals,svals);
@@ -186,13 +184,74 @@ void PDBilinearFormIntegrator::ComputeGradientAdjoint_Internal(ParGridFunction *
    UpdateGradient(g);
 }
 
+void PDBilinearFormIntegrator::PushPDIntRule(const FiniteElement &el,
+                                             ElementTransformation &Trans,
+                                             int qorder)
+{
+   MFEM_VERIFY(!oIntRule,"You forgot to pop the PDIntRule")
+   if (!IntRule)
+   {
+      IntRule = GetDefaultIntRule(el,Trans,0);
+   }
+   oIntRule = IntRule;
+   IntRule = GetDefaultIntRule(el,Trans,qorder);
+}
+
+void PDBilinearFormIntegrator::PushPDIntRule(const FiniteElement &trial_fe,
+                                             const FiniteElement &test_fe,
+                                             ElementTransformation &Trans,
+                                             int qorder)
+{
+   MFEM_VERIFY(!oIntRule,"You forgot to pop the PDIntRule")
+   if (!IntRule)
+   {
+      IntRule = GetDefaultIntRule(trial_fe,test_fe,Trans,0);
+   }
+   oIntRule = IntRule;
+   IntRule = GetDefaultIntRule(trial_fe,test_fe,Trans,qorder);
+}
+
+void PDBilinearFormIntegrator::PopPDIntRule()
+{
+   MFEM_VERIFY(oIntRule,"You forgot to push the PDIntRule")
+   IntRule = oIntRule;
+   oIntRule = NULL;
+}
+
+const IntegrationRule* PDMassIntegrator::GetDefaultIntRule(const FiniteElement &trial_fe,
+                                                           const FiniteElement &test_fe,
+                                                           ElementTransformation &Trans,
+                                                           int qo)
+{
+   int order = trial_fe.GetOrder() + test_fe.GetOrder() + Trans.OrderW() + qo;
+
+   const IntegrationRule *ir = NULL;
+   if (trial_fe.Space() == FunctionSpace::rQk)
+   {
+      ir = &RefinedIntRules.Get(trial_fe.GetGeomType(), order);
+   }
+   if (test_fe.Space() == FunctionSpace::rQk)
+   {
+      ir = &RefinedIntRules.Get(test_fe.GetGeomType(), order);
+   }
+   else
+   {
+      ir = &IntRules.Get(trial_fe.GetGeomType(), order);
+   }
+   return ir;
+}
+
 void PDMassIntegrator::AssembleElementMatrix(const FiniteElement &el,
                                              ElementTransformation &Trans,
                                              DenseMatrix &elmat)
 {
    Coefficient *oQ = MassIntegrator::Q;
    MassIntegrator::Q = pdcoeff->GetActiveCoefficient();
+
+   PushPDIntRule(el,Trans,pdcoeff->GetOrder());
    MassIntegrator::AssembleElementMatrix(el,Trans,elmat);
+   PopPDIntRule();
+
    MassIntegrator::Q = oQ;
 }
 
@@ -203,8 +262,62 @@ void PDMassIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe,
 {
    Coefficient *oQ = MassIntegrator::Q;
    MassIntegrator::Q = pdcoeff->GetActiveCoefficient();
+
+   PushPDIntRule(trial_fe,test_fe,Trans,pdcoeff->GetOrder());
    MassIntegrator::AssembleElementMatrix2(trial_fe,test_fe,Trans,elmat);
+   PopPDIntRule();
+
    MassIntegrator::Q = oQ;
+}
+
+const IntegrationRule* PDVectorFEMassIntegrator::GetDefaultIntRule(const FiniteElement &trial_fe,
+                                                                   const FiniteElement &test_fe,
+                                                                   ElementTransformation &Trans,
+                                                                   int qo)
+{
+   int order = Trans.OrderW() + trial_fe.GetOrder() + test_fe.GetOrder() + qo;
+   return &IntRules.Get(trial_fe.GetGeomType(), order);
+}
+
+void PDVectorFEMassIntegrator::AssembleElementMatrix(const FiniteElement &el,
+                                                     ElementTransformation &Trans,
+                                                     DenseMatrix &elmat)
+{
+   Coefficient       *oQ = VectorFEMassIntegrator::Q;
+   VectorCoefficient *VQ = VectorFEMassIntegrator::VQ;
+   MatrixCoefficient *MQ = VectorFEMassIntegrator::MQ;
+   VectorFEMassIntegrator::Q = pdcoeff->GetActiveCoefficient();
+   VectorFEMassIntegrator::VQ = NULL;
+   VectorFEMassIntegrator::MQ = pdcoeff->GetActiveMatrixCoefficient();
+
+   PushPDIntRule(el,Trans,pdcoeff->GetOrder());
+   VectorFEMassIntegrator::AssembleElementMatrix(el,Trans,elmat);
+   PopPDIntRule();
+
+   VectorFEMassIntegrator::Q  = oQ;
+   VectorFEMassIntegrator::VQ = VQ;
+   VectorFEMassIntegrator::MQ = MQ;
+}
+
+void PDVectorFEMassIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe,
+                                                      const FiniteElement &test_fe,
+                                                      ElementTransformation &Trans,
+                                                      DenseMatrix &elmat)
+{
+   Coefficient       *oQ = VectorFEMassIntegrator::Q;
+   VectorCoefficient *VQ = VectorFEMassIntegrator::VQ;
+   MatrixCoefficient *MQ = VectorFEMassIntegrator::MQ;
+   VectorFEMassIntegrator::Q = pdcoeff->GetActiveCoefficient();
+   VectorFEMassIntegrator::VQ = NULL;
+   VectorFEMassIntegrator::MQ = pdcoeff->GetActiveMatrixCoefficient();
+
+   PushPDIntRule(trial_fe,test_fe,Trans,pdcoeff->GetOrder());
+   VectorFEMassIntegrator::AssembleElementMatrix2(trial_fe,test_fe,Trans,elmat);
+   PopPDIntRule();
+
+   VectorFEMassIntegrator::Q  = oQ;
+   VectorFEMassIntegrator::VQ = VQ;
+   VectorFEMassIntegrator::MQ = MQ;
 }
 
 }

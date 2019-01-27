@@ -31,7 +31,7 @@ void ModelHeat::InitForms(Coefficient* mu, MatrixCoefficient* sigma)
 
 void ModelHeat::InitForms(PDCoefficient* mu, MatrixCoefficient* sigma)
 {
-   mu_bilin = new PDMassIntegrator(mu); /* TODO: fix inconsistency */
+   mu_bilin = new PDMassIntegrator(*mu);
    m->AddDomainIntegrator(mu_bilin);
    k->AddDomainIntegrator(new DiffusionIntegrator(*sigma));
 }
