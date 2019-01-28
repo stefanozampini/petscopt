@@ -390,32 +390,8 @@ void PDCoefficient::GetCurrentVector(Vector& m)
 
 void PDCoefficient::UpdateCoefficient(const Vector& m)
 {
-   MFEM_VERIFY(m.Size() == lsize,"Invalid Vector size " << m.Size() << "!. Should be " << lsize);
-   int off = 0;
-   for (int i=0; i<pcoeffgf.Size(); i++)
-   {
-      int n = P->Width();
-      Vector pmi(m.GetData()+off,n);
-      ParGridFunction *gf;
-      if (usederiv)
-      {
-         gf = deriv_work_coeffgf[i];
-      }
-      else
-      {
-         gf = pcoeffgf[i];
-      }
-      P->Mult(pmi,*gf);
-
-      /* restore values from excluded regions */
-      const int st = i*gf->Size();
-      for (int j = 0; j < pcoeffiniti.Size(); j++)
-      {
-         if (usederiv) (*gf)[pcoeffiniti[j]] = 0;
-         else (*gf)[pcoeffiniti[j]] = pcoeffinitv[j+st];
-      }
-      off += n;
-   }
+   if (usederiv) UpdateCoefficientWithGF(m,deriv_work_coeffgf);
+   else          UpdateCoefficientWithGF(m,pcoeffgf);
 }
 
 void PDCoefficient::UpdateCoefficientWithGF(const Vector& m, Array<ParGridFunction*>& agf)
@@ -435,8 +411,7 @@ void PDCoefficient::UpdateCoefficientWithGF(const Vector& m, Array<ParGridFuncti
       const int st = i*gf->Size();
       for (int j = 0; j < pcoeffiniti.Size(); j++)
       {
-         if (usederiv) (*gf)[pcoeffiniti[j]] = 0;
-         else (*gf)[pcoeffiniti[j]] = pcoeffinitv[j+st];
+         (*gf)[pcoeffiniti[j]] = usederiv ? 0.0 : pcoeffinitv[j+st];
       }
       off += n;
    }
