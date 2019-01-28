@@ -299,20 +299,12 @@ TikhonovRegularizer::TikhonovRegularizer(PDCoefficient *_u0) : ObjectiveFunction
    delete m;
 
    PetscParMatrix *P = _u0->GetP();
-   Array<PetscInt> &global_cols = _u0->GetGlobalCols();
 
    H_MM = RAP(tM,P);
    delete tM;
 
-   PetscParVector *tu0  = new PetscParVector(pgf[0]->ParFESpace());
-   pgf[0]->GetTrueDofs(*tu0);
    u0 = new PetscParVector(*P);
-   PetscInt cst = P->GetColStart();
-   for (int i = 0; i < u0->Size(); i++)
-   {
-      (*u0)(i) = (*tu0)((int)(global_cols[i] - cst));
-   }
-   delete tu0;
+   _u0->GetCurrentVector(*u0);
 }
 
 void TikhonovRegularizer::Eval(const mfem::Vector& u,const mfem::Vector& m,double t,double* f)
