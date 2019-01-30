@@ -82,7 +82,7 @@ double ComponentCoefficient::Eval(ElementTransformation &T,
                                   const IntegrationPoint &ip)
 {
    VQ->Eval(w,T,ip);
-   return w(c);
+   return w[c];
 }
 
 DiagonalMatrixCoefficient::DiagonalMatrixCoefficient(VectorCoefficient* _VQ, bool _own) : MatrixCoefficient(0) /* XXX the class have the explicit constructor */

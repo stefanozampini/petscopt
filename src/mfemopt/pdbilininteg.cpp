@@ -230,7 +230,7 @@ const IntegrationRule* PDMassIntegrator::GetDefaultIntRule(const FiniteElement &
    {
       ir = &RefinedIntRules.Get(trial_fe.GetGeomType(), order);
    }
-   if (test_fe.Space() == FunctionSpace::rQk)
+   else if (test_fe.Space() == FunctionSpace::rQk)
    {
       ir = &RefinedIntRules.Get(test_fe.GetGeomType(), order);
    }
