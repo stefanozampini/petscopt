@@ -445,8 +445,9 @@ void TDLeastSquares::InitDeltaCoefficients()
    rhsform_x  = new ParLinearForm(fes);
    for (int i=0; i<receivers.Size(); i++)
    {
+      if (!fes->GetParMesh()->GetNE()) { deltacoeffs_x.Append(NULL); continue; } //XXX empty meshes
       int eid = receivers_eid[i];
-      const FiniteElement *FElem = fes->GetFE(eid < 0 ? 0 : eid); //XXX empty meshes
+      const FiniteElement *FElem = fes->GetFE(eid < 0 ? 0 : eid);
       int vdim = (FElem->GetRangeType() == FiniteElement::SCALAR) ? fes->GetVDim() : fes->GetParMesh()->SpaceDimension();
       Vector V(vdim);
       V = 0.0;
@@ -463,7 +464,6 @@ void TDLeastSquares::InitDeltaCoefficients()
       }
       deltacoeffs_x.Append(vd);
    }
-
 }
 
 void TDLeastSquares::EvalGradient_X(const Vector& state, const Vector& m, double time, mfem::Vector& g)
