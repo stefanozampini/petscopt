@@ -1,0 +1,4 @@
+Using param fec type H1, order 2
+Using state fec type HCURL, order 2
+Error at line 289: 6.38595e-17
+Error at line 313: 1.11022e-16
