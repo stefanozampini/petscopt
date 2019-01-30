@@ -18,8 +18,8 @@ private:
    mfem::ParGridFunction *sworkgf;
    const mfem::IntegrationRule *oIntRule;
 
-   void ComputeGradient_Internal(mfem::ParGridFunction*,mfem::Vector&,mfem::Vector&,mfem::Vector&,bool=false);
-   void ComputeGradientAdjoint_Internal(mfem::ParGridFunction*,mfem::ParGridFunction*,mfem::Vector&,mfem::Vector&,bool=false);
+   void ComputeGradient_Internal(mfem::ParGridFunction*,const mfem::Vector&,const mfem::Vector&,mfem::Vector&,bool=false);
+   void ComputeGradientAdjoint_Internal(mfem::ParGridFunction*,mfem::ParGridFunction*,const mfem::Vector&,mfem::Vector&,bool=false);
 
 protected:
    PDCoefficient *pdcoeff;
@@ -37,10 +37,10 @@ public:
    void UpdateGradient(mfem::Vector&);
    void GetCurrentVector(mfem::Vector&);
    /* XXX */
-   void ComputeGradient(mfem::ParGridFunction*,mfem::Vector&,mfem::Vector&,mfem::Vector&);
-   void ComputeGradientAdjoint(mfem::ParGridFunction*,mfem::ParGridFunction*,mfem::Vector&,mfem::Vector&);
-   void ComputeHessian_XM(mfem::ParGridFunction*,mfem::Vector&,mfem::Vector&,mfem::Vector&);
-   void ComputeHessian_MX(mfem::ParGridFunction*,mfem::ParGridFunction*,mfem::Vector&,mfem::Vector&);
+   void ComputeGradient(mfem::ParGridFunction*,const mfem::Vector&,const mfem::Vector&,mfem::Vector&);
+   void ComputeGradientAdjoint(mfem::ParGridFunction*,mfem::ParGridFunction*,const mfem::Vector&,mfem::Vector&);
+   void ComputeHessian_XM(mfem::ParGridFunction*,const mfem::Vector&,const mfem::Vector&,mfem::Vector&);
+   void ComputeHessian_MX(mfem::ParGridFunction*,mfem::ParGridFunction*,const mfem::Vector&,mfem::Vector&);
 
    /* Default integration rule: specific implementations are copy-and-pasted from MFEM code */
    virtual const mfem::IntegrationRule* GetDefaultIntRule(const mfem::FiniteElement&,const mfem::FiniteElement&,mfem::ElementTransformation&,int)

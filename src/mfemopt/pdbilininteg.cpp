@@ -31,27 +31,27 @@ void PDBilinearFormIntegrator::GetCurrentVector(Vector& m)
    pdcoeff->GetCurrentVector(m);
 }
 
-void PDBilinearFormIntegrator::ComputeHessian_XM(ParGridFunction *agf, Vector& m, Vector& pertIn, Vector& out)
+void PDBilinearFormIntegrator::ComputeHessian_XM(ParGridFunction *agf, const Vector& m, const Vector& pertIn, Vector& out)
 {
    ComputeGradient_Internal(agf,m,pertIn,out,true);
 }
 
-void PDBilinearFormIntegrator::ComputeHessian_MX(ParGridFunction *agf, ParGridFunction *sgf, Vector& m, Vector& out)
+void PDBilinearFormIntegrator::ComputeHessian_MX(ParGridFunction *agf, ParGridFunction *sgf, const Vector& m, Vector& out)
 {
    ComputeGradientAdjoint_Internal(agf,sgf,m,out,true);
 }
 
-void PDBilinearFormIntegrator::ComputeGradient(ParGridFunction *sgf, Vector& m, Vector& pertIn, Vector& out)
+void PDBilinearFormIntegrator::ComputeGradient(ParGridFunction *sgf, const Vector& m, const Vector& pertIn, Vector& out)
 {
    ComputeGradient_Internal(sgf,m,pertIn,out);
 }
 
-void PDBilinearFormIntegrator::ComputeGradientAdjoint(ParGridFunction *agf, ParGridFunction *sgf, Vector& m, Vector& out)
+void PDBilinearFormIntegrator::ComputeGradientAdjoint(ParGridFunction *agf, ParGridFunction *sgf, const Vector& m, Vector& out)
 {
    ComputeGradientAdjoint_Internal(agf,sgf,m,out);
 }
 
-void PDBilinearFormIntegrator::ComputeGradient_Internal(ParGridFunction *sgf, Vector& m, Vector& pertIn ,Vector& out, bool hessian)
+void PDBilinearFormIntegrator::ComputeGradient_Internal(ParGridFunction *sgf, const Vector& m, const Vector& pertIn ,Vector& out, bool hessian)
 {
    Vector      ovals,svals,pvals;
    Array<int>  vdofs,pdofs;
@@ -122,7 +122,7 @@ void PDBilinearFormIntegrator::ComputeGradient_Internal(ParGridFunction *sgf, Ve
    pdcoeff->SetUseDerivCoefficients(false);
 }
 
-void PDBilinearFormIntegrator::ComputeGradientAdjoint_Internal(ParGridFunction *agf, ParGridFunction *sgf, Vector& m, Vector& g, bool hessian)
+void PDBilinearFormIntegrator::ComputeGradientAdjoint_Internal(ParGridFunction *agf, ParGridFunction *sgf, const Vector& m, Vector& g, bool hessian)
 {
    Array<int>  vdofs,pdofs;
    Vector      avals,svals,ovals;
