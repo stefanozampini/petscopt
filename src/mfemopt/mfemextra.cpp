@@ -51,6 +51,23 @@ void MeshGetElementsTagged(Mesh *mesh,const Array<int>& which_tag,Array<bool>& t
    }
 }
 
+void FiniteElementSpaceGetRangeAndDeriv(FiniteElementSpace& fes, int* r, int* d)
+{
+   const FiniteElement* fe = fes.GetFE(0);
+   if (r) *r = fe ? fe->GetRangeType() : -1;
+   if (d) *d = fe ? fe->GetDerivType() : -1;
+}
+
+void ParFiniteElementSpaceGetRangeAndDeriv(ParFiniteElementSpace& fes, int* r, int* d)
+{
+   int lr[2] = {-1,-1}, gr[2];
+   FiniteElementSpaceGetRangeAndDeriv(fes,lr,lr+1);
+   /* reduce for empty meshes */
+   MPI_Allreduce(&lr,&gr,2,MPI_INT,MPI_MAX,fes.GetParMesh()->GetComm());
+   if (r) *r = gr[0];
+   if (d) *d = gr[1];
+}
+
 ComponentCoefficient::ComponentCoefficient(VectorCoefficient& _VQ, int _c)
 {
    MFEM_VERIFY(_c > -1,"Invalid component " << _c );
