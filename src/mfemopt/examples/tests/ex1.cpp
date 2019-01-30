@@ -244,7 +244,7 @@ void Image::Visualize(const char* name)
 
 PDCoefficient* Image::CreatePDCoefficient()
 {
-   return new PDCoefficient(*this,(*this).pfes);
+   return new PDCoefficient(*this,pmesh,fec);
 }
 
 /* the objective functional as a sum of Tikhonov and TV terms */

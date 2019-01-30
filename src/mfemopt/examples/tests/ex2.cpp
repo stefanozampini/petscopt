@@ -1056,17 +1056,17 @@ int main(int argc, char *argv[])
          MFEM_ABORT("Unhandled FEC Type");
          break;
    }
-   ParFiniteElementSpace *mu_fes = new ParFiniteElementSpace(pmesh,mu_fec);
 
    /* The parameter dependent coefficient for mu
       We construct the guess from the exact solution just for testing purposes */
    PDCoefficient *mu_pd;
-   if (mu_excl_fn) mu_pd = new PDCoefficient(*mu,mu_fes,excl_fn);
-   else mu_pd = new PDCoefficient(*mu,mu_fes,mu_excl_a);
+   if (mu_excl_fn) mu_pd = new PDCoefficient(*mu,pmesh,mu_fec,excl_fn);
+   else mu_pd = new PDCoefficient(*mu,pmesh,mu_fec,mu_excl_a);
 
    /* Exact solution */
-   Vector muv_exact;
+   Vector muv_exact(mu_pd->GetLocalSize());
    mu_pd->GetCurrentVector(muv_exact);
+   if (glvis) mu_pd->Visualize();
 
    /* The misfit function */
    MultiSourceMisfit *obj = new MultiSourceMisfit(fes,mu_pd,sigma,bchandler,srcpoints,recpoints,t0,dt,tf,scratchdir);
@@ -1196,7 +1196,6 @@ int main(int argc, char *argv[])
    delete robj;
    delete tv;
    delete mu_fec;
-   delete mu_fes;
    delete mu_pd;
    delete obj;
 

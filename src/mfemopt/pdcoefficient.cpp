@@ -1,4 +1,5 @@
 #include <mfemopt/pdcoefficient.hpp>
+#include <mfemopt/mfemextra.hpp>
 #include <petscmat.h>
 #include <fstream>
 
@@ -39,8 +40,10 @@ void PDCoefficient::Reset()
    deriv_coeffgf.SetSize(0);
    deriv_work_coeffgf.SetSize(0);
    global_cols.SetSize(0);
+   delete pfes;
    lvsize = 0;
    lsize = 0;
+   order = -1;
    for (unsigned int i=0; i<souts.size(); i++)
    {
       delete souts[i];
@@ -48,44 +51,52 @@ void PDCoefficient::Reset()
    souts.resize(0);
 }
 
-PDCoefficient::PDCoefficient(Coefficient& Q, ParFiniteElementSpace* pfes,
+
+PDCoefficient::PDCoefficient(Coefficient& Q, ParMesh *mesh, const FiniteElementCollection *fec,
+               const Array<bool>& excl)
+{
+   Init(&Q,NULL,NULL,mesh,fec,excl);
+}
+
+PDCoefficient::PDCoefficient(Coefficient& Q, ParMesh *mesh, const FiniteElementCollection *fec,
                              bool (*excl_fn)(const Vector&))
 {
-   ParMesh *mesh = pfes->GetParMesh();
-   Vector pt(mesh->SpaceDimension());
-   Array<bool> excl(mesh->GetNE());
-   for (int e = 0; e < mesh->GetNE(); e++)
-   {
-      mesh->GetElementTransformation(e)->Transform(
-         Geometries.GetCenter(mesh->GetElementBaseGeometry(e)), pt);
-      excl[e] = (*excl_fn)(pt);
-   }
-   Init(&Q,NULL,NULL,pfes,excl);
+   Array<bool> excl;
+   MeshGetElementsTagged(mesh,excl_fn,excl);
+   Init(&Q,NULL,NULL,mesh,fec,excl);
 }
 
-PDCoefficient::PDCoefficient(Coefficient& Q, ParFiniteElementSpace* pfes,
+PDCoefficient::PDCoefficient(Coefficient& Q, ParMesh *mesh, const FiniteElementCollection *fec,
                const Array<int>& excl_tag)
 {
-   ParMesh *mesh = pfes->GetParMesh();
-   Array<bool> excl(mesh->GetNE());
-   for (int i = 0; i < mesh->GetNE(); i++)
-   {
-      bool lexcl = false;
-      int eatt = mesh->GetAttribute(i);
-      for (int r = 0; r < excl_tag.Size(); r++)
-      {
-         if (excl_tag[r] == eatt)
-         {
-            lexcl = true;
-            break;
-         }
-      }
-      excl[i] = lexcl;
-   }
-   Init(&Q,NULL,NULL,pfes,excl);
+   Array<bool> excl;
+   MeshGetElementsTagged(mesh,excl_tag,excl);
+   Init(&Q,NULL,NULL,mesh,fec,excl);
 }
 
-void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficient *MQ, ParFiniteElementSpace* pfes,const Array<bool>& excl)
+PDCoefficient::PDCoefficient(VectorCoefficient& Q, ParMesh *mesh, const FiniteElementCollection *fec,
+               const Array<bool>& excl)
+{
+   Init(NULL,&Q,NULL,mesh,fec,excl);
+}
+
+PDCoefficient::PDCoefficient(VectorCoefficient& Q, ParMesh *mesh, const FiniteElementCollection *fec,
+                             bool (*excl_fn)(const Vector&))
+{
+   Array<bool> excl;
+   MeshGetElementsTagged(mesh,excl_fn,excl);
+   Init(NULL,&Q,NULL,mesh,fec,excl);
+}
+
+PDCoefficient::PDCoefficient(VectorCoefficient& Q, ParMesh *mesh, const FiniteElementCollection *fec,
+               const Array<int>& excl_tag)
+{
+   Array<bool> excl;
+   MeshGetElementsTagged(mesh,excl_tag,excl);
+   Init(NULL,&Q,NULL,mesh,fec,excl);
+}
+
+void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficient *MQ, ParMesh *mesh, const FiniteElementCollection *fec, const Array<bool>& excl)
 {
    lsize = 0;
    lvsize = 0;
@@ -97,33 +108,110 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
    P = NULL;
    R = NULL;
 
-   /* coefficients */
-   int ngf = 1;
-   if (MQ) { mfem_error("Not yet implemented"); }
-   else if (VQ) { mfem_error("Not yet implemented"); }
-   else if (Q) { ngf = 1; };
+   const FiniteElement *fe;
+   if (!mesh->GetNE())
+   {
+      static const Geometry::Type geoms[3] =
+      { Geometry::SEGMENT, Geometry::TRIANGLE, Geometry::TETRAHEDRON };
+      fe = fec->FiniteElementForGeometry(geoms[pfes->GetMesh()->Dimension()-1]);
+   }
+   else
+   {
+      fe = fec->FiniteElementForGeometry(mesh->GetElementBaseGeometry(0));
+   }
+   order = fe->GetOrder();
+   bool scalar = (fe->GetRangeType() == FiniteElement::SCALAR);
 
-   for (int i = 0; i < ngf; i++)
+   /* store values of projected initial coefficients
+      and create actual coefficients to be used */
+   int ngf = 0;
+   if (MQ) { mfem_error("Not yet implemented"); }
+   else if (VQ)
+   {
+      /* XXX MASK */
+      if (scalar)
+      {
+         ngf = VQ->GetVDim();
+      }
+      else
+      {
+         MFEM_VERIFY(mesh->SpaceDimension() == VQ->GetVDim(),"Cannot represent a vector coefficient with VDIM " << VQ->GetVDim() << " using with space dimension " << mesh->SpaceDimension());
+         ngf = 1;
+      }
+   }
+   else if (Q)
+   {
+      MFEM_VERIFY(scalar,"Cannot represent a scalar coefficient with a vector finite element space");
+      ngf = 1;
+   }
+   MFEM_VERIFY(ngf,"Zero functions");
+
+   pfes = new ParFiniteElementSpace(mesh,fec,1,Ordering::byVDIM);
+
+   /* store values of projected initial coefficients
+      and create actual coefficients to be used */
+   if (MQ) { mfem_error("Not yet implemented"); }
+   else if (VQ)
+   {
+      if (scalar)
+      {
+         for (int i = 0; i < ngf; i++)
+         {
+            pcoeffgf.Append(new ParGridFunction(pfes));
+            deriv_coeffgf.Append(new ParGridFunction(pfes));
+            deriv_work_coeffgf.Append(new ParGridFunction(pfes));
+            pgradgf.Append(new ParGridFunction(pfes));
+
+            ComponentCoefficient Q(*VQ,i);
+            *pcoeffgf[i] = 0.0;
+            //pcoeffgf[i]->ProjectCoefficient(Q);
+            pcoeffgf[i]->ProjectDiscCoefficient(Q,GridFunction::ARITHMETIC);
+         }
+         /* XXX MASK */
+         MatrixArrayCoefficient *tmp_m_coeff = new MatrixArrayCoefficient(VQ->GetVDim());
+         MatrixArrayCoefficient *tmp_deriv_m_coeff = new MatrixArrayCoefficient(VQ->GetVDim());
+         for (int i = 0; i < ngf; i++)
+         {
+            tmp_m_coeff->Set(i,i,new GridFunctionCoefficient(pcoeffgf[i]));
+            tmp_deriv_m_coeff->Set(i,i,new GridFunctionCoefficient(deriv_coeffgf[i]));
+         }
+         m_coeff = tmp_m_coeff;
+         deriv_m_coeff = tmp_deriv_m_coeff;
+      }
+      else
+      {
+         /* XXX MASK ERROR */
+         ngf = 1;
+         pcoeffgf.Append(new ParGridFunction(pfes));
+         deriv_coeffgf.Append(new ParGridFunction(pfes));
+         deriv_work_coeffgf.Append(new ParGridFunction(pfes));
+         pgradgf.Append(new ParGridFunction(pfes));
+
+         *pcoeffgf[0] = 0.0;
+         //pcoeffgf[0]->ProjectCoefficient(*VQ);
+         pcoeffgf[0]->ProjectDiscCoefficient(*VQ,GridFunction::ARITHMETIC);
+
+         m_coeff = new DiagonalMatrixCoefficient(new VectorGridFunctionCoefficient(pcoeffgf[0]),true);
+         deriv_m_coeff = new DiagonalMatrixCoefficient(new VectorGridFunctionCoefficient(deriv_coeffgf[0]),true);
+      }
+   }
+   else if (Q)
    {
       pcoeffgf.Append(new ParGridFunction(pfes));
       deriv_coeffgf.Append(new ParGridFunction(pfes));
       deriv_work_coeffgf.Append(new ParGridFunction(pfes));
       pgradgf.Append(new ParGridFunction(pfes));
-      lvsize += pfes->GetVSize();
-   }
 
-   /* store values of projected initial coefficients
-      and create actual coefficients to be used */
-   if (MQ) { mfem_error("Not yet implemented"); }
-   else if (VQ) { mfem_error("Not yet implemented"); }
-   else if (Q)
-   {
       *pcoeffgf[0] = 0.0;
-      // XXX BUG: GROUPCOMM not created!
-      pcoeffgf[0]->ProjectDiscCoefficient(*Q,GridFunction::ARITHMETIC);
       //pcoeffgf[0]->ProjectCoefficient(*Q);
+      pcoeffgf[0]->ProjectDiscCoefficient(*Q,GridFunction::ARITHMETIC);
       s_coeff = new GridFunctionCoefficient(pcoeffgf[0]);
       deriv_s_coeff = new GridFunctionCoefficient(deriv_coeffgf[0]);
+   }
+
+   for (int i = 0; i < ngf; i++)
+   {
+      lvsize += pcoeffgf[i]->ParFESpace()->GetVSize();
    }
 
    pcoeffexcl.SetSize(pfes->GetParMesh()->GetNE());
@@ -133,10 +221,10 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
    PetscBool lhas = PETSC_FALSE,has;
    for (int i = 0; i < pcoeffexcl.Size(); i++) if (pcoeffexcl[i]) { lhas = PETSC_TRUE; break; }
    MPI_Allreduce(&lhas,&has,1,MPIU_BOOL,MPI_LOR,pfes->GetParMesh()->GetComm());
+
    if (has)
    {
-      ParMesh *pmesh = pfes->GetParMesh();
-      ParGridFunction *gf = pgradgf[0];
+      ParGridFunction *gf = new ParGridFunction(pfes);
       *gf = 0.0;
 
       PetscParMatrix *PT = new PetscParMatrix(pfes->Dof_TrueDof_Matrix(),Operator::PETSC_MATAIJ);
@@ -147,10 +235,9 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
          rows[i] = i + rst;
       }
 
-      for (int i = 0; i < pmesh->GetNE(); i++)
+      for (int i = 0; i < mesh->GetNE(); i++)
       {
          if (!pcoeffexcl[i])
-         //if (pcoeffexcl[i])
          {
             Array<int> dofs;
             pfes->GetElementVDofs(i,dofs);
@@ -168,7 +255,6 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
          for (int i = 0; i < lwork.Size(); i++)
          {
             if (std::abs(lwork(i)) < 1.e-12)
-            //if (std::abs(lwork(i)) > 0.0)
             {
                initi[cum++] = i;
             }
@@ -178,16 +264,16 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
 
       /* we don't exclude those elements that are
          neighbours of the domain of interest */
-      for (int i = 0; i < pmesh->GetNE(); i++)
+      for (int i = 0; i < mesh->GetNE(); i++)
       {
          Array<int> dofs;
-         pfes->GetElementVDofs(i,dofs);
          Vector vals;
+         pfes->GetElementVDofs(i,dofs);
          gf->GetSubVector(dofs,vals);
-         pcoeffexcl[i] = vals.Normlinf() > 1.e-12 ? false : true;
+         pcoeffexcl[i] = vals.Normlinf() != 0.0  ? false : true;
       }
 
-      /* restrict on active dofs (XXX is this robust?) */
+      /* restrict on active dofs */
       Array<PetscInt> local_cols;
       global_cols.Reserve(PT->Width());
       local_cols.Reserve(PT->Width());
@@ -195,8 +281,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
       HypreParVector *work = gf->ParallelAssemble();
       for (int i = 0; i < work->Size(); i++)
       {
-         if (std::abs((*work)(i)) > 1.e-12)
-         //if (std::abs((*work)(i)) < 1.e-12)
+         if (std::abs((*work)(i)) != 0.0)
          {
             global_cols.Append(i + cst);
             local_cols.Append(i);
@@ -225,6 +310,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
             pcoeffinitv[i+st] = (*vgf)[initi[i]];
          }
       }
+      delete gf;
    }
    else
    {
@@ -377,14 +463,14 @@ MatrixCoefficient* PDCoefficient::GetActiveMatrixCoefficient()
 void PDCoefficient::GetCurrentVector(Vector& m)
 {
    MFEM_VERIFY(!usederiv,"This should not happen");
-   int off = 0;
-   m.SetSize(lsize);
+   MFEM_VERIFY(m.Size() == lsize,"Invalid Vector size " << m.Size() << "!. Should be " << lsize);
+   double *data = m.GetData();
+   int n = P->Width();
    for (int i=0; i<pgradgf.Size(); i++)
    {
-      int n = P->Width();
-      Vector pmi(m.GetData()+off,n);
+      Vector pmi(data,n);
       R->Mult(*pcoeffgf[i],pmi);
-      off += n;
+      data += n;
    }
 }
 
@@ -398,11 +484,11 @@ void PDCoefficient::UpdateCoefficientWithGF(const Vector& m, Array<ParGridFuncti
 {
    MFEM_VERIFY(agf.Size() == pcoeffgf.Size(),"Invalid array size " << agf.Size() << "!. Should be " << pcoeffgf.Size());
    MFEM_VERIFY(m.Size() == lsize,"Invalid Vector size " << m.Size() << "!. Should be " << lsize);
-   int off = 0;
+   double *data = m.GetData();
+   int n = P->Width();
    for (int i=0; i<pcoeffgf.Size(); i++)
    {
-      int n = P->Width();
-      Vector pmi(m.GetData()+off,n);
+      Vector pmi(data,n);
 
       ParGridFunction *gf = agf[i];
       P->Mult(pmi,*gf);
@@ -413,21 +499,21 @@ void PDCoefficient::UpdateCoefficientWithGF(const Vector& m, Array<ParGridFuncti
       {
          (*gf)[pcoeffiniti[j]] = usederiv ? 0.0 : pcoeffinitv[j+st];
       }
-      off += n;
+      data += n;
    }
 }
 
 void PDCoefficient::UpdateGradient(Vector& g)
 {
-   int off = 0;
-   g.SetSize(lsize);
+   MFEM_VERIFY(g.Size() == lsize,"Invalid Vector size " << g.Size() << "!. Should be " << lsize);
+   double *data = g.GetData();
+   int n = P->Width();
    for (int i=0; i<pgradgf.Size(); i++)
    {
-      int n = P->Width();
-      Vector pgi(g.GetData()+off,n);
+      Vector pgi(data,n);
       ParGridFunction *gf = pgradgf[i];
       P->MultTranspose(*gf,pgi);
-      off += n;
+      data += n;
    }
 }
 
