@@ -27,11 +27,13 @@ private:
    bool has_x,has_m;
 
 protected:
+   double scale;
    mfem::Operator *H_XX, *H_MM; /* Hessian operators, owned by the base class */
 
 public:
-   ObjectiveFunction(bool _has_x = true, bool _has_m = true, double _teval = std::numeric_limits<double>::min()) : teval(_teval), has_x(_has_x), has_m(_has_m), H_XX(NULL), H_MM(NULL) {}
+   ObjectiveFunction(bool _has_x = true, bool _has_m = true, double _teval = std::numeric_limits<double>::min()) : teval(_teval), has_x(_has_x), has_m(_has_m), scale(1.0), H_XX(NULL), H_MM(NULL) {}
 
+   void SetScale(double s) { scale = s; }
    double GetEvalTime() { return teval; }
 
    virtual void Eval(const mfem::Vector&,const mfem::Vector&,double,double*)
@@ -139,7 +141,6 @@ public:
 class TVRegularizer : public ObjectiveFunction
 {
 private:
-   double alpha;
    double beta;
    TVIntegrator tvInteg;
    mfem::Array<mfem::ParGridFunction*> wkgf;
@@ -152,8 +153,6 @@ private:
 
 public:
    TVRegularizer(PDCoefficient*,double,double,bool=false);
-   void SetAlpha(double _alpha) { alpha = _alpha; }
-   double GetAlpha() { return alpha; }
    void Symmetrize(bool _sym = true) { tvInteg.Symmetrize(_sym); }
    void Project(bool _nrm = true) { tvInteg.Project(_nrm); }
    virtual void Eval(const mfem::Vector&,const mfem::Vector&,double,double*);

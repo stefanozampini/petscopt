@@ -432,6 +432,7 @@ void TDLeastSquares::Eval(const Vector& state, const Vector& m, double time, dou
       lval += F_ls(E,D);
    }
    ParFiniteElementSpace *fes = u->ParFESpace();
+   lval *= scale;
    MPI_Allreduce(&lval,f,1,MPI_DOUBLE_PRECISION,MPI_SUM,fes->GetParMesh()->GetComm());
 }
 
@@ -483,6 +484,7 @@ void TDLeastSquares::EvalGradient_X(const Vector& state, const Vector& m, double
       receivers[i]->GetIData(time,D);
       dFdu_ls(E,D); // E = E - D
       deltacoeffs_x[i]->SetDirection(E);
+      deltacoeffs_x[i]->SetScale(scale);
    }
    rhsform_x->Assemble();
    rhsform_x->ParallelAssemble(g);
@@ -530,16 +532,18 @@ void TDLeastSquaresHessian::Mult(const Vector& x, Vector& y) const
       if (eid < 0) continue;
       const IntegrationPoint& ip = ls->receivers_ip[i];
 
-      Vector E,D;
+      Vector E;
       ls->u->GetVectorValue(eid,ip,E);
       ls->deltacoeffs_x[i]->SetDirection(E);
+      ls->deltacoeffs_x[i]->SetScale(ls->scale);
    }
    ls->rhsform_x->Assemble();
    ls->rhsform_x->ParallelAssemble(y);
 }
 
-TVRegularizer::TVRegularizer(PDCoefficient* _m_pd, double _alpha, double _beta, bool _primal_dual) : ObjectiveFunction(false,true), alpha(_alpha), beta(_beta), tvInteg(beta), wkgf(), P2D(NULL), ljacs(), primal_dual(_primal_dual), m_pd(_m_pd)
+TVRegularizer::TVRegularizer(PDCoefficient* _m_pd, double _alpha, double _beta, bool _primal_dual) : ObjectiveFunction(false,true), beta(_beta), tvInteg(beta), wkgf(), P2D(NULL), ljacs(), primal_dual(_primal_dual), m_pd(_m_pd)
 {
+   SetScale(_alpha);
    if (!m_pd) return;
    Array<ParGridFunction*> &pgf = m_pd->GetDerivCoeffs();
    if (!pgf.Size()) return;
@@ -706,11 +710,10 @@ void TVRegularizer::Eval(const Vector& state, const Vector& m, double time, doub
 
    *f = 0.0;
    if (!m_pd) return;
-   double lf = 0.0;
    Array<ParGridFunction*> pgf;
    pgf = m_pd->GetDerivCoeffs();
    if (!pgf.Size()) return;
-   m_pd->UpdateCoefficientWithGF(m,pgf);
+
    ParFiniteElementSpace *fes = pgf[0]->ParFESpace();
    ParMesh *mesh = fes->GetParMesh();
    for (int i = 0; i < pgf.Size(); i++)
@@ -718,6 +721,10 @@ void TVRegularizer::Eval(const Vector& state, const Vector& m, double time, doub
       ParFiniteElementSpace *pfes = pgf[i]->ParFESpace();
       MFEM_VERIFY(mesh == pfes->GetParMesh(),"Different meshes not supported");
    }
+
+   m_pd->UpdateCoefficientWithGF(m,pgf);
+
+   double lf = 0.0;
    Array<bool>& integ_exclude = m_pd->GetExcludedElements();
    for (int e = 0; e < mesh->GetNE(); e++)
    {
@@ -730,7 +737,7 @@ void TVRegularizer::Eval(const Vector& state, const Vector& m, double time, doub
          pgf[pg]->GetSubVector(vdofs, mk);
          const FiniteElement *el = fes->GetFE(e);
          ElementTransformation *T = fes->GetElementTransformation(e);
-         lf += alpha * tvInteg.GetElementEnergy(*el,*T,mk);
+         lf += scale * tvInteg.GetElementEnergy(*el,*T,mk);
       }
    }
    MPI_Allreduce(&lf,f,1,MPI_DOUBLE_PRECISION,MPI_SUM,mesh->GetComm());
@@ -745,7 +752,7 @@ void TVRegularizer::EvalGradient_M(const Vector& state, const Vector& m, double 
    if (!m_pd) return;
    Array<ParGridFunction*> &pgf = m_pd->GetDerivCoeffs();
    if (!pgf.Size()) return;
-   m_pd->UpdateCoefficientWithGF(m,pgf);
+
    ParFiniteElementSpace *fes = pgf[0]->ParFESpace();
    ParMesh *mesh = fes->GetParMesh();
    for (int i = 0; i < pgf.Size(); i++)
@@ -753,6 +760,9 @@ void TVRegularizer::EvalGradient_M(const Vector& state, const Vector& m, double 
       ParFiniteElementSpace *pfes = pgf[i]->ParFESpace();
       MFEM_VERIFY(mesh == pfes->GetParMesh(),"Different meshes not supported");
    }
+
+   m_pd->UpdateCoefficientWithGF(m,pgf);
+
    Array<ParGridFunction*> &pgradgf = m_pd->GetGradCoeffs();
    for (int pg = 0; pg < pgf.Size(); pg++) *pgradgf[pg] = 0.0;
 
@@ -769,7 +779,7 @@ void TVRegularizer::EvalGradient_M(const Vector& state, const Vector& m, double 
          const FiniteElement *el = fes->GetFE(e);
          ElementTransformation *T = fes->GetElementTransformation(e);
          tvInteg.AssembleElementVector(*el,*T,mk,elgrad);
-         elgrad *= alpha;
+         elgrad *= scale;
          pgradgf[pg]->AddElementVector(vdofs,elgrad);
       }
    }
@@ -781,7 +791,6 @@ void TVRegularizer::SetUpHessian_MM(const Vector& x,const Vector& m,double t)
    if (!m_pd) return;
    Array<ParGridFunction*> &pgf = m_pd->GetDerivCoeffs();
    if (!pgf.Size()) return;
-   m_pd->UpdateCoefficientWithGF(m,pgf);
 
    ParFiniteElementSpace *fes = pgf[0]->ParFESpace();
    ParMesh *mesh = fes->GetParMesh();
@@ -790,6 +799,8 @@ void TVRegularizer::SetUpHessian_MM(const Vector& x,const Vector& m,double t)
       ParFiniteElementSpace *pfes = pgf[i]->ParFESpace();
       MFEM_VERIFY(mesh == pfes->GetParMesh(),"Different meshes not supported");
    }
+
+   m_pd->UpdateCoefficientWithGF(m,pgf);
 
    if (!ljacs.Size())
    {
@@ -826,7 +837,7 @@ void TVRegularizer::SetUpHessian_MM(const Vector& x,const Vector& m,double t)
          if (primal_dual) tvInteg.SetDualCoefficient(WQ[pg]);
          else tvInteg.SetDualCoefficient(NULL);
          tvInteg.AssembleElementGrad(*el,*T,mk,elmat);
-         elmat *= alpha;
+         elmat *= scale;
          ljacs[pg]->AddSubMatrix(vdofs,vdofs,elmat,skz);
       }
    }
