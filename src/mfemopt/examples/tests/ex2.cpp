@@ -12,16 +12,19 @@ static const char help[] = "Tests a parameter dependent one-dimensional diffusio
 using namespace mfem;
 using namespace mfemopt;
 
-typedef enum {FEC_L2, FEC_H1} FECType;
-static const char *FECTypes[] = {"L2","H1","FecType","FEC_",0};
+typedef enum {FEC_L2, FEC_H1, FEC_HCURL, FEC_HDIV} FECType;
+static const char *FECTypes[] = {"L2","H1","HCURL","HDIV","FecType","FEC_",0};
+
 // TODO
 //typedef enum {SIGMA_NONE, SIGMA_SCALAR, SIGMA_DIAG, SIGMA_FULL} SIGMAType;
 //static const char *SIGMATypes[] = {"NONE","SCALAR","DIAG","FULL","SigmaType","SIGMA_",0};
 
 /* auxiliary functions to perform refinement */
+PetscReal refine_fn_bb[6] = {-1.0,1.0,-1.0,1.0,-1.0,1.0};
+
 static int refine_fn(const Vector &x)
 {
-   for (int d = 0; d < x.Size(); d++) if (x(d) < -1.0 || x(d) > 1.0) return 0;
+   for (int d = 0; d < x.Size(); d++) if (x(d) < refine_fn_bb[2*d] || x(d) > refine_fn_bb[2*d+1]) return 0;
    return 1;
 }
 
@@ -39,9 +42,11 @@ void NCRefinement(ParMesh *mesh, int (*fn)(const Vector&))
    mesh->GeneralRefinement(el_to_refine,1);
 }
 
+PetscReal excl_fn_bb[6] = {-1.0,1.0,-1.0,1.0,-1.0,1.0};
+
 static bool excl_fn(const Vector &x)
 {
-   for (int d = 0; d < x.Size(); d++) if (x(d) < -1.0 || x(d) > 1.0) return true;
+   for (int d = 0; d < x.Size(); d++) if (x(d) < excl_fn_bb[2*d] || x(d) > excl_fn_bb[2*d+1]) return true;
    return false;
 }
 
@@ -70,15 +75,31 @@ static double mu_exact_jump(const Vector &x)
    return mu_m(m);
 }
 
+#if 0
+static double mu_exact_jump(const Vector &x)
+{
+   double m = 0;
+   if (1000 <= x(0) && x(0) <= 2000) m = -2.0;
+   else if (3000 <= x(0) && x(0) <= 6000) m = -1.0;
+   return mu_m(m);
+}
+#endif
+
+static double mu_const_val = 1.0;
+
 static double mu_exact_const(const Vector &x)
 {
-   return 1.0;
+   return mu_const_val;
 }
 
-static void sigma_exact(const Vector& x,DenseMatrix& K)
+/* inverse of magnetic permeability of free space */
+static double sigma_scal_muinv_0 = 1.0/(4 * M_PI * 1.0e-7);
+
+static double sigma_scal = 1.0;
+
+static double sigma_exact(const Vector& x)
 {
-   K = 0.0;
-   for (int i = 0; i < x.Size(); i++) K(i,i) = 1.e0;
+   return sigma_scal;
 }
 
 /* The classes needed to define the objective function we want to minimize */
@@ -110,6 +131,7 @@ private:
 
    Array<TDLeastSquares*> lsobj;
    Array<Coefficient*> sources;
+   Array<VectorCoefficient*> vsources;
 
    mutable ParGridFunction *u;
    mutable PetscParVector *U, *G;
@@ -127,7 +149,7 @@ protected:
    mutable PetscParVector *M;
 
 public:
-   MultiSourceMisfit(ParFiniteElementSpace*,PDCoefficient*,MatrixCoefficient*,PetscBCHandler*,DenseMatrix&,DenseMatrix&,double,double,double,const char*);
+   MultiSourceMisfit(ParFiniteElementSpace*,PDCoefficient*,Coefficient*,PetscBCHandler*,DenseMatrix&,DenseMatrix&,bool,double,double,double,double,const char*);
 
    MPI_Comm GetComm() const { return comm; }
    void RunTests(bool=true);
@@ -172,8 +194,9 @@ public:
    virtual void MultTranspose(const Vector&,Vector&) const;
 };
 
-MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient* mu, MatrixCoefficient* sigma, PetscBCHandler* _bchandler,
+MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient* mu, Coefficient* sigma, PetscBCHandler* _bchandler,
                                      DenseMatrix& srcpoints, DenseMatrix& recpoints,
+                                     bool scalar_source, double scale_ls,
                                      double _t0, double _dt, double _tf,
                                      const char *scratch)
 {
@@ -212,10 +235,20 @@ MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient*
          receivers.Append(new Receiver(tmp.str()));
       }
       lsobj.Append(new TDLeastSquares(receivers,_fes,true));
+      lsobj[i]->SetScale(scale_ls);
 
       Vector x;
       srcpoints.GetColumn(i,x);
-      sources.Append(new RickerSource(x,10,1.1,1.0e3));
+      if (scalar_source)
+      {
+         sources.Append(new RickerSource(x,10,1.1,1.0e3));
+      }
+      else
+      {
+         Vector dir(_fes->GetParMesh()->SpaceDimension());
+         dir = 1.0;
+         vsources.Append(new VectorRickerSource(x,dir,10,1.4,1.e0));
+      }
    }
 
    /* XXX No PetscParVector constructor with a given local size */
@@ -229,6 +262,7 @@ MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient*
 
 void MultiSourceMisfit::RunTests(bool progress)
 {
+   PetscErrorCode ierr;
    double t = t0 + 0.5*(tf - t0);
 
    /* Test least-squares objective */
@@ -236,7 +270,6 @@ void MultiSourceMisfit::RunTests(bool progress)
    {
       Vector dummy;
       double f;
-      PetscErrorCode ierr;
 
       U->Randomize();
 
@@ -245,16 +278,17 @@ void MultiSourceMisfit::RunTests(bool progress)
       lsobj[0]->Eval(*U,dummy,t,&f);
       lsobj[0]->TestFDGradient(comm,*U,dummy,t,1.e-6,progress);
       lsobj[0]->TestFDHessian(comm,*U,dummy,t);
-      ierr = PetscPrintf(comm,"---------------------------------------\n");CCHKERRQ(comm,ierr);
    }
 
    /* Test PDOperator */
+   ierr = PetscPrintf(comm,"---------------------------------------\n");CCHKERRQ(comm,ierr);
    PetscParVector Xdot(*U);
    PetscParVector X(*U);
    Xdot.Randomize();
    X.Randomize();
    heat->GetCurrentVector(*M);
    heat->TestFDGradient(comm,Xdot,X,*M,t);
+   ierr = PetscPrintf(comm,"---------------------------------------\n");CCHKERRQ(comm,ierr);
 }
 
 MultiSourceMisfit::~MultiSourceMisfit()
@@ -262,6 +296,7 @@ MultiSourceMisfit::~MultiSourceMisfit()
    delete heat;
    for (int i = 0; i < lsobj.Size(); i++) delete lsobj[i];
    for (int i = 0; i < sources.Size(); i++) delete sources[i];
+   for (int i = 0; i < vsources.Size(); i++) delete vsources[i];
    delete u;
    delete U;
    delete G;
@@ -299,7 +334,14 @@ void MultiSourceMisfit::ComputeObjective(const Vector& m, double *f) const
                             NULL,NULL,
                             NULL,NULL,NULL,NULL,NULL,NULL,lsobj[i]);PCHKERRQ(*odesolver,ierr);
 
-      heat->SetRHS(sources[i]);
+      if (sources.Size())
+      {
+         heat->SetRHS(sources[i]);
+      }
+      else if (vsources.Size())
+      {
+         heat->SetRHS(vsources[i]);
+      }
 
       PetscReal rf;
       ierr = TSComputeObjectiveAndGradient(*odesolver,t0,dt,tf,*U,*M,NULL,&rf);PCHKERRQ(*odesolver,ierr);
@@ -335,7 +377,14 @@ void MultiSourceMisfit::ComputeGradient(const Vector& m, Vector& g) const
                             mfemopt_eval_tdobj_x,NULL,
                             NULL,NULL,NULL,NULL,NULL,NULL,lsobj[i]);PCHKERRQ(*odesolver,ierr);
 
-      heat->SetRHS(sources[i]);
+      if (sources.Size())
+      {
+         heat->SetRHS(sources[i]);
+      }
+      else if (vsources.Size())
+      {
+         heat->SetRHS(vsources[i]);
+      }
 
       ierr = TSComputeObjectiveAndGradient(*odesolver,t0,dt,tf,*U,*M,*G,NULL);PCHKERRQ(*odesolver,ierr);
       g += *G;
@@ -372,7 +421,14 @@ void MultiSourceMisfit::ComputeObjectiveAndGradient(const Vector& m, double *f, 
                             mfemopt_eval_tdobj_x,NULL,
                             NULL,NULL,NULL,NULL,NULL,NULL,lsobj[i]);PCHKERRQ(*odesolver,ierr);
 
-      heat->SetRHS(sources[i]);
+      if (sources.Size())
+      {
+         heat->SetRHS(sources[i]);
+      }
+      else if (vsources.Size())
+      {
+         heat->SetRHS(vsources[i]);
+      }
 
       PetscReal rf;
       ierr = TSComputeObjectiveAndGradient(*odesolver,t0,dt,tf,*U,*M,*G,&rf);PCHKERRQ(*odesolver,ierr);
@@ -424,7 +480,14 @@ MultiSourceMisfitHessian::MultiSourceMisfitHessian(const MultiSourceMisfit* _mso
                             *Hls,mfemopt_eval_tdobj_xx,NULL,NULL,NULL,NULL,_msobj->lsobj[i]);CCHKERRQ(comm,ierr);
       delete Hls;
 
-      _msobj->heat->SetRHS(_msobj->sources[i]);
+      if (_msobj->sources.Size())
+      {
+         _msobj->heat->SetRHS(_msobj->sources[i]);
+      }
+      else if (_msobj->vsources.Size())
+      {
+         _msobj->heat->SetRHS(_msobj->vsources[i]);
+      }
 
       odesolver->Customize();
 
@@ -808,7 +871,7 @@ int main(int argc, char *argv[])
 {
    MFEMInitializePetsc(&argc,&argv,NULL,help);
 
-   PetscInt ord = 1, srl = 0, prl = 0, viz = 0, ncrl = 0;
+   PetscInt srl = 0, prl = 0, viz = 0, ncrl = 0;
 
    PetscInt  gridr[3] = {1,1,1};
    PetscInt  grids[3] = {1,1,1};
@@ -818,9 +881,13 @@ int main(int argc, char *argv[])
    char scratchdir[PETSC_MAX_PATH_LEN] = "/tmp";
    char meshfile[PETSC_MAX_PATH_LEN] = "../../../../share/petscopt/meshes/segment-m5-5.mesh";
    PetscReal t0 = 0.0, dt = 1.e-3, tf = 0.1;
+   PetscReal scale_ls = 1.0;
+
+   FECType   s_fec_type = FEC_H1;
+   PetscInt  s_ord = 1;
 
    FECType   mu_fec_type = FEC_H1;
-   PetscInt  mu_ord = 0;
+   PetscInt  mu_ord = 1;
    PetscInt  n_mu_excl = 1024;
    PetscInt  mu_excl[1024];
    PetscBool mu_excl_fn = PETSC_FALSE, mu_with_jumps = PETSC_FALSE;
@@ -828,7 +895,7 @@ int main(int argc, char *argv[])
    PetscReal tva = 1.0, tvb = 0.1;
    PetscBool tvpd = PETSC_TRUE, tvsy = PETSC_FALSE, tvpr = PETSC_FALSE;
 
-   PetscBool test_part = PETSC_FALSE, test_null = PETSC_FALSE, test_newton = PETSC_TRUE, test_progress = PETSC_TRUE;
+   PetscBool test_part = PETSC_FALSE, test_null = PETSC_FALSE, test_newton = PETSC_FALSE, test_progress = PETSC_TRUE;
    PetscBool test_misfit[3] = {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}, test_misfit_reg[2] = {PETSC_FALSE,PETSC_FALSE}, test_misfit_internal = PETSC_FALSE;
    PetscReal test_newton_noise = 0.0;
    PetscBool glvis = PETSC_TRUE;
@@ -842,12 +909,14 @@ int main(int argc, char *argv[])
       ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"Options for Heat equation",NULL);CHKERRQ(ierr);
 
       /* Simulation parameters */
+      ierr = PetscOptionsInt("-state_ord","Polynomial order approximation for state variables",NULL,s_ord,&s_ord,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsEnum("-state_fec_type","FEC for state","",FECTypes,(PetscEnum)s_fec_type,(PetscEnum*)&s_fec_type,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsString("-scratch","Location where to put temporary data (must be present)",NULL,scratchdir,scratchdir,sizeof(scratchdir),NULL);CHKERRQ(ierr);
       ierr = PetscOptionsString("-meshfile","Mesh filename",NULL,meshfile,meshfile,sizeof(meshfile),NULL);CHKERRQ(ierr);
-      ierr = PetscOptionsInt("-ord","FEM order",NULL,ord,&ord,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsInt("-srl","Number of sequential refinements",NULL,srl,&srl,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsInt("-prl","Number of parallel refinements",NULL,prl,&prl,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsInt("-ncrl","Number of non-conforming refinements (refines element with center in [-1,1]^d)",NULL,ncrl,&ncrl,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsRealArray("-ncrl_fn_bb","Bounding box for non-conforming refinement (defaults to [-1,1]^d)",NULL,refine_fn_bb,(i=6,&i),NULL);CHKERRQ(ierr);
       ierr = PetscOptionsReal("-t0","Initial time",NULL,t0,&t0,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsReal("-dt","Initial time step",NULL,dt,&dt,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsReal("-tf","Final time",NULL,tf,&tf,NULL);CHKERRQ(ierr);
@@ -866,18 +935,21 @@ int main(int argc, char *argv[])
 
       /* Parameter space */
       ierr = PetscOptionsInt("-mu_ord","Polynomial order approximation for mu",NULL,mu_ord,&mu_ord,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsReal("-mu_const_val","Costant mu value",NULL,mu_const_val,&mu_const_val,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-mu_jumps","Use jumping target for mu",NULL,mu_with_jumps,&mu_with_jumps,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsEnum("-mu_fec_type","FEC for mu","",FECTypes,(PetscEnum)mu_fec_type,(PetscEnum*)&mu_fec_type,NULL);CHKERRQ(ierr);
-      ierr = PetscOptionsBool("-mu_exclude_fn","Excludes elements outside [-1,1]^d for mu optimization",NULL,mu_excl_fn,&mu_excl_fn,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsBool("-mu_exclude_fn","Excludes elements outside a given bounding box for mu optimization",NULL,mu_excl_fn,&mu_excl_fn,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsRealArray("-mu_exclude_fn_bb","Excludes elements outside the specified bounding box (defaults to [-1,1]^d)",NULL,excl_fn_bb,(i=6,&i),NULL);CHKERRQ(ierr);
       ierr = PetscOptionsIntArray("-mu_exclude","Elements' tag to exclude for mu optimization",NULL,mu_excl,&n_mu_excl,&flg);CHKERRQ(ierr);
       if (!flg) n_mu_excl = 0;
 
-      /* TV options */
-      ierr = PetscOptionsReal("-tv_alpha","",NULL,tva,&tva,NULL);CHKERRQ(ierr);
-      ierr = PetscOptionsReal("-tv_beta","",NULL,tvb,&tvb,NULL);CHKERRQ(ierr);
-      ierr = PetscOptionsBool("-tv_pd","",NULL,tvpd,&tvpd,NULL);CHKERRQ(ierr);
-      ierr = PetscOptionsBool("-tv_symm","",NULL,tvsy,&tvsy,NULL);CHKERRQ(ierr);
-      ierr = PetscOptionsBool("-tv_proj","",NULL,tvpr,&tvpr,NULL);CHKERRQ(ierr);
+      /* Objectives' options */
+      ierr = PetscOptionsReal("-ls_scale","Scaling factor for least-squares objective",NULL,scale_ls,&scale_ls,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsReal("-tv_alpha","Scaling factor for TV regularizer",NULL,tva,&tva,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsReal("-tv_beta","Gradient norm perturbation for TV regularizer",NULL,tvb,&tvb,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsBool("-tv_pd","Use Primal-Dual TV regularizer",NULL,tvpd,&tvpd,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsBool("-tv_symm","Symmetrize TV Hessian",NULL,tvsy,&tvsy,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsBool("-tv_proj","Project on the unit ball instead of performing line search for the dual TV variables",NULL,tvpr,&tvpr,NULL);CHKERRQ(ierr);
 
       ierr = PetscOptionsBool("-test_partitioning","Test with a fixed element partition",NULL,test_part,&test_part,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-test_newton","Test Newton solver",NULL,test_newton,&test_newton,NULL);CHKERRQ(ierr);
@@ -892,8 +964,6 @@ int main(int argc, char *argv[])
 
       ierr = PetscOptionsEnd();CHKERRQ(ierr);
    }
-
-   if (mu_fec_type == FEC_H1 && !mu_ord) mu_ord = 1;
 
    Array<int> mu_excl_a((int)n_mu_excl);
    for (int i = 0; i < n_mu_excl; i++) mu_excl_a[i] = (int)mu_excl[i];
@@ -927,8 +997,26 @@ int main(int argc, char *argv[])
          NCRefinement(pmesh,refine_fn);
       }
    }
-   FiniteElementCollection *fec = new H1_FECollection(ord, pmesh->Dimension());
-   ParFiniteElementSpace *fes = new ParFiniteElementSpace(pmesh, fec);
+
+   /* Simulation space */
+   bool scalar_source = true;
+   FiniteElementCollection *s_fec = NULL;
+   switch (s_fec_type)
+   {
+      case FEC_HCURL:
+         /* magnetic -> assumes the mesh in meters */
+         sigma_scal = sigma_scal_muinv_0;
+         scalar_source = false;
+         s_fec = new ND_FECollection(s_ord,pmesh->Dimension());
+         break;
+      case FEC_H1:
+         s_fec = new H1_FECollection(s_ord,pmesh->Dimension());
+         break;
+      default:
+         MFEM_ABORT("Unhandled FEC Type");
+         break;
+   }
+   ParFiniteElementSpace *s_fes = new ParFiniteElementSpace(pmesh, s_fec);
 
    /* Boundary conditions handler */
    Array<int> ess_tdof_list;
@@ -936,7 +1024,7 @@ int main(int argc, char *argv[])
    {
       Array<int> ess_bdr(pmesh->bdr_attributes.Max());
       ess_bdr = 1;
-      fes->GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
+      s_fes->GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
    }
    PetscBCHandler *bchandler = new PetscBCHandler(ess_tdof_list);
 
@@ -1000,15 +1088,33 @@ int main(int argc, char *argv[])
    }
 
    /* exact PDE coefficients */
-   MatrixFunctionCoefficient *sigma = new MatrixFunctionCoefficient(pmesh->SpaceDimension(),sigma_exact);
+   FunctionCoefficient *sigma = new FunctionCoefficient(sigma_exact);
    FunctionCoefficient *mu;
    if (mu_with_jumps) mu = new FunctionCoefficient(mu_exact_jump);
    else mu = new FunctionCoefficient(mu_exact_const);
 
+   /* Source terms */
+   RickerSource       *rick = NULL;
+   VectorRickerSource *vrick = NULL;
+   if (srcpoints.Width())
+   {
+      Vector t(pmesh->SpaceDimension());
+      if (scalar_source)
+      {
+         rick = new RickerSource(t,10,1.1,1.0e3);
+      }
+      else
+      {
+         Vector dir(pmesh->SpaceDimension());
+         dir = 1.0;
+         vrick = new VectorRickerSource(t,dir,10,1.4,1.e0);
+      }
+   }
+
    /* Multi-source sampling */
    for (int i = 0; i < srcpoints.Width(); i++)
    {
-      ParGridFunction *u = new ParGridFunction(fes);
+      ParGridFunction *u = new ParGridFunction(s_fes);
       HypreParVector *U = u->GetTrueDofs();
       *U = 0.0;
 
@@ -1018,12 +1124,20 @@ int main(int argc, char *argv[])
       UserMonitor *monitor = new UserMonitor(u,viz,tmp1.str());
       ReceiverMonitor *rmonitor = new ReceiverMonitor(u,recpoints,tmp2.str());
 
-      ModelHeat *heat = new ModelHeat(mu,sigma,fes,Operator::PETSC_MATAIJ);
+      ModelHeat *heat = new ModelHeat(mu,sigma,s_fes,Operator::PETSC_MATAIJ);
 
       Vector srcctr;
       srcpoints.GetColumn(i,srcctr);
-      RickerSource rick(srcctr,10,1.1,1.0e3);
-      heat->SetRHS(&rick);
+      if (vrick)
+      {
+         vrick->SetDeltaCenter(srcctr);
+         heat->SetRHS(vrick);
+      }
+      else if (rick)
+      {
+         rick->SetDeltaCenter(srcctr);
+         heat->SetRHS(rick);
+      }
 
       PetscODESolver *odesolver = new PetscODESolver(pmesh->GetComm(),"model_");
       odesolver->Init(*heat,PetscODESolver::ODE_SOLVER_LINEAR);
@@ -1069,7 +1183,7 @@ int main(int argc, char *argv[])
    if (glvis) mu_pd->Visualize();
 
    /* The misfit function */
-   MultiSourceMisfit *obj = new MultiSourceMisfit(fes,mu_pd,sigma,bchandler,srcpoints,recpoints,t0,dt,tf,scratchdir);
+   MultiSourceMisfit *obj = new MultiSourceMisfit(s_fes,mu_pd,sigma,bchandler,srcpoints,recpoints,scalar_source,scale_ls,t0,dt,tf,scratchdir);
 
    /* Tests internal objects inside the misfit function */
    if (test_misfit_internal)
@@ -1187,10 +1301,22 @@ int main(int argc, char *argv[])
       vnoise *= test_newton_noise;
       u += vnoise;
 
+      double f1,f2;
+      robj->ComputeObjective(u,&f1);
+      tv->SetScale(0.0);
+      robj->ComputeObjective(u,&f2);
+      if (!PetscGlobalRank) std::cout << "Initial objective " << f1 << " (LS " << f2 << ", TV " << f1 - f2 << ")" << std::endl;
+      tv->SetScale(tva);
+
       newton.Mult(dummy,u);
       //mu_pd->UpdateCoefficient(u);
       //mu_pd->Save("reconstructed_sigma");
       //mu_pd->Visualize("RJlc");
+
+      robj->ComputeObjective(u,&f1);
+      tv->SetScale(0.0);
+      robj->ComputeObjective(u,&f2);
+      if (!PetscGlobalRank) std::cout << "Final objective " << f1 << " (LS " << f2 << ", TV " << f1 - f2 << ")" << std::endl;
    }
 
    delete robj;
@@ -1199,11 +1325,14 @@ int main(int argc, char *argv[])
    delete mu_pd;
    delete obj;
 
+   delete rick;
+   delete vrick;
+
    delete bchandler;
    delete sigma;
    delete mu;
-   delete fec;
-   delete fes;
+   delete s_fec;
+   delete s_fes;
    delete pmesh;
 
    MFEMFinalizePetsc();
@@ -1218,14 +1347,21 @@ int main(int argc, char *argv[])
    testset:
      timeoutfactor: 3
      nsize: {{1 2}}
-     args: -scratch ./ -test_partitioning -meshfile ${petscopt_dir}/share/petscopt/meshes/segment-m5-5.mesh -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg
+     args: -scratch ./ -test_partitioning -meshfile ${petscopt_dir}/share/petscopt/meshes/segment-m5-5.mesh -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -test_newton
      test:
        suffix: null_test
-       args: -test_misfit_internal -test_misfit 1 -test_misfit_reg 1 -test_newton -test_progress 0 -tv_alpha 0 -newton_pc_type none -newton_snes_atol 1.e-8 -glvis 0
+       args: -test_null -test_misfit_internal -test_misfit 1 -test_misfit_reg 1 -test_progress 0 -tv_alpha 0 -newton_pc_type none -newton_snes_atol 1.e-8 -glvis 0
      test:
        suffix: newton_test
        args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 1 -newton_snes_test_jacobian -newton_snes_rtol 1.e-6 -newton_snes_atol 1.e-6 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude_fn -ncrl 1
      test:
        suffix: newton_full
        args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 10 -newton_snes_rtol 1.e-6 -newton_snes_atol 1.e-6 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1
+
+   testset:
+      suffix: em_test
+      timeoutfactor: 3
+      nsize: 1
+      args: -scratch ./ -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad_testem.mesh -dt 0.01 -tf 1 -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -state_fec_type HCURL -test_progress 0 -test_misfit_internal -test_misfit 1,0,0 -ls_scale 1.e12 -tv_alpha 1.e-12 -tv_beta 1.e-6 -test_newton -test_newton_noise 0.0 -newton_pc_type none -newton_snes_atol 1.e-6 -newton_snes_converged_reason -test_null 0 -mu_const_val 0.9 -mu_exclude_fn_bb 3000,7000,4000,8000 -mu_exclude_fn  -grid_src_n 1 -grid_src_bb 5000,7000,5000,7000 -grid_rcv_n 4,1 -grid_rcv_bb 5500,6500,5800,5800 -glvis 0
+
 TEST*/
