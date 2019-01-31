@@ -87,12 +87,11 @@ double ComponentCoefficient::Eval(ElementTransformation &T,
 
 DiagonalMatrixCoefficient::DiagonalMatrixCoefficient(VectorCoefficient* _VQ, bool _own) : MatrixCoefficient(0) /* XXX the class have the explicit constructor */
 {
-   MFEM_VERIFY(_VQ,"Missing VectorCoefficient");
-   MFEM_VERIFY(_VQ->GetVDim() > 0,"Invalid dim " << _VQ->GetVDim());
    VQ = _VQ;
    own = _own;
-   w.SetSize(VQ->GetVDim());
-   height = width = VQ->GetVDim();
+   int vd = VQ ? VQ->GetVDim() : 0;
+   w.SetSize(vd);
+   height = width = vd;
    time = 0.0;
 }
 

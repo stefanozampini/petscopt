@@ -71,11 +71,11 @@ void Receiver::GetIData(double time, Vector& vals)
    switch (vals.Size())
    {
       case 3:
-         vals(2) = data.v_z;
+         vals[2] = data.v_z;
       case 2:
-         vals(1) = data.v_y;
+         vals[1] = data.v_y;
       case 1:
-         vals(0) = data.v_x;
+         vals[0] = data.v_x;
          break;
       default:
          MFEM_ABORT("Invalid dimension " << vals.Size());

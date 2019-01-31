@@ -39,7 +39,7 @@ double GaussianNoise::random() const
 void GaussianNoise::random(Vector& v, int n) const
 {
    if (n >= 0) v.SetSize(n);
-   for (int i = 0; i < v.Size(); i++) v(i) = (*this).random();
+   for (int i = 0; i < v.Size(); i++) v[i] = (*this).random();
 }
 
 }
