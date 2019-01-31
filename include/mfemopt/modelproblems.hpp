@@ -17,8 +17,8 @@ namespace mfemopt
    The class for a linear, parameter dependent heat-like operator, i.e. 
      F(xdot,x,t) = M*xdot + K*x - f(t)
    M mass matrix
-   K stiffness matrix
-   f(t) forcing term (time-dependent mfem::Coefficient)
+   K stiffness matrix (Diffusion, CurlCurl or DivDiv depending on the space)
+   f(t) forcing term (time-dependent mfem::Coefficient or mfem::VectorCoefficient for vector spaces)
 */
 class ModelHeat : public mfem::TimeDependentOperator, public PDOperator
 {
@@ -26,8 +26,12 @@ private:
    mfem::OperatorHandle         *Mh;
    mfem::OperatorHandle         *Kh;
    mfem::Operator::Type         oid;
+
    mfem::ParFiniteElementSpace  *fes;
-   mfem::Array<mfem::Coefficient*>    rhs;
+   int fe_range, fe_deriv;
+
+   mfem::Coefficient*       rhs;
+   mfem::VectorCoefficient* vrhs;
 
    mutable mfem::ParLinearForm  *rhsform;
    mutable mfem::PetscParVector *rhsvec;
@@ -38,18 +42,24 @@ private:
    mfem::ParBilinearForm *k;
    mfem::ParBilinearForm *m;
 
-   PDBilinearFormIntegrator *mu_bilin;
+   PDBilinearFormIntegrator *mu_pd_bilin;
+   PDBilinearFormIntegrator *sigma_pd_bilin;
 
    void Init(mfem::ParFiniteElementSpace*,mfem::Operator::Type);
+   void InitForms(mfem::Coefficient*,mfem::Coefficient*);
    void InitForms(mfem::Coefficient*,mfem::MatrixCoefficient*);
    void InitForms(PDCoefficient*,mfem::MatrixCoefficient*);
+   void InitForms(PDCoefficient*,mfem::Coefficient*);
    void UpdateStiffness();
    void UpdateMass();
 
 public:
+   ModelHeat(mfem::Coefficient*,mfem::Coefficient*,mfem::ParFiniteElementSpace*,mfem::Operator::Type);
+   ModelHeat(PDCoefficient*,mfem::Coefficient*,mfem::ParFiniteElementSpace*,mfem::Operator::Type);
    ModelHeat(mfem::Coefficient*,mfem::MatrixCoefficient*,mfem::ParFiniteElementSpace*,mfem::Operator::Type);
    ModelHeat(PDCoefficient*,mfem::MatrixCoefficient*,mfem::ParFiniteElementSpace*,mfem::Operator::Type);
    void SetRHS(mfem::Coefficient*);
+   void SetRHS(mfem::VectorCoefficient*);
 
    /* interface for mfem::TimeDependentOperator */
    virtual void Mult(const mfem::Vector&,mfem::Vector&) const
