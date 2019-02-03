@@ -60,7 +60,6 @@ class ReceiverMonitor : public mfem::PetscSolverMonitor
 {
 private:
    mfem::ParGridFunction* u;
-   int                    vsize;
    mfem::DenseMatrix      points;
    std::string            filename;
 

@@ -201,12 +201,14 @@ void ModelHeat::GetCurrentVector(Vector &m)
       Vector pm(data,ls);
       mu_pd_bilin->GetCurrentVector(pm);
       data += ls;
+      pm.SetData(NULL); /* XXX clang static analysis */
    }
    if (sigma_pd_bilin)
    {
       int ls = sigma_pd_bilin->GetLocalSize();
       Vector pm(data,ls);
       sigma_pd_bilin->GetCurrentVector(pm);
+      pm.SetData(NULL); /* XXX clang static analysis */
    }
 }
 
@@ -234,12 +236,14 @@ void ModelHeat::SetUpFromParameters(const Vector& p)
       Vector pp(data,ls);
       mu_pd_bilin->UpdateCoefficient(pp);
       data += ls;
+      pp.SetData(NULL); /* XXX clang static analysis */
    }
    if (sigma_pd_bilin)
    {
       int ls = sigma_pd_bilin->GetLocalSize();
       Vector pp(data,ls);
       sigma_pd_bilin->UpdateCoefficient(pp);
+      pp.SetData(NULL); /* XXX clang static analysis */
    }
    UpdateMass();
    UpdateStiffness();

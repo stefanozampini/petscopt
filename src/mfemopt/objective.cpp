@@ -408,7 +408,7 @@ void TDLeastSquares::InitReceivers()
       MFEM_VERIFY(center.Size() == sdim,
                   "Point dim " << center.Size() <<
                   " does not match space dim " << sdim)
-      for (int k = 0; k < sdim; k++) centers(k,i) = center[k];
+      centers.SetCol(i,center);
    }
    mesh->FindPoints(centers,receivers_eid,receivers_ip,false);
 }

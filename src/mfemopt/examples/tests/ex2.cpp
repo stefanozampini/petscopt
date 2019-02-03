@@ -529,7 +529,7 @@ RegularizedMultiSourceMisfit::RegularizedMultiSourceMisfit(MultiSourceMisfit *_o
 
 void RegularizedMultiSourceMisfit::ComputeObjective(const Vector& m, double *f) const
 {
-   Vector pm;
+   Vector pm(m.Size());
    if (pmap) pmap->Map(m,pm);
    else pm = m;
 
@@ -542,14 +542,12 @@ void RegularizedMultiSourceMisfit::ComputeObjective(const Vector& m, double *f) 
 
 void RegularizedMultiSourceMisfit::ComputeGradient(const Vector& m, Vector& g) const
 {
-   Vector pm;
+   Vector pm(m.Size());
    if (pmap) pmap->Map(m,pm);
    else pm = m;
 
    Vector dummy;
-   Vector g1,g2;
-   g1.SetSize(pm.Size());
-   g2.SetSize(pm.Size());
+   Vector g1(pm.Size()),g2(pm.Size());
 
    obj->ComputeGradient(pm,g1);
    reg->EvalGradient_M(dummy,pm,0.,g2);
@@ -583,7 +581,7 @@ RegularizedMultiSourceMisfitHessian::RegularizedMultiSourceMisfitHessian(const R
    height = width = _m.Size();
    pmap = _rmsobj->pmap;
 
-   Vector pm;
+   Vector pm(_m.Size());
    if (pmap) pmap->Map(_m,pm);
    else pm = _m;
 
@@ -595,9 +593,7 @@ RegularizedMultiSourceMisfitHessian::RegularizedMultiSourceMisfitHessian(const R
 
    if (pmap && pmap->SecondOrder())
    {
-      Vector g1,g2;
-      g1.SetSize(pm.Size());
-      g2.SetSize(pm.Size());
+      Vector g1(pm.Size()),g2(pm.Size());
 
       _rmsobj->obj->ComputeGradient(pm,g1);
       _rmsobj->reg->EvalGradient_M(dummy,pm,0.,g2);
@@ -608,7 +604,7 @@ RegularizedMultiSourceMisfitHessian::RegularizedMultiSourceMisfitHessian(const R
 
 void RegularizedMultiSourceMisfitHessian::Mult(const Vector& x, Vector& y) const
 {
-   Vector px,py1,py2;
+   Vector px(x.Size());
 
    if (pmap)
    {
@@ -616,8 +612,8 @@ void RegularizedMultiSourceMisfitHessian::Mult(const Vector& x, Vector& y) const
       pmap->GradientMap(m,x,false,px);
    }
    else px = x;
-   py1.SetSize(px.Size());
-   py2.SetSize(px.Size());
+
+   Vector py1(px.Size()),py2(px.Size());
    Hobj->Mult(px,py1);
    Hreg->Mult(px,py2);
    py1 += py2;
@@ -627,7 +623,7 @@ void RegularizedMultiSourceMisfitHessian::Mult(const Vector& x, Vector& y) const
       pmap->GradientMap(m,py1,true,y);
       if (pmap->SecondOrder())
       {
-         Vector y2;
+         Vector y2(x.Size());
 
          pmap->HessianMult(x,y2);
          y += y2;
@@ -642,7 +638,7 @@ void RegularizedMultiSourceMisfitHessian::Mult(const Vector& x, Vector& y) const
 /* We need the transpose callback just in case the Newton solver fails, and PETSc requests it */
 void RegularizedMultiSourceMisfitHessian::MultTranspose(const Vector& x, Vector& y) const
 {
-   Vector px,py1,py2;
+   Vector px(x.Size());
 
    if (pmap)
    {
@@ -650,8 +646,8 @@ void RegularizedMultiSourceMisfitHessian::MultTranspose(const Vector& x, Vector&
       pmap->GradientMap(m,x,false,px);
    }
    else px = x;
-   py1.SetSize(px.Size());
-   py2.SetSize(px.Size());
+
+   Vector py1(px.Size()),py2(px.Size());
    Hobj->Mult(px,py1); /* the Hessian of the misfit function is symmetric */
    Hreg->MultTranspose(px,py2);
    py1 += py2;
@@ -661,7 +657,7 @@ void RegularizedMultiSourceMisfitHessian::MultTranspose(const Vector& x, Vector&
       pmap->GradientMap(m,py1,true,y);
       if (pmap->SecondOrder())
       {
-         Vector y2;
+         Vector y2(x.Size());
 
          pmap->HessianMult(x,y2);
          y += y2;
@@ -824,7 +820,7 @@ public:
       }
       else
       {
-         Vector pu;
+         Vector pu(X.Size());
          if (pmap) pmap->Map(X,pu);
          else pu = X;
          if (m)
@@ -1249,7 +1245,7 @@ int main(int argc, char *argv[])
       else muv = muv_exact;
 
       /* Misfit in terms of mu, the optimization variable is the inverse of the map */
-      Vector m;
+      Vector m(muv.Size());
       pmap.InverseMap(muv,m);
 
       double f;
@@ -1265,10 +1261,10 @@ int main(int argc, char *argv[])
       else muv = muv_exact;
 
       /* Misfit in terms of mu, the optimization variable is the inverse of the map */
-      Vector m;
+      Vector m(muv.Size());
       pmap.InverseMap(muv,m);
 
-      Vector y;
+      Vector y(m.Size());
       robj->Mult(m,y);
    }
 
@@ -1292,7 +1288,7 @@ int main(int argc, char *argv[])
       if (!test_null) obj->ComputeGuess(muv);
       else muv = muv_exact;
 
-      Vector dummy,u;
+      Vector dummy,u(muv.Size());
       pmap.InverseMap(muv,u);
 
       GaussianNoise nnoise;

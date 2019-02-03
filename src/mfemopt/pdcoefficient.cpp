@@ -144,7 +144,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
       MFEM_VERIFY(scalar,"Cannot represent a scalar coefficient with a vector finite element space");
       ngf = 1;
    }
-   MFEM_VERIFY(ngf,"Zero functions");
+   else mfem_error("Unhandled case");
 
    pfes = new ParFiniteElementSpace(mesh,fec,1,Ordering::byVDIM);
 
@@ -254,7 +254,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
          Vector lwork(gf->GetData(),gf->Size());
          for (int i = 0; i < lwork.Size(); i++)
          {
-            if (std::abs(lwork(i)) < 1.e-12)
+            if (std::abs(lwork[i]) < 1.e-12)
             {
                initi[cum++] = i;
             }
@@ -278,10 +278,12 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
       global_cols.Reserve(PT->Width());
       local_cols.Reserve(PT->Width());
       PetscInt cst = PT->GetColStart();
-      HypreParVector *work = gf->ParallelAssemble();
-      for (int i = 0; i < work->Size(); i++)
+
+      Vector work(pfes->GetTrueVSize());
+      gf->ParallelAssemble(work);
+      for (int i = 0; i < work.Size(); i++)
       {
-         if (std::abs((*work)(i)) != 0.0)
+         if (std::abs(work[i]) != 0.0)
          {
             global_cols.Append(i + cst);
             local_cols.Append(i);
@@ -297,7 +299,6 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
       PT = new PetscParMatrix(pfes->GetRestrictionMatrix());
       R = new PetscParMatrix(*PT,local_cols,rows);
       delete PT;
-      delete work;
 
       initi.Copy(pcoeffiniti);
       pcoeffinitv.SetSize(initi.Size()*ngf);
@@ -471,6 +472,7 @@ void PDCoefficient::GetCurrentVector(Vector& m)
       Vector pmi(data,n);
       R->Mult(*pcoeffgf[i],pmi);
       data += n;
+      pmi.SetData(NULL); /* XXX clang static analysis */
    }
 }
 
@@ -500,6 +502,7 @@ void PDCoefficient::UpdateCoefficientWithGF(const Vector& m, Array<ParGridFuncti
          (*gf)[pcoeffiniti[j]] = usederiv ? 0.0 : pcoeffinitv[j+st];
       }
       data += n;
+      pmi.SetData(NULL); /* XXX clang static analysis */
    }
 }
 
@@ -514,6 +517,7 @@ void PDCoefficient::UpdateGradient(Vector& g)
       ParGridFunction *gf = pgradgf[i];
       P->MultTranspose(*gf,pgi);
       data += n;
+      pgi.SetData(NULL); /* XXX clang static analysis */
    }
 }
 

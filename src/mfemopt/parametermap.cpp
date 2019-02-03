@@ -23,23 +23,24 @@ PointwiseMap::PointwiseMap(double (*_p)(double), double (*_pinv)(double), double
 
 void PointwiseMap::Map(const Vector& m, Vector& model_m)
 {
-   model_m.SetSize(m.Size());
-   for (int i = 0; i < m.Size(); i++) model_m(i) = (*p)(m(i));
+   MFEM_VERIFY(model_m.Size() == m.Size(),"Wrong sizes! " << model_m.Size() << " != " << m.Size());
+   if (!p) model_m = 0.0; /* XXX clang static analysis */
+   else for (int i = 0; i < m.Size(); i++) model_m[i] = (*p)(m[i]);
 }
 
 void PointwiseMap::InverseMap(const Vector& model_m, Vector& m)
 {
    MFEM_VERIFY(pinv,"Missing the inverse of the mapping function!");
-   m.SetSize(model_m.Size());
-   if (!pinv) m = 0.0;
-   else for (int i = 0; i < model_m.Size(); i++) m(i) = (*pinv)(model_m(i));
+   MFEM_VERIFY(model_m.Size() == m.Size(),"Wrong sizes! " << model_m.Size() << " != " << m.Size());
+   if (!pinv) m = 0.0; /* XXX clang static analysis */
+   else for (int i = 0; i < model_m.Size(); i++) m[i] = (*pinv)(model_m[i]);
 }
 
 void PointwiseMap::GradientMap(const Vector& m, const Vector& gin, bool transpose, Vector& g)
 {
    MFEM_VERIFY(gin.Size() == m.Size(),"Wrong sizes! " << m.Size() << " != " << gin.Size());
-   g.SetSize(m.Size());
-   for (int i = 0; i < m.Size(); i++) g(i) = (*dp_dm)(m(i))*gin(i);
+   MFEM_VERIFY(g.Size() == m.Size(),"Wrong sizes! " << m.Size() << " != " << g.Size());
+   for (int i = 0; i < m.Size(); i++) g[i] = (*dp_dm)(m[i])*gin[i];
 }
 
 void PointwiseMap::HessianMult(const Vector& x, Vector& y)
@@ -48,10 +49,10 @@ void PointwiseMap::HessianMult(const Vector& x, Vector& y)
    const Vector& m = (*this).GetParameter();
    MFEM_VERIFY(m.Size() == x.Size(),"Wrong sizes! " << x.Size() << " != " << m.Size());
    MFEM_VERIFY(g.Size() == m.Size(),"Wrong sizes! " << m.Size() << " != " << g.Size());
+   MFEM_VERIFY(y.Size() == x.Size(),"Wrong sizes! " << x.Size() << " != " << y.Size());
    MFEM_VERIFY(d2p_dm2,"Missing the second derivative of the mapping function!");
-   y.SetSize(x.Size());
-   if (!d2p_dm2) y = 0.0;
-   else for (int i = 0; i < x.Size(); i++) y(i) = (*d2p_dm2)(m(i))*g(i)*x(i);
+   if (!d2p_dm2) y = 0.0; /* XXX clang static analysis */
+   else for (int i = 0; i < x.Size(); i++) y[i] = (*d2p_dm2)(m[i])*g[i]*x[i];
 }
 
 }

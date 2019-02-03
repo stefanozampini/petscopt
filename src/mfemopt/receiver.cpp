@@ -142,7 +142,7 @@ void Receiver::ASCIIDump(std::ostream& f)
 {
    // Receiver location
    f << center.Size() << ' ';
-   for (int i = 0; i < center.Size(); i++) f << center(i) << ' ';
+   for (int i = 0; i < center.Size(); i++) f << center[i] << ' ';
    f << '\n';
 
    // Time history
@@ -196,6 +196,7 @@ ReceiverMonitor::ReceiverMonitor(ParGridFunction* _u, const DenseMatrix& _points
 
    T.reserve(1000);
    int np = 0;
+   int vsize = -1;
    for (int i = 0; i<points.Width(); i++)
    {
       if (eids[i] < 0) continue;
@@ -246,15 +247,18 @@ void ReceiverMonitor::MonitorSolution(PetscInt step, PetscReal time, const Vecto
       if (eids[i] < 0) continue;
       Vector R;
       u->GetVectorValue(eids[i],ips[i],R);
-      if (vsize > 2)
+      if (R.Size() > 2)
       {
-         Zd[np].push_back(R(2));
+         Zd[np].push_back(R[2]);
       }
-      if (vsize > 1)
+      if (R.Size() > 1)
       {
-         Yd[np].push_back(R(1));
+         Yd[np].push_back(R[1]);
       }
-      Xd[np].push_back(R(0));
+      if (R.Size() > 0)
+      {
+         Xd[np].push_back(R[0]);
+      }
       np++;
    }
 }
