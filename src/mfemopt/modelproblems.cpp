@@ -1,5 +1,6 @@
 #include <mfemopt/modelproblems.hpp>
 #include <mfemopt/mfemextra.hpp>
+#include <petscopt/tsopt.h>
 
 namespace mfemopt
 {
@@ -29,6 +30,17 @@ void ModelHeat::Init(ParFiniteElementSpace *_fe, Operator::Type _oid)
    k = new ParBilinearForm(fes);
    m = new ParBilinearForm(fes);
    rhsvec = new PetscParVector(fes);
+
+   pfactory = NULL;
+}
+
+PetscPreconditionerFactory* ModelHeat::GetPreconditionerFactory()
+{
+   if (!pfactory)
+   {
+      pfactory = new PreconditionerFactory(*this,"heat model preconditioner factory");
+   }
+   return pfactory;
 }
 
 void ModelHeat::InitForms(Coefficient* mu, MatrixCoefficient* sigma)
@@ -411,6 +423,7 @@ Operator& ModelHeat::GetImplicitGradient(const Vector &x, const Vector &xdot, do
          Jacobian = Add(shift,*(Mh->As<HypreParMatrix>()),1.0,*(Kh->As<HypreParMatrix>()));
          break;
       }
+      case Operator::PETSC_MATHYPRE:
       case Operator::PETSC_MATAIJ:
       case Operator::PETSC_MATIS:
       {
@@ -441,6 +454,139 @@ ModelHeat::~ModelHeat()
    delete k;
    delete adjgf;
    delete stgf;
+   delete pfactory;
+}
+
+#include <mfemopt/private/mfemoptpetscmacros.h>
+#if defined(PETSC_HAVE_HYPRE)
+#include "petscmathypre.h"
+#endif
+
+Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle& oh)
+{
+  Solver *solver = NULL;
+  PetscErrorCode ierr;
+
+  if (oh.Type() == Operator::PETSC_MATIS)
+  {
+     PetscParMatrix *pA;
+     oh.Get(pA);
+     MatSetOption(*pA,MAT_SPD,PETSC_TRUE);
+
+     PetscBDDCSolverParams opts;
+     Array<int>& ess = pde.bc->GetTDofs();
+     opts.SetSpace(pde.fes);
+     opts.SetEssBdrDofs(&ess);
+     solver = new PetscBDDCSolver(*pA,opts);
+  }
+#if 0
+|| defined(PETSC_HAVE_HYPRE)
+  else if (oh.Type() == Operator::PETSC_MATHYPRE)
+  {
+     PetscParMatrix *pA;
+     oh.Get(pA);
+     MatSetOption(*pA,MAT_SPD,PETSC_TRUE);
+
+     hypre_ParCSRMatrix *parcsr;
+     ierr = MatHYPREGetParCSR(*pA,&parcsr); PCHKERRQ(*pA,ierr);
+     delete hA;
+     hA = new HypreParMatrix(parcsr,false);
+     if (pde.fe_range == FiniteElement::SCALAR)
+     {
+        HypreBoomerAMG *t = new HypreBoomerAMG(*hA);
+        t->SetPrintLevel(0);
+        solver = t;
+     }
+     else
+     {
+        if (pde.fe_deriv == FiniteElement::DIV)
+        {
+           HypreADS *t = new HypreADS(*hA,pde.fes);
+           t->SetPrintLevel(0);
+           solver = t;
+        }
+        else
+        {
+           HypreAMS *t = new HypreAMS(*hA,pde.fes);
+           t->SetPrintLevel(0);
+           solver = t;
+        }
+     }
+  }
+#endif
+  else if (oh.Type() == Operator::Hypre_ParCSR)
+  {
+     HypreParMatrix *ohA;
+     oh.Get(ohA);
+
+     if (pde.fe_range == FiniteElement::SCALAR)
+     {
+        HypreBoomerAMG *t = new HypreBoomerAMG(*ohA);
+        t->SetPrintLevel(0);
+        solver = t;
+     }
+     else
+     {
+        if (pde.fe_deriv == FiniteElement::DIV)
+        {
+           HypreADS *t = new HypreADS(*ohA,pde.fes);
+           t->SetPrintLevel(0);
+           solver = t;
+        }
+        else
+        {
+           HypreAMS *t = new HypreAMS(*ohA,pde.fes);
+           t->SetPrintLevel(0);
+           solver = t;
+        }
+     }
+  }
+  else if (oh.Type() == Operator::PETSC_MATAIJ)
+  {
+     PetscParMatrix *pA;
+     oh.Get(pA);
+     ierr = MatSetOption(*pA,MAT_SPD,PETSC_TRUE); PCHKERRQ(*pA,ierr);
+
+     if (pde.fe_range == FiniteElement::SCALAR)
+     {
+        solver = new PetscPreconditioner(*pA);
+     }
+     else
+     {
+#if defined(PETSC_HAVE_HYPRE)
+        // convert and attach the converted Mat to the original one so that it will get destroyed
+        Mat tA;
+        ierr = MatConvert(*pA,MATHYPRE,MAT_INITIAL_MATRIX,&tA); PCHKERRQ(*pA,ierr);
+        ierr = PetscObjectCompose(*pA,"__mfemopt_temporary_convmat",(PetscObject)tA); PCHKERRQ(*pA,ierr);
+        ierr = PetscObjectDereference((PetscObject)tA); PCHKERRQ(*pA,ierr);
+
+        delete hA;
+        hypre_ParCSRMatrix *parcsr;
+        ierr = MatHYPREGetParCSR(tA,&parcsr); PCHKERRQ(*pA,ierr);
+        hA = new HypreParMatrix(parcsr,false);
+
+        if (pde.fe_deriv == FiniteElement::DIV)
+        {
+           HypreADS *t = new HypreADS(*hA,pde.fes);
+           t->SetPrintLevel(0);
+           solver = t;
+        }
+        else
+        {
+           HypreAMS *t = new HypreAMS(*hA,pde.fes);
+           t->SetPrintLevel(0);
+           solver = t;
+        }
+#else
+        solver = new PetscPreconditioner(*pA);
+#endif
+    }
+  }
+  else
+  {
+     mfem_error("Unhandled operator type");
+  }
+  return solver;
 }
 
 }

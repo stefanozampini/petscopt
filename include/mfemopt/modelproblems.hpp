@@ -10,11 +10,12 @@
 #include <mfem/fem/pgridfunc.hpp>
 #include <mfem/fem/plinearform.hpp>
 #include <mfem/fem/pbilinearform.hpp>
+#include <mfem/linalg/petsc.hpp>
 
 namespace mfemopt
 {
 /*
-   The class for a linear, parameter dependent heat-like operator, i.e. 
+   The class for a linear, parameter dependent heat-like operator, i.e.
      F(xdot,x,t) = M*xdot + K*x - f(t)
    M mass matrix
    K stiffness matrix (Diffusion, CurlCurl or DivDiv depending on the space)
@@ -23,9 +24,9 @@ namespace mfemopt
 class ModelHeat : public mfem::TimeDependentOperator, public PDOperator
 {
 private:
-   mfem::OperatorHandle         *Mh;
-   mfem::OperatorHandle         *Kh;
-   mfem::Operator::Type         oid;
+   mfem::OperatorHandle *Mh;
+   mfem::OperatorHandle *Kh;
+   mfem::Operator::Type oid;
 
    mfem::ParFiniteElementSpace  *fes;
    int fe_range, fe_deriv;
@@ -45,6 +46,8 @@ private:
    PDBilinearFormIntegrator *mu_pd_bilin;
    PDBilinearFormIntegrator *sigma_pd_bilin;
 
+   mfem::PetscPreconditionerFactory *pfactory;
+
    void Init(mfem::ParFiniteElementSpace*,mfem::Operator::Type);
    void InitForms(mfem::Coefficient*,mfem::Coefficient*);
    void InitForms(mfem::Coefficient*,mfem::MatrixCoefficient*);
@@ -61,12 +64,26 @@ public:
    void SetRHS(mfem::Coefficient*);
    void SetRHS(mfem::VectorCoefficient*);
 
+   mfem::PetscPreconditionerFactory* GetPreconditionerFactory();
+
    /* interface for mfem::TimeDependentOperator */
    virtual void Mult(const mfem::Vector&,mfem::Vector&) const
    { mfem::mfem_error("ModelHeat::not for explicit solvers!"); }
    virtual void ImplicitMult(const mfem::Vector&,const mfem::Vector&,mfem::Vector&) const;
    virtual Operator& GetImplicitGradient(const mfem::Vector&,const mfem::Vector&,double) const;
    virtual ~ModelHeat();
+
+   class PreconditionerFactory : public mfem::PetscPreconditionerFactory
+   {
+   private:
+      ModelHeat& pde;
+      mfem::HypreParMatrix *hA;
+
+   public:
+      PreconditionerFactory(ModelHeat& _pde, const std::string& name = std::string()): mfem::PetscPreconditionerFactory(name), pde(_pde), hA(NULL) {};
+      virtual mfem::Solver* NewPreconditioner(const mfem::OperatorHandle&);
+      virtual ~PreconditionerFactory() { delete hA;}
+   };
 
    /* interface for mfemopt::PDOperator */
    virtual void SetUpFromParameters(const mfem::Vector&);

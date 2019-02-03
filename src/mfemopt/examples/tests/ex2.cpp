@@ -14,6 +14,13 @@ using namespace mfemopt;
 
 typedef enum {FEC_L2, FEC_H1, FEC_HCURL, FEC_HDIV} FECType;
 static const char *FECTypes[] = {"L2","H1","HCURL","HDIV","FecType","FEC_",0};
+typedef enum {OID_MATAIJ, OID_MATIS, OID_MATHYPRE, OID_HYPRE} OIDType;
+static const char *OIDTypes[] = {"PETSC_MATAIJ",
+                                 "PETSC_MATIS",
+                                 "PETSC_MATHYPRE",
+                                 "Hypre_ParCSR",
+                                 "OIDType",
+                                 "OID_",0};
 
 // TODO
 //typedef enum {SIGMA_NONE, SIGMA_SCALAR, SIGMA_DIAG, SIGMA_FULL} SIGMAType;
@@ -149,7 +156,7 @@ protected:
    mutable PetscParVector *M;
 
 public:
-   MultiSourceMisfit(ParFiniteElementSpace*,PDCoefficient*,Coefficient*,PetscBCHandler*,DenseMatrix&,DenseMatrix&,bool,double,double,double,double,const char*);
+   MultiSourceMisfit(ParFiniteElementSpace*,PDCoefficient*,Coefficient*,Operator::Type,Operator::Type,PetscBCHandler*,DenseMatrix&,DenseMatrix&,bool,double,double,double,double,const char*);
 
    MPI_Comm GetComm() const { return comm; }
    void RunTests(bool=true);
@@ -194,9 +201,11 @@ public:
    virtual void MultTranspose(const Vector&,Vector&) const;
 };
 
-MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient* mu, Coefficient* sigma, PetscBCHandler* _bchandler,
+MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient* mu, Coefficient* sigma,
+                                     Operator::Type oid, Operator::Type jid,
+                                     PetscBCHandler* _bchandler,
                                      DenseMatrix& srcpoints, DenseMatrix& recpoints,
-                                     bool scalar_source, double scale_ls,
+                                     bool scalar, double scale_ls,
                                      double _t0, double _dt, double _tf,
                                      const char *scratch)
 {
@@ -209,8 +218,8 @@ MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient*
    bchandler = _bchandler;
 
    /* mfem::TimeDependent operator (as PDOperator) */
-   heat = new ModelHeat(mu,sigma,_fes,Operator::PETSC_MATAIJ);
-   heat->SetBCHandler(*_bchandler);
+   heat = new ModelHeat(mu,sigma,_fes,oid);
+   heat->SetBCHandler(bchandler);
 
    /* ReducedFunctional base class is an mfem::Operator */
    height = width = heat->GetParameterSize();
@@ -218,7 +227,9 @@ MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient*
    /* We use the same solver for objective and gradient computations */
    odesolver = new PetscODESolver(comm,"worker_");
    odesolver->Init(*heat,PetscODESolver::ODE_SOLVER_LINEAR);
-   odesolver->SetBCHandler(_bchandler); /* XXX fix inconsistency */
+   odesolver->SetBCHandler(bchandler);
+   odesolver->SetPreconditionerFactory(heat->GetPreconditionerFactory());
+   odesolver->SetJacobianType(jid);
    odesolver->Customize();
 
    u = new ParGridFunction(_fes);
@@ -239,7 +250,7 @@ MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient*
 
       Vector x;
       srcpoints.GetColumn(i,x);
-      if (scalar_source)
+      if (scalar)
       {
          sources.Append(new RickerSource(x,10,1.1,1.0e3));
       }
@@ -464,6 +475,7 @@ MultiSourceMisfitHessian::MultiSourceMisfitHessian(const MultiSourceMisfit* _mso
       PetscODESolver *odesolver = new PetscODESolver(comm,"worker_");
       odesolver->Init(*(_msobj->heat),PetscODESolver::ODE_SOLVER_LINEAR);
       odesolver->SetBCHandler(_msobj->bchandler);
+      odesolver->SetPreconditionerFactory(_msobj->heat->GetPreconditionerFactory());
 
       PetscErrorCode ierr;
       ierr = TSSetGradientDAE(*odesolver,*A,mfemopt_gradientdae,NULL);CCHKERRQ(comm,ierr);
@@ -881,6 +893,7 @@ int main(int argc, char *argv[])
 
    FECType   s_fec_type = FEC_H1;
    PetscInt  s_ord = 1;
+   OIDType   s_oid_type = OID_MATAIJ, s_jid_type = OID_MATAIJ;
 
    FECType   mu_fec_type = FEC_H1;
    PetscInt  mu_ord = 1;
@@ -905,6 +918,8 @@ int main(int argc, char *argv[])
       ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"Options for Heat equation",NULL);CHKERRQ(ierr);
 
       /* Simulation parameters */
+      ierr = PetscOptionsEnum("-state_oid_type","Operator::Type for state",NULL,OIDTypes,(PetscEnum)s_oid_type,(PetscEnum*)&s_oid_type,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsEnum("-state_jid_type","Operator::Type for state jacobian",NULL,OIDTypes,(PetscEnum)s_jid_type,(PetscEnum*)&s_jid_type,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsInt("-state_ord","Polynomial order approximation for state variables",NULL,s_ord,&s_ord,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsEnum("-state_fec_type","FEC for state","",FECTypes,(PetscEnum)s_fec_type,(PetscEnum*)&s_fec_type,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsString("-scratch","Location where to put temporary data (must be present)",NULL,scratchdir,scratchdir,sizeof(scratchdir),NULL);CHKERRQ(ierr);
@@ -960,6 +975,43 @@ int main(int argc, char *argv[])
 
       ierr = PetscOptionsEnd();CHKERRQ(ierr);
    }
+   Operator::Type oid,jid;
+   switch (s_oid_type)
+   {
+      case OID_MATAIJ:
+         oid = Operator::PETSC_MATAIJ;
+         break;
+      case OID_MATIS:
+         oid = Operator::PETSC_MATIS;
+         break;
+      case OID_MATHYPRE:
+         oid = Operator::PETSC_MATHYPRE;
+         break;
+      case OID_HYPRE:
+         oid = Operator::Hypre_ParCSR;
+         break;
+      default:
+         SETERRQ1(PETSC_COMM_WORLD,PETSC_ERR_USER,"Unhandled Operator::Type %d",(int)s_oid_type);
+         break;
+   }
+   switch (s_jid_type)
+   {
+      case OID_MATAIJ:
+         jid = Operator::PETSC_MATAIJ;
+         break;
+      case OID_MATIS:
+         jid = Operator::PETSC_MATIS;
+         break;
+      case OID_MATHYPRE:
+         jid = Operator::PETSC_MATHYPRE;
+         break;
+      case OID_HYPRE:
+         jid = Operator::Hypre_ParCSR;
+         break;
+      default:
+         SETERRQ1(PETSC_COMM_WORLD,PETSC_ERR_USER,"Unhandled Operator::Type %d",(int)s_jid_type);
+         break;
+   }
 
    Array<int> mu_excl_a((int)n_mu_excl);
    for (int i = 0; i < n_mu_excl; i++) mu_excl_a[i] = (int)mu_excl[i];
@@ -995,14 +1047,14 @@ int main(int argc, char *argv[])
    }
 
    /* Simulation space */
-   bool scalar_source = true;
+   bool scalar = true;
    FiniteElementCollection *s_fec = NULL;
    switch (s_fec_type)
    {
       case FEC_HCURL:
          /* magnetic -> assumes the mesh in meters */
          sigma_scal = sigma_scal_muinv_0;
-         scalar_source = false;
+         scalar = false;
          s_fec = new ND_FECollection(s_ord,pmesh->Dimension());
          break;
       case FEC_H1:
@@ -1095,7 +1147,7 @@ int main(int argc, char *argv[])
    if (srcpoints.Width())
    {
       Vector t(pmesh->SpaceDimension());
-      if (scalar_source)
+      if (scalar)
       {
          rick = new RickerSource(t,10,1.1,1.0e3);
       }
@@ -1120,7 +1172,7 @@ int main(int argc, char *argv[])
       UserMonitor *monitor = new UserMonitor(u,viz,tmp1.str());
       ReceiverMonitor *rmonitor = new ReceiverMonitor(u,recpoints,tmp2.str());
 
-      ModelHeat *heat = new ModelHeat(mu,sigma,s_fes,Operator::PETSC_MATAIJ);
+      ModelHeat *heat = new ModelHeat(mu,sigma,s_fes,oid);
 
       Vector srcctr;
       srcpoints.GetColumn(i,srcctr);
@@ -1138,8 +1190,11 @@ int main(int argc, char *argv[])
       PetscODESolver *odesolver = new PetscODESolver(pmesh->GetComm(),"model_");
       odesolver->Init(*heat,PetscODESolver::ODE_SOLVER_LINEAR);
       odesolver->SetBCHandler(bchandler);
+      odesolver->SetPreconditionerFactory(heat->GetPreconditionerFactory());
+      odesolver->SetJacobianType(jid);
       odesolver->SetMonitor(rmonitor);
       odesolver->SetMonitor(monitor);
+      odesolver->SetJacobianType(Operator::ANY_TYPE);
 
       double tt0 = t0, tdt = dt, ttf = tf;
       odesolver->Run(*U,tt0,tdt,ttf);
@@ -1179,7 +1234,7 @@ int main(int argc, char *argv[])
    if (glvis) mu_pd->Visualize();
 
    /* The misfit function */
-   MultiSourceMisfit *obj = new MultiSourceMisfit(s_fes,mu_pd,sigma,bchandler,srcpoints,recpoints,scalar_source,scale_ls,t0,dt,tf,scratchdir);
+   MultiSourceMisfit *obj = new MultiSourceMisfit(s_fes,mu_pd,sigma,oid,jid,bchandler,srcpoints,recpoints,scalar,scale_ls,t0,dt,tf,scratchdir);
 
    /* Tests internal objects inside the misfit function */
    if (test_misfit_internal)

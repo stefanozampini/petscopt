@@ -63,19 +63,19 @@ private:
    PDOperatorGradient* GOp;
    PDOperatorHessian* HOp[3][3];
 
-   mfem::PetscBCHandler bc; /* unused */
    mfem::PetscBCHandler hbc; /* XXX */
 
 protected:
    friend class PDOperatorGradient;
    friend class PDOperatorHessian;
 
+   mfem::PetscBCHandler *bc;
    void ApplyHomogeneousBC(mfem::Vector&);
 
 public:
    PDOperator();
 
-   void SetBCHandler(mfem::PetscBCHandler&);
+   void SetBCHandler(mfem::PetscBCHandler*);
 
    /* This maps parameter to state
       Given a parameter dependent F(xdot,x,t;m) residual equation, implements the action of dF/dm */

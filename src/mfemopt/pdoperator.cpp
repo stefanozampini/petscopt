@@ -64,6 +64,7 @@ PDOperatorGradientFD::PDOperatorGradientFD(MPI_Comm _comm, PDOperator *_pd, cons
 PDOperator::PDOperator()
 {
    GOp = NULL;
+   bc  = NULL;
    HOp[0][0] = NULL;
    HOp[0][1] = NULL;
    HOp[0][2] = NULL;
@@ -89,14 +90,14 @@ PDOperator::~PDOperator()
    delete HOp[2][2];
 }
 
-void PDOperator::SetBCHandler(mfem::PetscBCHandler& _bc)
+void PDOperator::SetBCHandler(mfem::PetscBCHandler* _bc)
 {
-   /* unused so far */
-   bc.SetType(_bc.GetType());
-   bc.SetTDofs(_bc.GetTDofs());
+   /* Model bchandler */
+   bc = _bc;
 
    /* bchandler for homogenous bc application */
-   hbc.SetTDofs(_bc.GetTDofs());
+   Array<int> empty(0);
+   hbc.SetTDofs(bc ? bc->GetTDofs() : empty);
 }
 
 void PDOperator::ApplyHomogeneousBC(Vector& x)
