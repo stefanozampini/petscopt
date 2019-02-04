@@ -214,19 +214,16 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
       lvsize += pcoeffgf[i]->ParFESpace()->GetVSize();
    }
 
-   pcoeffexcl.SetSize(pfes->GetParMesh()->GetNE());
+   pcoeffexcl.SetSize(mesh->GetNE());
    pcoeffexcl = false;
    for (int i = 0; i < std::min(pcoeffexcl.Size(),excl.Size()); i++) pcoeffexcl[i] = excl[i];
 
    PetscBool lhas = PETSC_FALSE,has;
    for (int i = 0; i < pcoeffexcl.Size(); i++) if (pcoeffexcl[i]) { lhas = PETSC_TRUE; break; }
-   MPI_Allreduce(&lhas,&has,1,MPIU_BOOL,MPI_LOR,pfes->GetParMesh()->GetComm());
+   MPI_Allreduce(&lhas,&has,1,MPIU_BOOL,MPI_LOR,mesh->GetComm());
 
    if (has)
    {
-      ParGridFunction *gf = new ParGridFunction(pfes);
-      *gf = 0.0;
-
       PetscParMatrix *PT = new PetscParMatrix(pfes->Dof_TrueDof_Matrix(),Operator::PETSC_MATAIJ);
       Array<PetscInt> rows(PT->GetNumRows());
       PetscInt rst = PT->GetRowStart();
@@ -235,26 +232,44 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
          rows[i] = i + rst;
       }
 
+      Array<int> vdofs_mark(pfes->Dof_TrueDof_Matrix()->Height()),tdofs_mark(pfes->Dof_TrueDof_Matrix()->Width());
+      vdofs_mark = 0;
+      tdofs_mark = 0;
       for (int i = 0; i < mesh->GetNE(); i++)
       {
          if (!pcoeffexcl[i])
          {
             Array<int> dofs;
             pfes->GetElementVDofs(i,dofs);
-            Vector vals(dofs.Size());
-            vals = 1.0;
-            gf->SetSubVector(dofs,vals);
+            for (int j = 0; j < dofs.Size(); j++) vdofs_mark[dofs[j]] = 1;
          }
       }
 
+      /* For nonconforming meshes, we may want to include all the true dofs until
+         all vdofs are represented by true dofs in the optimization process? */
+      PetscInt cum = 0,maxcum = 0;
+      PetscOptionsGetInt(NULL,NULL,"-mfemopt_ncsquare",&maxcum,NULL);
+      PetscBool done = maxcum > 0 ? PETSC_FALSE : PETSC_TRUE;
+      while (!done && cum < maxcum)
+      {
+        int b = vdofs_mark.Sum();
+        pfes->Dof_TrueDof_Matrix()->BooleanMultTranspose(1,vdofs_mark,1,tdofs_mark);
+        pfes->Dof_TrueDof_Matrix()->BooleanMult(1,tdofs_mark,1,vdofs_mark);
+        int a = vdofs_mark.Sum();
+        PetscBool ldone = (PetscBool)(a == b);
+        MPI_Allreduce(&ldone,&done,1,MPIU_BOOL,MPI_LOR,mesh->GetComm());
+        cum++;
+      }
+      MFEM_VERIFY(done,"Internal error: try with a value for -mfemopt_ncsquare greater than " << maxcum);
+      pfes->Dof_TrueDof_Matrix()->BooleanMultTranspose(1,vdofs_mark,1,tdofs_mark);
+
       /* store dofs for excluded regions */
-      Array<int> initi(gf->Size());
+      Array<int> initi(pfes->Dof_TrueDof_Matrix()->Height());
       {
          int cum = 0;
-         Vector lwork(gf->GetData(),gf->Size());
-         for (int i = 0; i < lwork.Size(); i++)
+         for (int i = 0; i < vdofs_mark.Size(); i++)
          {
-            if (std::abs(lwork[i]) < 1.e-12)
+            if (!vdofs_mark[i])
             {
                initi[cum++] = i;
             }
@@ -266,11 +281,15 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
          neighbours of the domain of interest */
       for (int i = 0; i < mesh->GetNE(); i++)
       {
-         Array<int> dofs;
-         Vector vals;
-         pfes->GetElementVDofs(i,dofs);
-         gf->GetSubVector(dofs,vals);
-         pcoeffexcl[i] = vals.Normlinf() != 0.0  ? false : true;
+         if (pcoeffexcl[i])
+         {
+            Array<int> dofs;
+            pfes->GetElementVDofs(i,dofs);
+            for (int j = 0; j < dofs.Size(); j++)
+            {
+               if (vdofs_mark[dofs[j]]) { pcoeffexcl[i] = false; break; }
+            }
+         }
       }
 
       /* restrict on active dofs */
@@ -279,11 +298,9 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
       local_cols.Reserve(PT->Width());
       PetscInt cst = PT->GetColStart();
 
-      Vector work(pfes->GetTrueVSize());
-      gf->ParallelAssemble(work);
-      for (int i = 0; i < work.Size(); i++)
+      for (int i = 0; i < tdofs_mark.Size(); i++)
       {
-         if (std::abs(work[i]) != 0.0)
+         if (tdofs_mark[i])
          {
             global_cols.Append(i + cst);
             local_cols.Append(i);
@@ -304,14 +321,13 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
       pcoeffinitv.SetSize(initi.Size()*ngf);
       for (int g = 0; g < ngf; g++)
       {
-         const int st = g*gf->Size();
          ParGridFunction *vgf = pcoeffgf[g];
+         const int st = g*vgf->Size();
          for (int i = 0; i < initi.Size(); i++)
          {
             pcoeffinitv[i+st] = (*vgf)[initi[i]];
          }
       }
-      delete gf;
    }
    else
    {
@@ -494,7 +510,6 @@ void PDCoefficient::UpdateCoefficientWithGF(const Vector& m, Array<ParGridFuncti
 
       ParGridFunction *gf = agf[i];
       P->Mult(pmi,*gf);
-
       /* restore values from excluded regions */
       const int st = i*gf->Size();
       for (int j = 0; j < pcoeffiniti.Size(); j++)
@@ -515,6 +530,13 @@ void PDCoefficient::UpdateGradient(Vector& g)
    {
       Vector pgi(data,n);
       ParGridFunction *gf = pgradgf[i];
+
+      /* values from excluded regions need to be zeroed */
+      for (int j = 0; j < pcoeffiniti.Size(); j++)
+      {
+         (*gf)[pcoeffiniti[j]] = 0.0;
+      }
+
       P->MultTranspose(*gf,pgi);
       data += n;
       pgi.SetData(NULL); /* XXX clang static analysis */
