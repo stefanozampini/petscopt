@@ -127,6 +127,9 @@ void PDOperator::TestFDGradient(MPI_Comm comm, const Vector& xpIn, const Vector&
    PetscBool verbose = PETSC_FALSE;
    ierr = PetscOptionsGetBool(NULL,NULL,"-fd_gradient_verbose",&verbose,NULL); CCHKERRQ(comm,ierr);
 
+   PetscMPIInt size;
+   ierr = MPI_Comm_size(comm,&size);CCHKERRQ(comm,ierr);
+
    PetscParVector xdot(comm,xpIn,true);
    PetscParVector x(comm,xIn,true);
    PetscParVector m(comm,mIn,true);
@@ -151,14 +154,14 @@ void PDOperator::TestFDGradient(MPI_Comm comm, const Vector& xpIn, const Vector&
    G->Update(xdot,x,m);
 
    ierr = MatComputeExplicitOperator(*pG,&GExpl);CCHKERRQ(comm,ierr);
-   ierr = MatConvert(GExpl,MATAIJ,MAT_INPLACE_MATRIX,&GExpl);CCHKERRQ(comm,ierr);
+   ierr = MatConvert(GExpl,size > 1 ? MATMPIAIJ : MATSEQAIJ,MAT_INPLACE_MATRIX,&GExpl);CCHKERRQ(comm,ierr);
    ierr = MatNorm(GExpl,NORM_INFINITY,&normG);CCHKERRQ(comm,ierr);
    ierr = PetscObjectSetName((PetscObject)GExpl,"G");CCHKERRQ(comm,ierr);
    ierr = MatViewFromOptions(GExpl,NULL,"-test_pdoperatorgradient_G_view");CCHKERRQ(comm,ierr);
 
    ierr = MatCreateTranspose(*pG,&GT);CCHKERRQ(comm,ierr);
    ierr = MatComputeExplicitOperator(GT,&GTExpl);CCHKERRQ(comm,ierr);
-   ierr = MatConvert(GTExpl,MATAIJ,MAT_INPLACE_MATRIX,&GTExpl);CCHKERRQ(comm,ierr);
+   ierr = MatConvert(GTExpl,size > 1 ? MATMPIAIJ : MATSEQAIJ,MAT_INPLACE_MATRIX,&GTExpl);CCHKERRQ(comm,ierr);
    ierr = MatNorm(GTExpl,NORM_INFINITY,&normGT);CCHKERRQ(comm,ierr);
 
    ierr = MatTranspose(GTExpl,MAT_INITIAL_MATRIX,&check);CCHKERRQ(comm,ierr);
