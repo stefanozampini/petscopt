@@ -31,8 +31,9 @@ PetscReal refine_fn_bb[6] = {-1.0,1.0,-1.0,1.0,-1.0,1.0};
 
 static int refine_fn(const Vector &x)
 {
-   for (int d = 0; d < x.Size(); d++) if (x(d) < refine_fn_bb[2*d] || x(d) > refine_fn_bb[2*d+1]) return 0;
-   return 1;
+   int r = 1;
+   for (int d = 0; d < x.Size(); d++) if (x(d) < refine_fn_bb[2*d] || x(d) > refine_fn_bb[2*d+1]) r = 0;
+   return r;
 }
 
 void NCRefinement(ParMesh *mesh, int (*fn)(const Vector&))
@@ -46,7 +47,11 @@ void NCRefinement(ParMesh *mesh, int (*fn)(const Vector&))
       int refineme = (*fn)(pt);
       if (refineme) el_to_refine.Append(e);
    }
-   mesh->GeneralRefinement(el_to_refine,1);
+   mesh->GeneralRefinement(el_to_refine,-1);
+   if (mesh->Nonconforming())
+   {
+      mesh->Rebalance();
+   }
 }
 
 PetscReal excl_fn_bb[6] = {-1.0,1.0,-1.0,1.0,-1.0,1.0};
@@ -907,7 +912,7 @@ int main(int argc, char *argv[])
    PetscBool test_part = PETSC_FALSE, test_null = PETSC_FALSE, test_newton = PETSC_FALSE, test_progress = PETSC_TRUE;
    PetscBool test_misfit[3] = {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}, test_misfit_reg[2] = {PETSC_FALSE,PETSC_FALSE}, test_misfit_internal = PETSC_FALSE;
    PetscReal test_newton_noise = 0.0;
-   PetscBool glvis = PETSC_TRUE;
+   PetscBool glvis = PETSC_TRUE, save = PETSC_FALSE;
 
    /* Process options */
    {
@@ -935,6 +940,7 @@ int main(int argc, char *argv[])
       /* GLVis */
       ierr = PetscOptionsInt("-viz","Visualization steps for model sampling",NULL,viz,&viz,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-glvis","Activate GLVis monitoring of Newton process",NULL,glvis,&glvis,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsBool("-save","Save final result",NULL,save,&save,NULL);CHKERRQ(ierr);
 
       /* Sources and receivers */
       ierr = PetscOptionsIntArray("-grid_rcv_n","Grid receivers: points per direction",NULL,gridr,(i=3,&i),NULL);CHKERRQ(ierr);
@@ -1173,6 +1179,7 @@ int main(int argc, char *argv[])
       ReceiverMonitor *rmonitor = new ReceiverMonitor(u,recpoints,tmp2.str());
 
       ModelHeat *heat = new ModelHeat(mu,sigma,s_fes,oid);
+      heat->SetBCHandler(bchandler); /* XXX so many times setting the object -> add specialized constructor for odesolver? */
 
       Vector srcctr;
       srcpoints.GetColumn(i,srcctr);
@@ -1285,6 +1292,22 @@ int main(int argc, char *argv[])
    TVRegularizer *tv = new TVRegularizer(mu_pd,tva,tvb,tvpd);
    tv->Symmetrize(tvsy);
    tv->Project(tvpr);
+   if (test_misfit_internal)
+   {
+      Vector muv;
+      if (!test_null) obj->ComputeGuess(muv);
+      else muv = muv_exact;
+      Vector dummy;
+      double f;
+
+      PetscErrorCode ierr;
+      MPI_Comm comm = PETSC_COMM_WORLD;
+      ierr = PetscPrintf(comm,"---------------------------------------\n");CCHKERRQ(comm,ierr);
+      ierr = PetscPrintf(comm,"TV tests\n");CCHKERRQ(comm,ierr);
+      tv->Eval(dummy,muv,0.0,&f);
+      tv->TestFDGradient(comm,dummy,muv,0.0,1.e-6,test_progress);
+      tv->TestFDHessian(comm,dummy,muv,0.0);
+   }
 
    /* Map from optimization variables to model variables */
    PointwiseMap pmap(mu_m,m_mu,dmu_dm,dmu_dm);
@@ -1360,14 +1383,23 @@ int main(int argc, char *argv[])
       tv->SetScale(tva);
 
       newton.Mult(dummy,u);
-      //mu_pd->UpdateCoefficient(u);
-      //mu_pd->Save("reconstructed_sigma");
-      //mu_pd->Visualize("RJlc");
 
       robj->ComputeObjective(u,&f1);
       tv->SetScale(0.0);
       robj->ComputeObjective(u,&f2);
       if (!PetscGlobalRank) std::cout << "Final objective " << f1 << " (LS " << f2 << ", TV " << f1 - f2 << ")" << std::endl;
+
+      // TODO HANG
+      //u = 0.0;
+      //u[1] = 1e6;
+      //u[2] = -1e6;
+      //mu_pd->UpdateCoefficient(u);
+      //mu_pd->Visualize("RJlc");
+
+   }
+   if (save)
+   {
+      mu_pd->Save("saved");
    }
 
    delete robj;
@@ -1396,6 +1428,7 @@ int main(int argc, char *argv[])
      requires: mfemopt
 
    testset:
+     filter: sed -e "s/-nan/nan/g"
      timeoutfactor: 3
      nsize: {{1 2}}
      args: -scratch ./ -test_partitioning -meshfile ${petscopt_dir}/share/petscopt/meshes/segment-m5-5.mesh -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -test_newton
