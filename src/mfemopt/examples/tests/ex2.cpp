@@ -950,6 +950,7 @@ int main(int argc, char *argv[])
       for (j=i;j<3;j++) grids[j] = grids[i > 0 ? i-1 : 0];
       ierr = PetscOptionsRealArray("-grid_src_bb","Grid sources: bounding box",NULL,grids_bb,(i=6,&i),NULL);CHKERRQ(ierr);
 
+      ierr = PetscOptionsReal("-sigma_scal","Diffusion scaling factor",NULL,sigma_scal,&sigma_scal,NULL);CHKERRQ(ierr);
       /* Parameter space */
       ierr = PetscOptionsInt("-mu_ord","Polynomial order approximation for mu",NULL,mu_ord,&mu_ord,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsReal("-mu_const_val","Costant mu value",NULL,mu_const_val,&mu_const_val,NULL);CHKERRQ(ierr);
@@ -1059,7 +1060,7 @@ int main(int argc, char *argv[])
    {
       case FEC_HCURL:
          /* magnetic -> assumes the mesh in meters */
-         sigma_scal = sigma_scal_muinv_0;
+         sigma_scal *= sigma_scal_muinv_0;
          scalar = false;
          s_fec = new ND_FECollection(s_ord,pmesh->Dimension());
          break;
