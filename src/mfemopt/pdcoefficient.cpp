@@ -245,6 +245,9 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
          }
       }
 
+      /* need to reduce the vdofs_markers */
+      pfes->Synchronize(vdofs_mark);
+
       /* For nonconforming meshes, we may want to include all the true dofs until
          all vdofs are represented by true dofs in the optimization process? */
       PetscInt cum = 0,maxcum = 0;
@@ -263,7 +266,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
       MFEM_VERIFY(done,"Internal error: try with a value for -mfemopt_ncsquare greater than " << maxcum);
       pfes->Dof_TrueDof_Matrix()->BooleanMultTranspose(1,vdofs_mark,1,tdofs_mark);
 
-      /* store dofs for excluded regions */
+      /* store local vdofs indices for excluded regions */
       Array<int> initi(pfes->Dof_TrueDof_Matrix()->Height());
       {
          int cum = 0;
