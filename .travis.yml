@@ -27,14 +27,14 @@ env:
     - PETSC_OPTIONS='-check_pointer_intensity 0 -malloc_test'
     - OPTFLAGS='-O'
     - CPPFLAGS="-Wno-unused-command-line-argument"
-    - MFEM_COMMIT=314cea210030926eafa6790a91a46205937079ca
+    - MFEM_COMMIT=16d982c629e5c646d0d68c455434af91c36c65d2
 
   matrix:
 
     - MPI=mpich  INT64=0  SCALAR=real     PRECISION=double MFEM=1
 ###    - MPI=mpich  INT64=0  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
-##    - MPI=mpich  INT64=0  SCALAR=complex  PRECISION=double     LANGUAGE=C++
-    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=double MFEM=1
+    - MPI=mpich  INT64=0  SCALAR=complex  PRECISION=double     LANGUAGE=C++
+#    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=double MFEM=1
 ###    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
 ##    - MPI=mpich  INT64=1  SCALAR=complex  PRECISION=double     LANGUAGE=C++
 
@@ -102,7 +102,7 @@ install:
   - git fetch
   - git clean -q -d -x -f
   - git reset --hard origin/stefano_zampini/feature-gmakegen-pkgs
-  - ./configure PETSC_ARCH=arch-test --with-cc=mpicc --with-cxx=mpicxx --with-fc=0 --with-clanguage=${LANGUAGE:-C} --with-64-bit-indices=${INT64:-0} --with-scalar-type=${SCALAR:-real} --with-precision=${PRECISION:-double} --download-mfem=${MFEM:-0} --download-hypre=${MFEM:-0} --download-metis=${MFEM:-0} --download-mfem-commit=${MFEM_COMMIT:-master} $BLASLAPACK COPTFLAGS="$OPTFLAGS" CXXOPTFLAGS="$OPTFLAGS" FOPTFLAGS="$OPTFLAGS" --CPPFLAGS="$CPPFLAGS" --CXXCPPFLAGS="$CPPFLAGS" || /bin/sh -c "tail -2500 configure.log; false"
+  - ./configure PETSC_ARCH=arch-test --with-cc=mpicc --with-cxx=mpicxx --with-fc=0 --with-debugging=${DBG:-0} --with-clanguage=${LANGUAGE:-C} --with-64-bit-indices=${INT64:-0} --with-scalar-type=${SCALAR:-real} --with-precision=${PRECISION:-double} --download-mfem=${MFEM:-0} --download-hypre=${MFEM:-0} --download-metis=${MFEM:-0} --download-mfem-commit=${MFEM_COMMIT:-master} $BLASLAPACK COPTFLAGS="$OPTFLAGS" CXXOPTFLAGS="$OPTFLAGS" FOPTFLAGS="$OPTFLAGS" --CPPFLAGS="$CPPFLAGS" --CXXCPPFLAGS="$CPPFLAGS" || /bin/sh -c "tail -2500 configure.log; false"
   - make MAKE_NP=$(nproc) PETSC_ARCH=arch-test || /bin/sh -c "if [ -f arch-test/lib/petsc/conf/mfem.errorflg ]; then tail -200 arch-test/lib/petsc/conf/mfem.log; fi; tail -200 make.log; false"
   - cd $PETSCOPT_DIR
   - make with_mfem=${MFEM:-0} MAKE_NP=$(nproc) PETSC_ARCH=arch-test
