@@ -1265,7 +1265,7 @@ int main(int argc, char *argv[])
       g1 -= g2;
       f1 = ParNormlp(g1,infinity(),PETSC_COMM_WORLD);
       MFEM_VERIFY(f1 < PETSC_SMALL,"Error on misfit computations! gradient error " << f1)
-      if (!PetscGlobalRank) std::cout << "Misfit objective " << f2 << std::endl;
+      PetscPrintf(PETSC_COMM_WORLD,"Misfit objective %g\n",f2);
    }
 
    /* FD test for misfit function gradient */
@@ -1328,7 +1328,7 @@ int main(int argc, char *argv[])
 
       double f;
       robj->ComputeObjective(m,&f);
-      if (!PetscGlobalRank) std::cout << "Regularized objective " << f << std::endl;
+      PetscPrintf(PETSC_COMM_WORLD,"Regularized objective %g\n",f);
    }
 
    /* Test callbacks for full objective gradient */
@@ -1379,7 +1379,7 @@ int main(int argc, char *argv[])
       robj->ComputeObjective(u,&f1);
       tv->SetScale(0.0);
       robj->ComputeObjective(u,&f2);
-      if (!PetscGlobalRank) std::cout << "Initial objective " << f1 << " (LS " << f2 << ", TV " << f1 - f2 << ")" << std::endl;
+      PetscPrintf(PETSC_COMM_WORLD,"Initial objective %g (LS %g, TV %g)\n",f1,f2,f1-f2);
       tv->SetScale(tva);
 
       newton.Mult(dummy,u);
@@ -1387,7 +1387,7 @@ int main(int argc, char *argv[])
       robj->ComputeObjective(u,&f1);
       tv->SetScale(0.0);
       robj->ComputeObjective(u,&f2);
-      if (!PetscGlobalRank) std::cout << "Final objective " << f1 << " (LS " << f2 << ", TV " << f1 - f2 << ")" << std::endl;
+      PetscPrintf(PETSC_COMM_WORLD,"Final objective %g (LS %g, TV %g)\n",f1,f2,f1-f2);
 
       // TODO HANG
       //u = 0.0;
