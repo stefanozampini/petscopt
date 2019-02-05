@@ -472,11 +472,13 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
      PetscParMatrix *pA;
      oh.Get(pA);
      MatSetOption(*pA,MAT_SPD,PETSC_TRUE);
-
      PetscBDDCSolverParams opts;
-     Array<int>& ess = pde.bc->GetTDofs();
      opts.SetSpace(pde.fes);
-     opts.SetEssBdrDofs(&ess);
+     if (pde.bc)
+     {
+        Array<int>& ess = pde.bc->GetTDofs();
+        opts.SetEssBdrDofs(&ess);
+     }
      solver = new PetscBDDCSolver(*pA,opts);
   }
 #if 0
