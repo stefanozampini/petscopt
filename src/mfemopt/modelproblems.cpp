@@ -419,8 +419,17 @@ Operator& ModelHeat::GetImplicitGradient(const Vector &x, const Vector &xdot, do
    {
       case Operator::Hypre_ParCSR:
       {
-         delete Jacobian;
-         Jacobian = Add(shift,*(Mh->As<HypreParMatrix>()),1.0,*(Kh->As<HypreParMatrix>()));
+         if (!Jacobian)
+         {
+            Jacobian = Add(shift,*(Mh->As<HypreParMatrix>()),1.0,*(Kh->As<HypreParMatrix>()));
+         }
+         else
+         {
+            HypreParMatrix *hJacobian = dynamic_cast<HypreParMatrix *>(Jacobian);
+            *hJacobian = 0.0;
+            hJacobian->Add(shift,*(Mh->As<HypreParMatrix>()));
+            hJacobian->Add(1.0,*(Kh->As<HypreParMatrix>()));
+         }
          break;
       }
       case Operator::PETSC_MATHYPRE:
@@ -481,8 +490,7 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
      }
      solver = new PetscBDDCSolver(*pA,opts);
   }
-#if 0
-|| defined(PETSC_HAVE_HYPRE)
+#if defined(PETSC_HAVE_HYPRE)
   else if (oh.Type() == Operator::PETSC_MATHYPRE)
   {
      PetscParMatrix *pA;
