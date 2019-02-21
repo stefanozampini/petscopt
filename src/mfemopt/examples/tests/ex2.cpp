@@ -14,11 +14,12 @@ using namespace mfemopt;
 
 typedef enum {FEC_L2, FEC_H1, FEC_HCURL, FEC_HDIV} FECType;
 static const char *FECTypes[] = {"L2","H1","HCURL","HDIV","FecType","FEC_",0};
-typedef enum {OID_MATAIJ, OID_MATIS, OID_MATHYPRE, OID_HYPRE} OIDType;
+typedef enum {OID_MATAIJ, OID_MATIS, OID_MATHYPRE, OID_HYPRE, OID_ANY} OIDType;
 static const char *OIDTypes[] = {"PETSC_MATAIJ",
                                  "PETSC_MATIS",
                                  "PETSC_MATHYPRE",
                                  "Hypre_ParCSR",
+                                 "ANY_TYPE",
                                  "OIDType",
                                  "OID_",0};
 
@@ -997,8 +998,9 @@ int main(int argc, char *argv[])
       case OID_HYPRE:
          oid = Operator::Hypre_ParCSR;
          break;
+      case OID_ANY:
       default:
-         SETERRQ1(PETSC_COMM_WORLD,PETSC_ERR_USER,"Unhandled Operator::Type %d",(int)s_oid_type);
+         oid = Operator::ANY_TYPE;
          break;
    }
    switch (s_jid_type)
@@ -1015,8 +1017,9 @@ int main(int argc, char *argv[])
       case OID_HYPRE:
          jid = Operator::Hypre_ParCSR;
          break;
+      case OID_ANY:
       default:
-         SETERRQ1(PETSC_COMM_WORLD,PETSC_ERR_USER,"Unhandled Operator::Type %d",(int)s_jid_type);
+         jid = Operator::ANY_TYPE;
          break;
    }
 
@@ -1202,7 +1205,6 @@ int main(int argc, char *argv[])
       odesolver->SetJacobianType(jid);
       odesolver->SetMonitor(rmonitor);
       odesolver->SetMonitor(monitor);
-      odesolver->SetJacobianType(Operator::ANY_TYPE);
 
       double tt0 = t0, tdt = dt, ttf = tf;
       odesolver->Run(*U,tt0,tdt,ttf);
