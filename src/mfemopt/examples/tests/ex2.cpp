@@ -1,4 +1,4 @@
-static const char help[] = "Tests a parameter dependent one-dimensional diffusion.";
+static const char help[] = "Tests a parameter dependent time-dependent diffusion.";
 
 #include <petscopt.h>
 #include <mfemopt.hpp>
@@ -55,6 +55,12 @@ void NCRefinement(ParMesh *mesh, int (*fn)(const Vector&))
    }
 }
 
+/* experimental */
+static double mesh_scal = 1.0;
+static double signal_scal = 1.0e3;
+static double mu_guess = 1.0;
+static bool oil_test = false; // YYY
+
 PetscReal excl_fn_bb[6] = {-1.0,1.0,-1.0,1.0,-1.0,1.0};
 
 static bool excl_fn(const Vector &x)
@@ -105,7 +111,35 @@ static double mu_exact_const(const Vector &x)
    return mu_const_val;
 }
 
-/* inverse of magnetic permeability of free space */
+static double mu_exact_jump_test_em_2d(const Vector &x)
+{
+   double val;
+   double xx = x(0)*mesh_scal, yy=x(1)*mesh_scal;
+
+   double water_v = 3.0;
+   double back_v = 1.e-1;
+   double oil_v = 1.e-3;
+   double salt_v = 1.e-2;
+
+   if (yy < 600) val = back_v;
+   else val = water_v;
+
+   double oil_1[2][2] = {{300,450},{1000,550}};
+   double oil_2[2][2] = {{550,350},{750,450}};
+   //double oil_1[2][2] = {{300,350},{1000,450}};
+   //double oil_2[2][2] = {{550,250},{750,350}};
+   if (oil_1[0][0] <= xx && xx <= oil_1[1][0] &&
+       oil_1[0][1] <= yy && yy <= oil_1[1][1]) val = oil_v;
+   if (oil_2[0][0] <= xx && xx <= oil_2[1][0] &&
+       oil_2[0][1] <= yy && yy <= oil_2[1][1]) val = oil_v;
+
+   double dome_r = 250.0, dome_c[2] = {1250.0,0.0};
+   if (std::sqrt((xx - dome_c[0])*(xx - dome_c[0]) + (yy - dome_c[1])*(yy - dome_c[1])) < dome_r) val = salt_v;
+   if (yy < 0) val = back_v;
+   return val*mesh_scal;
+}
+
+/* inverse of magnetic permeability of free space (meters) */
 static double sigma_scal_muinv_0 = 1.0/(4 * M_PI * 1.0e-7);
 
 static double sigma_scal = 1.0;
@@ -123,6 +157,7 @@ class MultiSourceMisfitHessian: public Operator
 private:
    Array<PetscParMatrix*> arrayH;
    Array<PetscODESolver*> arrayS;
+   const MultiSourceMisfit *msobj;
 
 public:
    MultiSourceMisfitHessian(const MultiSourceMisfit*,const Vector&);
@@ -155,6 +190,8 @@ private:
 
    mutable Operator *H;
 
+   double scale_ls;
+
    MPI_Comm comm;
 
 protected:
@@ -186,11 +223,13 @@ public:
    mutable MultiSourceMisfit *obj;
    mutable TVRegularizer *reg;
    ParameterMap *pmap;
+   bool tvopt;
 
-   RegularizedMultiSourceMisfit(MultiSourceMisfit*,TVRegularizer*,ParameterMap* = NULL);
+   RegularizedMultiSourceMisfit(MultiSourceMisfit*,TVRegularizer*,ParameterMap* = NULL,bool tvopt = false);
    virtual void ComputeObjective(const Vector&,double*) const;
    virtual void ComputeGradient(const Vector&,Vector&) const;
    virtual Operator& GetHessian(const Vector&) const;
+   virtual void Update(int,const Vector&,const Vector&,const Vector&,const Vector&) const;
    virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&) const;
    virtual ~RegularizedMultiSourceMisfit() { delete H; }
 };
@@ -200,18 +239,20 @@ class RegularizedMultiSourceMisfitHessian: public Operator
 private:
    Operator *Hobj,*Hreg;
    ParameterMap *pmap;
+   bool tvopt;
 
 public:
    RegularizedMultiSourceMisfitHessian(const RegularizedMultiSourceMisfit*,const Vector&);
    virtual void Mult(const Vector&,Vector&) const;
    virtual void MultTranspose(const Vector&,Vector&) const;
+   PetscParMatrix* CreatePmat() const;
 };
 
 MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient* mu, Coefficient* sigma,
                                      Operator::Type oid, Operator::Type jid,
                                      PetscBCHandler* _bchandler,
                                      DenseMatrix& srcpoints, DenseMatrix& recpoints,
-                                     bool scalar, double scale_ls,
+                                     bool scalar, double _scale_ls,
                                      double _t0, double _dt, double _tf,
                                      const char *scratch)
 {
@@ -232,7 +273,6 @@ MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient*
 
    /* We use the same solver for objective and gradient computations */
    odesolver = new PetscODESolver(comm,"worker_");
-   odesolver->Init(*heat,PetscODESolver::ODE_SOLVER_LINEAR);
    odesolver->SetBCHandler(bchandler);
    odesolver->SetPreconditionerFactory(heat->GetPreconditionerFactory());
    odesolver->SetJacobianType(jid);
@@ -240,6 +280,12 @@ MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient*
 
    u = new ParGridFunction(_fes);
    U = new PetscParVector(_fes);
+
+   scale_ls = 1.0;
+
+   /* Uncomment the following two lines to scale outside of the callbacks */
+   //scale_ls = _scale_ls;
+   // _scale_ls = 1.0;
 
    /* Setup sources and receivers */
    for (int i = 0; i < srcpoints.Width(); i++)
@@ -252,19 +298,20 @@ MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient*
          receivers.Append(new Receiver(tmp.str()));
       }
       lsobj.Append(new TDLeastSquares(receivers,_fes,true));
-      lsobj[i]->SetScale(scale_ls);
+      lsobj[i]->SetScale(_scale_ls);
 
       Vector x;
       srcpoints.GetColumn(i,x);
       if (scalar)
       {
-         sources.Append(new RickerSource(x,10,1.1,1.0e3));
+         sources.Append(new RickerSource(x,10,1.1,signal_scal));
       }
       else
       {
          Vector dir(_fes->GetParMesh()->SpaceDimension());
-         dir = 1.0;
-         vsources.Append(new VectorRickerSource(x,dir,10,1.4,1.e0));
+         dir = 0.0;
+         dir(0) = 1.0;
+         vsources.Append(new VectorRickerSource(x,dir,10,1.4,signal_scal/mesh_scal));
       }
    }
 
@@ -325,16 +372,20 @@ MultiSourceMisfit::~MultiSourceMisfit()
 void MultiSourceMisfit::ComputeGuess(Vector& m) const
 {
    m.SetSize(heat->GetParameterSize());
-   m = 1.0;
+   m = mu_guess*mesh_scal;
 }
+
+PetscLogStage stages[5];
 
 void MultiSourceMisfit::ComputeObjective(const Vector& m, double *f) const
 {
+   PetscErrorCode ierr;
+   ierr = PetscLogStagePush(stages[0]); CCHKERRQ(PETSC_COMM_SELF,ierr);
+
    odesolver->Init(*heat,PetscODESolver::ODE_SOLVER_LINEAR);
 
    /* Set callbacks for setup
       ModelHeat specific callbacks are handled in mfemopt_setupts */
-   PetscErrorCode ierr;
    ierr = TSSetSetUpFromDesign(*odesolver,mfemopt_setupts,heat);PCHKERRQ(*odesolver,ierr);
    ierr = TSSetFromOptions(*odesolver);PCHKERRQ(*odesolver,ierr);
 
@@ -364,16 +415,19 @@ void MultiSourceMisfit::ComputeObjective(const Vector& m, double *f) const
       ierr = TSComputeObjectiveAndGradient(*odesolver,t0,dt,tf,*U,*M,NULL,&rf);PCHKERRQ(*odesolver,ierr);
       *f += rf;
    }
+   *f *= scale_ls;
 
    M->ResetArray();
+   ierr = PetscLogStagePop(); CCHKERRQ(PETSC_COMM_SELF,ierr);
 }
 
 void MultiSourceMisfit::ComputeGradient(const Vector& m, Vector& g) const
 {
+   PetscErrorCode ierr;
+   ierr = PetscLogStagePush(stages[1]); CCHKERRQ(PETSC_COMM_SELF,ierr);
    odesolver->Init(*heat,PetscODESolver::ODE_SOLVER_LINEAR);
 
    /* Specify callbacks for the purpose of computing the gradient (wrt the model parameters) of the residual function */
-   PetscErrorCode ierr;
    PetscParMatrix *A = new PetscParMatrix(comm,heat->GetGradientOperator(),Operator::PETSC_MATSHELL);
    ierr = TSSetGradientDAE(*odesolver,*A,mfemopt_gradientdae,NULL);PCHKERRQ(*odesolver,ierr);
    delete A;
@@ -407,14 +461,19 @@ void MultiSourceMisfit::ComputeGradient(const Vector& m, Vector& g) const
       g += *G;
    }
 
+   g *= scale_ls;
+
    M->ResetArray();
+   ierr = PetscLogStagePop(); CCHKERRQ(PETSC_COMM_SELF,ierr);
 }
 
 void MultiSourceMisfit::ComputeObjectiveAndGradient(const Vector& m, double *f, Vector& g) const
 {
+   PetscErrorCode ierr;
+   ierr = PetscLogStagePush(stages[2]); CCHKERRQ(PETSC_COMM_SELF,ierr);
+
    odesolver->Init(*heat,PetscODESolver::ODE_SOLVER_LINEAR);
 
-   PetscErrorCode ierr;
    PetscParMatrix *A = new PetscParMatrix(comm,heat->GetGradientOperator(),Operator::PETSC_MATSHELL);
    ierr = TSSetGradientDAE(*odesolver,*A,mfemopt_gradientdae,NULL);PCHKERRQ(*odesolver,ierr);
    delete A;
@@ -453,7 +512,11 @@ void MultiSourceMisfit::ComputeObjectiveAndGradient(const Vector& m, double *f, 
       g += *G;
    }
 
+   *f *= scale_ls;
+   g *= scale_ls;
+
    M->ResetArray();
+   ierr = PetscLogStagePop(); CCHKERRQ(PETSC_COMM_SELF,ierr);
 }
 
 Operator& MultiSourceMisfit::GetHessian(const Vector& m) const
@@ -465,68 +528,92 @@ Operator& MultiSourceMisfit::GetHessian(const Vector& m) const
 
 MultiSourceMisfitHessian::MultiSourceMisfitHessian(const MultiSourceMisfit* _msobj, const Vector& _m) : Operator(_m.Size(),_m.Size())
 {
+   PetscErrorCode ierr;
+   ierr = PetscLogStagePush(stages[3]); CCHKERRQ(PETSC_COMM_SELF,ierr);
+
    MPI_Comm comm = _msobj->GetComm();
 
-   arrayH.SetSize(_msobj->lsobj.Size());
-   arrayS.SetSize(_msobj->lsobj.Size());
+   msobj = _msobj;
 
-   PetscParMatrix *A = new PetscParMatrix(comm,_msobj->heat->GetGradientOperator(),Operator::PETSC_MATSHELL);
+   PetscParMatrix *A = new PetscParMatrix(comm,msobj->heat->GetGradientOperator(),Operator::PETSC_MATSHELL);
 
-   _msobj->M->PlaceArray(_m.GetData());
+   msobj->M->PlaceArray(_m.GetData());
 
    /* Loop over least-squares objectives */
-   for (int i = 0; i < _msobj->lsobj.Size(); i++)
+   for (int i = 0; i < msobj->lsobj.Size(); i++)
    {
       /* we create new solvers to not interfere with the gradient solver */
       PetscODESolver *odesolver = new PetscODESolver(comm,"worker_");
-      odesolver->Init(*(_msobj->heat),PetscODESolver::ODE_SOLVER_LINEAR);
-      odesolver->SetBCHandler(_msobj->bchandler);
-      odesolver->SetPreconditionerFactory(_msobj->heat->GetPreconditionerFactory());
+      odesolver->Init(*(msobj->heat),PetscODESolver::ODE_SOLVER_LINEAR);
+      odesolver->SetBCHandler(msobj->bchandler);
+      odesolver->SetPreconditionerFactory(msobj->heat->GetPreconditionerFactory());
 
-      PetscErrorCode ierr;
       ierr = TSSetGradientDAE(*odesolver,*A,mfemopt_gradientdae,NULL);CCHKERRQ(comm,ierr);
       ierr = TSSetHessianDAE(*odesolver,NULL,NULL,NULL,
                                         NULL,NULL,mfemopt_hessiandae_xtm,
-                                        NULL,mfemopt_hessiandae_mxt,NULL,_msobj->heat);CCHKERRQ(comm,ierr);
-      ierr = TSSetSetUpFromDesign(*odesolver,mfemopt_setupts,_msobj->heat);CCHKERRQ(comm,ierr);
+                                        NULL,mfemopt_hessiandae_mxt,NULL,msobj->heat);CCHKERRQ(comm,ierr);
+      ierr = TSSetSetUpFromDesign(*odesolver,mfemopt_setupts,msobj->heat);CCHKERRQ(comm,ierr);
 
 
-      PetscParMatrix *Hls = new PetscParMatrix(comm,_msobj->lsobj[i]->GetHessianOperator_XX(),Operator::PETSC_MATSHELL);
+      PetscParMatrix *Hls = new PetscParMatrix(comm,msobj->lsobj[i]->GetHessianOperator_XX(),Operator::PETSC_MATSHELL);
       ierr = TSAddObjective(*odesolver,PETSC_MIN_REAL,
                             mfemopt_eval_tdobj,
                             mfemopt_eval_tdobj_x,NULL,
-                            *Hls,mfemopt_eval_tdobj_xx,NULL,NULL,NULL,NULL,_msobj->lsobj[i]);CCHKERRQ(comm,ierr);
+                            *Hls,mfemopt_eval_tdobj_xx,NULL,NULL,NULL,NULL,msobj->lsobj[i]);CCHKERRQ(comm,ierr);
       delete Hls;
 
-      if (_msobj->sources.Size())
+      if (msobj->sources.Size())
       {
-         _msobj->heat->SetRHS(_msobj->sources[i]);
+         msobj->heat->SetRHS(msobj->sources[i]);
       }
-      else if (_msobj->vsources.Size())
+      else if (msobj->vsources.Size())
       {
-         _msobj->heat->SetRHS(_msobj->vsources[i]);
+         msobj->heat->SetRHS(msobj->vsources[i]);
       }
 
       odesolver->Customize();
 
       Mat pH;
       ierr = MatCreate(comm,&pH);CCHKERRQ(comm,ierr);
-      ierr = TSComputeHessian(*odesolver,_msobj->t0,_msobj->dt,_msobj->tf,*(_msobj->U),*(_msobj->M),pH);CCHKERRQ(comm,ierr);
-      arrayH[i] = new PetscParMatrix(pH,false);
-      arrayS[i] = odesolver;
+      ierr = TSComputeHessian(*odesolver,msobj->t0,msobj->dt,msobj->tf,*(msobj->U),*(msobj->M),pH);CCHKERRQ(comm,ierr);
+      arrayH.Append(new PetscParMatrix(pH,false));
+      arrayS.Append(odesolver);
    }
    delete A;
-   _msobj->M->ResetArray();
+
+   msobj->M->ResetArray();
+
+   ierr = PetscLogStagePop(); CCHKERRQ(PETSC_COMM_SELF,ierr);
 }
 
 void MultiSourceMisfitHessian::Mult(const Vector& x, Vector& y) const
 {
    y.SetSize(x.Size());
+   PetscErrorCode ierr;
+   ierr = PetscLogStagePush(stages[4]); CCHKERRQ(PETSC_COMM_SELF,ierr);
    y = 0.0;
+
+   Vector yt(y);
    for (int i = 0; i < arrayH.Size(); i++)
    {
-      arrayH[i]->Mult(1.0,x,1.0,y);
+      /* In case we use MFFD, we need to set the sources, as we need to recompute forward and backward for F(u+h*dx) */
+      if (msobj->sources.Size())
+      {
+         msobj->heat->SetRHS(msobj->sources[i]);
+      }
+      else if (msobj->vsources.Size())
+      {
+         msobj->heat->SetRHS(msobj->vsources[i]);
+      }
+
+      // MFFD does not support MatMultAdd
+      //arrayH[i]->Mult(1.0,x,1.0,y);
+
+      arrayH[i]->Mult(x,yt);
+      y += yt;
    }
+   y *= msobj->scale_ls;
+   ierr = PetscLogStagePop(); CCHKERRQ(PETSC_COMM_SELF,ierr);
 }
 
 MultiSourceMisfitHessian::~MultiSourceMisfitHessian()
@@ -535,12 +622,13 @@ MultiSourceMisfitHessian::~MultiSourceMisfitHessian()
    for (int i = 0; i < arrayS.Size(); i++) { delete arrayS[i]; }
 }
 
-RegularizedMultiSourceMisfit::RegularizedMultiSourceMisfit(MultiSourceMisfit *_obj, TVRegularizer *_reg, ParameterMap *_pmap)
+RegularizedMultiSourceMisfit::RegularizedMultiSourceMisfit(MultiSourceMisfit *_obj, TVRegularizer *_reg, ParameterMap *_pmap, bool _tvopt)
 {
-   obj  = _obj;
-   reg  = _reg;
-   pmap = _pmap;
-   H    = NULL;
+   obj   = _obj;
+   reg   = _reg;
+   pmap  = _pmap;
+   tvopt = _tvopt;
+   H     = NULL;
 
    height = width = _obj->Height();
 }
@@ -554,7 +642,14 @@ void RegularizedMultiSourceMisfit::ComputeObjective(const Vector& m, double *f) 
    double f1,f2;
    Vector dummy;
    obj->ComputeObjective(pm,&f1);
-   reg->Eval(dummy,pm,0.,&f2);
+   if (tvopt)
+   {
+      reg->Eval(dummy,m,0.,&f2);
+   }
+   else
+   {
+      reg->Eval(dummy,pm,0.,&f2);
+   }
    *f = f1 + f2;
 }
 
@@ -568,10 +663,20 @@ void RegularizedMultiSourceMisfit::ComputeGradient(const Vector& m, Vector& g) c
    Vector g1(pm.Size()),g2(pm.Size());
 
    obj->ComputeGradient(pm,g1);
-   reg->EvalGradient_M(dummy,pm,0.,g2);
-   g1 += g2;
-   if (pmap) pmap->GradientMap(m,g1,true,g);
-   else g = g1;
+   if (tvopt)
+   {
+      if (pmap) pmap->GradientMap(m,g1,true,g);
+      else g = g1;
+      reg->EvalGradient_M(dummy,m,0.,g2);
+      g += g2;
+   }
+   else
+   {
+      reg->EvalGradient_M(dummy,pm,0.,g2);
+      g1 += g2;
+      if (pmap) pmap->GradientMap(m,g1,true,g);
+      else g = g1;
+   }
 }
 
 Operator& RegularizedMultiSourceMisfit::GetHessian(const Vector& m) const
@@ -579,6 +684,23 @@ Operator& RegularizedMultiSourceMisfit::GetHessian(const Vector& m) const
    delete H;
    H = new RegularizedMultiSourceMisfitHessian(this,m);
    return *H;
+}
+
+void RegularizedMultiSourceMisfit::Update(int it, const Vector& F, const Vector& X,
+                                   const Vector& dX, const Vector &pX) const
+{
+   if (!it)
+   {
+      //reg->ResetDual(X);
+   }
+   else
+   {
+      double lambda = pX.Size() ? (pX[0] - X[0])/dX[0] : 0.0;
+      //std::cout << "OK" << lambda << ": " << pX.Size() << std::endl;
+      ////px.Print();
+      //dX.Print();
+      reg->UpdateDual(pX,dX,lambda);
+   }
 }
 
 void RegularizedMultiSourceMisfit::PostCheck(const Vector& X, Vector& Y, Vector &W, bool& cy, bool& cw) const
@@ -592,12 +714,20 @@ void RegularizedMultiSourceMisfit::PostCheck(const Vector& X, Vector& Y, Vector 
 
 /*
    The hessian of the full objective
-   - H = H_map + J(mu(m))^T * ( H_tv + H_misfit ) J(mu(m))
+
+   - TV on model parameter mu:
+
+      H = H_map(_m) + J(mu(_m))^T * ( H_tv(mu(_m)) + H_misfit(mu(_m)) ) J(mu(_m))
+
+   - TV on optimization parameter _m:
+
+      H = H_map(_m) + J(mu(_m))^T * ( H_misfit(mu(_m)) ) J(mu(_m)) + H_tv(_m)
 */
 RegularizedMultiSourceMisfitHessian::RegularizedMultiSourceMisfitHessian(const RegularizedMultiSourceMisfit* _rmsobj, const Vector& _m)
 {
    height = width = _m.Size();
    pmap = _rmsobj->pmap;
+   tvopt = _rmsobj->tvopt;
 
    Vector pm(_m.Size());
    if (pmap) pmap->Map(_m,pm);
@@ -605,18 +735,35 @@ RegularizedMultiSourceMisfitHessian::RegularizedMultiSourceMisfitHessian(const R
 
    Hobj = &( _rmsobj->obj->GetHessian(pm));
 
-   Vector dummy;
-   _rmsobj->reg->SetUpHessian_MM(dummy,pm,0.);
-   Hreg = _rmsobj->reg->GetHessianOperator_MM();
-
-   if (pmap && pmap->SecondOrder())
+   if (tvopt)
    {
-      Vector g1(pm.Size()),g2(pm.Size());
+      Vector dummy;
+      _rmsobj->reg->SetUpHessian_MM(dummy,_m,0.);
+      Hreg = _rmsobj->reg->GetHessianOperator_MM();
 
-      _rmsobj->obj->ComputeGradient(pm,g1);
-      _rmsobj->reg->EvalGradient_M(dummy,pm,0.,g2);
-      g1 += g2;
-      pmap->SetUpHessianMap(_m,g1);
+      if (pmap && pmap->SecondOrder())
+      {
+         Vector g1(pm.Size());
+
+         _rmsobj->obj->ComputeGradient(pm,g1);
+         pmap->SetUpHessianMap(_m,g1);
+      }
+   }
+   else
+   {
+      Vector dummy;
+      _rmsobj->reg->SetUpHessian_MM(dummy,pm,0.);
+      Hreg = _rmsobj->reg->GetHessianOperator_MM();
+
+      if (pmap && pmap->SecondOrder())
+      {
+         Vector g1(pm.Size()),g2(pm.Size());
+
+         _rmsobj->obj->ComputeGradient(pm,g1);
+         _rmsobj->reg->EvalGradient_M(dummy,pm,0.,g2);
+         g1 += g2;
+         pmap->SetUpHessianMap(_m,g1);
+      }
    }
 }
 
@@ -633,23 +780,49 @@ void RegularizedMultiSourceMisfitHessian::Mult(const Vector& x, Vector& y) const
 
    Vector py1(px.Size()),py2(px.Size());
    Hobj->Mult(px,py1);
-   Hreg->Mult(px,py2);
-   py1 += py2;
-   if (pmap)
+   if (tvopt)
    {
-      const Vector& m = pmap->GetParameter();
-      pmap->GradientMap(m,py1,true,y);
-      if (pmap->SecondOrder())
-      {
-         Vector y2(x.Size());
+      Vector y2(x.Size());
 
-         pmap->HessianMult(x,y2);
-         y += y2;
+      if (pmap)
+      {
+         const Vector& m = pmap->GetParameter();
+         pmap->GradientMap(m,py1,true,y);
+         if (pmap->SecondOrder())
+         {
+            pmap->HessianMult(x,y2);
+            y += y2;
+         }
       }
+      else
+      {
+         y = py1;
+      }
+
+      y2 = 0.0;
+      Hreg->Mult(x,y2);
+      y += y2;
    }
    else
    {
-      y = py1;
+      Hreg->Mult(px,py2);
+      py1 += py2;
+      if (pmap)
+      {
+         const Vector& m = pmap->GetParameter();
+         pmap->GradientMap(m,py1,true,y);
+         if (pmap->SecondOrder())
+         {
+            Vector y2(x.Size());
+
+            pmap->HessianMult(x,y2);
+            y += y2;
+         }
+      }
+      else
+      {
+         y = py1;
+      }
    }
 }
 
@@ -667,27 +840,53 @@ void RegularizedMultiSourceMisfitHessian::MultTranspose(const Vector& x, Vector&
 
    Vector py1(px.Size()),py2(px.Size());
    Hobj->Mult(px,py1); /* the Hessian of the misfit function is symmetric */
-   Hreg->MultTranspose(px,py2);
-   py1 += py2;
-   if (pmap)
+   if (tvopt)
    {
-      const Vector& m = pmap->GetParameter();
-      pmap->GradientMap(m,py1,true,y);
-      if (pmap->SecondOrder())
-      {
-         Vector y2(x.Size());
+      Vector y2(x.Size());
 
-         pmap->HessianMult(x,y2);
-         y += y2;
+      if (pmap)
+      {
+         const Vector& m = pmap->GetParameter();
+         pmap->GradientMap(m,py1,true,y);
+         if (pmap->SecondOrder())
+         {
+            pmap->HessianMult(x,y2);
+            y += y2;
+         }
       }
+      else
+      {
+         y = py1;
+      }
+
+      y2 = 0.0;
+      Hreg->MultTranspose(x,y2);
+      y += y2;
    }
    else
    {
-      y = py1;
+      Hreg->MultTranspose(px,py2);
+      py1 += py2;
+      if (pmap)
+      {
+         const Vector& m = pmap->GetParameter();
+         pmap->GradientMap(m,py1,true,y);
+         if (pmap->SecondOrder())
+         {
+            Vector y2(x.Size());
+
+            pmap->HessianMult(x,y2);
+            y += y2;
+         }
+      }
+      else
+      {
+         y = py1;
+      }
    }
 }
 
-#if 0
+#if 1
 PetscParMatrix* RegularizedMultiSourceMisfitHessian::CreatePmat() const
 {
    MPI_Comm comm = PETSC_COMM_WORLD/*XXX*/;
@@ -697,10 +896,10 @@ PetscParMatrix* RegularizedMultiSourceMisfitHessian::CreatePmat() const
    *pH = *pHreg;
    delete pHreg;
 
-   if (pmap) /* XXX valid only for diagonal maps */
+   if (pmap && !tvopt) /* XXX valid only for diagonal maps */
    {
       const Vector& m = pmap->GetParameter();
-      Vector x((*this).Height()),y((*this).Height()),px;
+      Vector x((*this).Height()),y((*this).Height()),px((*this).Height());
       x = 1.0;
       pmap->GradientMap(m,x,false,px);
       y = 0.0;
@@ -733,7 +932,6 @@ Solver* RMSHPFactory::NewPreconditioner(const OperatorHandle& oh)
   Solver *solver = NULL;
   PetscParMatrix *pA;
   oh.Get(pA);
-  std::cout << "HEY" << std::endl;
   if (oh.Type() == Operator::PETSC_MATSHELL)
   {
       Mat A = *pA;
@@ -850,6 +1048,8 @@ public:
             HypreParMatrix &P = *pfes->Dof_TrueDof_Matrix();
             P.Mult(pu,*u);
          }
+         /* visualize optimization space */
+         if (pmap) pmap->InverseMap(*u,*u);
       }
 
       if (sout && step % vt == 0)
@@ -884,7 +1084,15 @@ public:
 int main(int argc, char *argv[])
 {
    MFEMInitializePetsc(&argc,&argv,NULL,help);
-
+   {
+      PetscErrorCode ierr;
+      ierr = PetscLogDefaultBegin(); CCHKERRQ(PETSC_COMM_SELF,ierr);
+      ierr = PetscLogStageRegister("MSObj",&stages[0]); CCHKERRQ(PETSC_COMM_SELF,ierr);
+      ierr = PetscLogStageRegister("MSGrad",&stages[1]); CCHKERRQ(PETSC_COMM_SELF,ierr);
+      ierr = PetscLogStageRegister("MSObjAndGrad",&stages[2]); CCHKERRQ(PETSC_COMM_SELF,ierr);
+      ierr = PetscLogStageRegister("MSHessSetUp",&stages[3]); CCHKERRQ(PETSC_COMM_SELF,ierr);
+      ierr = PetscLogStageRegister("MSHessMult",&stages[4]); CCHKERRQ(PETSC_COMM_SELF,ierr);
+   }
    PetscInt srl = 0, prl = 0, viz = 0, ncrl = 0;
 
    PetscInt  gridr[3] = {1,1,1};
@@ -896,6 +1104,7 @@ int main(int argc, char *argv[])
    char meshfile[PETSC_MAX_PATH_LEN] = "../../../../share/petscopt/meshes/segment-m5-5.mesh";
    PetscReal t0 = 0.0, dt = 1.e-3, tf = 0.1;
    PetscReal scale_ls = 1.0;
+   PetscBool exact_sample = PETSC_TRUE;
 
    FECType   s_fec_type = FEC_H1;
    PetscInt  s_ord = 1;
@@ -908,7 +1117,7 @@ int main(int argc, char *argv[])
    PetscBool mu_excl_fn = PETSC_FALSE, mu_with_jumps = PETSC_FALSE;
 
    PetscReal tva = 1.0, tvb = 0.1;
-   PetscBool tvpd = PETSC_TRUE, tvsy = PETSC_FALSE, tvpr = PETSC_FALSE;
+   PetscBool tvopt = PETSC_FALSE, tvpd = PETSC_TRUE, tvsy = PETSC_FALSE, tvpr = PETSC_FALSE;
 
    PetscBool test_part = PETSC_FALSE, test_null = PETSC_FALSE, test_newton = PETSC_FALSE, test_progress = PETSC_TRUE;
    PetscBool test_misfit[3] = {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}, test_misfit_reg[2] = {PETSC_FALSE,PETSC_FALSE}, test_misfit_internal = PETSC_FALSE;
@@ -937,6 +1146,7 @@ int main(int argc, char *argv[])
       ierr = PetscOptionsReal("-t0","Initial time",NULL,t0,&t0,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsReal("-dt","Initial time step",NULL,dt,&dt,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsReal("-tf","Final time",NULL,tf,&tf,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsBool("-exact_sampling","Use exact coefficients when generating the data",NULL,exact_sample,&exact_sample,NULL);CHKERRQ(ierr);
 
       /* GLVis */
       ierr = PetscOptionsInt("-viz","Visualization steps for model sampling",NULL,viz,&viz,NULL);CHKERRQ(ierr);
@@ -962,6 +1172,10 @@ int main(int argc, char *argv[])
       ierr = PetscOptionsIntArray("-mu_exclude","Elements' tag to exclude for mu optimization",NULL,mu_excl,&n_mu_excl,&flg);CHKERRQ(ierr);
       if (!flg) n_mu_excl = 0;
 
+      ierr = PetscOptionsReal("-mesh_scale","Scaling factor Mesh",NULL,mesh_scal,&mesh_scal,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsReal("-signal_scale","Scaling factor signal",NULL,signal_scal,&signal_scal,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsReal("-mu_guess","Constant mu guess",NULL,mu_guess,&mu_guess,NULL);CHKERRQ(ierr);
+
       /* Objectives' options */
       ierr = PetscOptionsReal("-ls_scale","Scaling factor for least-squares objective",NULL,scale_ls,&scale_ls,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsReal("-tv_alpha","Scaling factor for TV regularizer",NULL,tva,&tva,NULL);CHKERRQ(ierr);
@@ -969,6 +1183,7 @@ int main(int argc, char *argv[])
       ierr = PetscOptionsBool("-tv_pd","Use Primal-Dual TV regularizer",NULL,tvpd,&tvpd,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-tv_symm","Symmetrize TV Hessian",NULL,tvsy,&tvsy,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-tv_proj","Project on the unit ball instead of performing line search for the dual TV variables",NULL,tvpr,&tvpr,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsBool("-tv_opt","TV on optimization variable or model variable",NULL,tvopt,&tvopt,NULL);CHKERRQ(ierr);
 
       ierr = PetscOptionsBool("-test_partitioning","Test with a fixed element partition",NULL,test_part,&test_part,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-test_newton","Test Newton solver",NULL,test_newton,&test_newton,NULL);CHKERRQ(ierr);
@@ -1044,6 +1259,15 @@ int main(int argc, char *argv[])
       else
       {
          pmesh = new ParMesh(PETSC_COMM_WORLD, *mesh);
+
+         //PetscInt nsub_sources = 1; //,nsub_color = 0;
+         //PetscErrorCode ierr;
+         //ierr = PetscOptionsGetInt(NULL,NULL,"-nsub_src",&nsub_sources,NULL);CHKERRQ(ierr);
+         //ReplicatedParMesh tm(PETSC_COMM_WORLD,*mesh,nsub_sources);
+
+         //ParMesh cm;
+         //cm  = *pmesh;
+         //cm.Print();
       }
       delete mesh;
       for (int lev = 0; lev < prl; lev++)
@@ -1063,7 +1287,7 @@ int main(int argc, char *argv[])
    {
       case FEC_HCURL:
          /* magnetic -> assumes the mesh in meters */
-         sigma_scal *= sigma_scal_muinv_0;
+         sigma_scal *= sigma_scal_muinv_0/mesh_scal;
          scalar = false;
          s_fec = new ND_FECollection(s_ord,pmesh->Dimension());
          break;
@@ -1148,8 +1372,16 @@ int main(int argc, char *argv[])
    /* exact PDE coefficients */
    FunctionCoefficient *sigma = new FunctionCoefficient(sigma_exact);
    FunctionCoefficient *mu;
-   if (mu_with_jumps) mu = new FunctionCoefficient(mu_exact_jump);
-   else mu = new FunctionCoefficient(mu_exact_const);
+
+   if (!oil_test)
+   {
+      if (mu_with_jumps) mu = new FunctionCoefficient(mu_exact_jump);
+      else mu = new FunctionCoefficient(mu_exact_const);
+   }
+   else
+   {
+      mu = new FunctionCoefficient(mu_exact_jump_test_em_2d);
+   }
 
    /* Source terms */
    RickerSource       *rick = NULL;
@@ -1159,15 +1391,42 @@ int main(int argc, char *argv[])
       Vector t(pmesh->SpaceDimension());
       if (scalar)
       {
-         rick = new RickerSource(t,10,1.1,1.0e3);
+         rick = new RickerSource(t,10,1.1,signal_scal);
       }
       else
       {
          Vector dir(pmesh->SpaceDimension());
-         dir = 1.0;
-         vrick = new VectorRickerSource(t,dir,10,1.4,1.e0);
+         dir = 0.0;
+         dir(0) = 1.0;
+         vrick = new VectorRickerSource(t,dir,10,1.4,signal_scal/mesh_scal);
       }
    }
+
+   /* Optimization space */
+   FiniteElementCollection *mu_fec = NULL;
+   switch (mu_fec_type)
+   {
+      case FEC_L2:
+         mu_fec = new L2_FECollection(mu_ord,pmesh->Dimension());
+         break;
+      case FEC_H1:
+         mu_fec = new H1_FECollection(mu_ord,pmesh->Dimension());
+         break;
+      default:
+         MFEM_ABORT("Unhandled FEC Type");
+         break;
+   }
+
+   /* The parameter dependent coefficient for mu
+      We construct the guess from the exact solution just for testing purposes */
+   PDCoefficient *mu_pd;
+   if (mu_excl_fn) mu_pd = new PDCoefficient(*mu,pmesh,mu_fec,excl_fn);
+   else mu_pd = new PDCoefficient(*mu,pmesh,mu_fec,mu_excl_a);
+
+   /* Exact solution */
+   Vector muv_exact(mu_pd->GetLocalSize());
+   mu_pd->GetCurrentVector(muv_exact);
+   if (glvis) mu_pd->Visualize();
 
    /* Multi-source sampling */
    for (int i = 0; i < srcpoints.Width(); i++)
@@ -1182,7 +1441,9 @@ int main(int argc, char *argv[])
       UserMonitor *monitor = new UserMonitor(u,viz,tmp1.str());
       ReceiverMonitor *rmonitor = new ReceiverMonitor(u,recpoints,tmp2.str());
 
-      ModelHeat *heat = new ModelHeat(mu,sigma,s_fes,oid);
+      ModelHeat *heat;
+      if (exact_sample) heat =new ModelHeat(mu,sigma,s_fes,oid);
+      else heat = new ModelHeat(mu_pd,sigma,s_fes,oid);
       heat->SetBCHandler(bchandler); /* XXX so many times setting the object -> add specialized constructor for odesolver? */
 
       Vector srcctr;
@@ -1216,32 +1477,6 @@ int main(int argc, char *argv[])
       delete u;
       delete U;
    }
-
-   /* Optimization space */
-   FiniteElementCollection *mu_fec = NULL;
-   switch (mu_fec_type)
-   {
-      case FEC_L2:
-         mu_fec = new L2_FECollection(mu_ord,pmesh->Dimension());
-         break;
-      case FEC_H1:
-         mu_fec = new H1_FECollection(mu_ord,pmesh->Dimension());
-         break;
-      default:
-         MFEM_ABORT("Unhandled FEC Type");
-         break;
-   }
-
-   /* The parameter dependent coefficient for mu
-      We construct the guess from the exact solution just for testing purposes */
-   PDCoefficient *mu_pd;
-   if (mu_excl_fn) mu_pd = new PDCoefficient(*mu,pmesh,mu_fec,excl_fn);
-   else mu_pd = new PDCoefficient(*mu,pmesh,mu_fec,mu_excl_a);
-
-   /* Exact solution */
-   Vector muv_exact(mu_pd->GetLocalSize());
-   mu_pd->GetCurrentVector(muv_exact);
-   if (glvis) mu_pd->Visualize();
 
    /* The misfit function */
    MultiSourceMisfit *obj = new MultiSourceMisfit(s_fes,mu_pd,sigma,oid,jid,bchandler,srcpoints,recpoints,scalar,scale_ls,t0,dt,tf,scratchdir);
@@ -1291,8 +1526,37 @@ int main(int argc, char *argv[])
       obj->TestFDHessian(PETSC_COMM_WORLD,muv);
    }
 
+#if 0
+   {
+      Vector muv;
+      if (!test_null) obj->ComputeGuess(muv);
+      else muv = muv_exact;
+
+      Operator &H = obj->GetHessian(muv);
+      PetscParMatrix pH(PETSC_COMM_WORLD,&H,Operator::PETSC_MATAIJ);
+      MatViewFromOptions(pH,NULL,"-hessian_view");
+      //Vector xx(muv.Size()),yy(muv.Size());
+      //xx = 1.0;
+      //H.Mult(xx,yy);
+      //std::cout << "HESS OUT " << std::endl;
+      //yy.Print(std::cout,1);
+   }
+#endif
+
+   /* Map from optimization variables to model variables */
+   PointwiseMap pmap(mu_m,m_mu,dmu_dm,dmu_dm);
+
    /* Total variation regularizer */
-   TVRegularizer *tv = new TVRegularizer(mu_pd,tva,tvb,tvpd);
+   PDCoefficient *mu_inv_pd = NULL;
+   FunctionOfCoefficient *mu_inv = NULL;
+   if (tvopt)
+   {
+      mu_inv = new FunctionOfCoefficient(m_mu,*mu);
+      if (mu_excl_fn) mu_inv_pd = new PDCoefficient(*mu_inv,pmesh,mu_fec,excl_fn);
+      else mu_inv_pd = new PDCoefficient(*mu_inv,pmesh,mu_fec,mu_excl_a);
+   }
+
+   TVRegularizer *tv = new TVRegularizer(tvopt ? mu_inv_pd : mu_pd,tva,tvb,tvpd);
    tv->Symmetrize(tvsy);
    tv->Project(tvpr);
    if (test_misfit_internal)
@@ -1303,20 +1567,21 @@ int main(int argc, char *argv[])
       Vector dummy;
       double f;
 
+      /* Misfit in terms of mu, the optimization variable is the inverse of the map */
+      Vector m(muv);
+      if (tvopt) pmap.InverseMap(muv,m);
       PetscErrorCode ierr;
+
       MPI_Comm comm = PETSC_COMM_WORLD;
       ierr = PetscPrintf(comm,"---------------------------------------\n");CCHKERRQ(comm,ierr);
       ierr = PetscPrintf(comm,"TV tests\n");CCHKERRQ(comm,ierr);
-      tv->Eval(dummy,muv,0.0,&f);
-      tv->TestFDGradient(comm,dummy,muv,0.0,1.e-6,test_progress);
-      tv->TestFDHessian(comm,dummy,muv,0.0);
+      tv->Eval(dummy,m,0.0,&f);
+      tv->TestFDGradient(comm,dummy,m,0.0,1.e-6,test_progress);
+      tv->TestFDHessian(comm,dummy,m,0.0);
    }
 
-   /* Map from optimization variables to model variables */
-   PointwiseMap pmap(mu_m,m_mu,dmu_dm,dmu_dm);
-
    /* The full objective: misfit + regularization */
-   RegularizedMultiSourceMisfit *robj = new RegularizedMultiSourceMisfit(obj,tv,&pmap);
+   RegularizedMultiSourceMisfit *robj = new RegularizedMultiSourceMisfit(obj,tv,&pmap,tvopt);
 
    /* Test callbacks for full objective */
    if (test_misfit_reg[0])
@@ -1356,6 +1621,7 @@ int main(int argc, char *argv[])
       newton.SetJacobianType(Operator::PETSC_MATSHELL);
       newton.iterative_mode = true; /* we always use an initial guess, it can be zero */
 
+//YYY
 #if 0
       RMSHPFactory myfactory;
       newton.SetPreconditionerFactory(&myfactory);
@@ -1408,6 +1674,7 @@ int main(int argc, char *argv[])
    delete robj;
    delete tv;
    delete mu_fec;
+   delete mu_inv_pd;
    delete mu_pd;
    delete obj;
 
@@ -1417,6 +1684,7 @@ int main(int argc, char *argv[])
    delete bchandler;
    delete sigma;
    delete mu;
+   delete mu_inv;
    delete s_fec;
    delete s_fes;
    delete pmesh;
@@ -1445,10 +1713,10 @@ int main(int argc, char *argv[])
        suffix: newton_full
        args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 10 -newton_snes_rtol 1.e-6 -newton_snes_atol 1.e-6 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1
 
-   testset:
+   test:
       suffix: em_test
       timeoutfactor: 3
       nsize: 1
-      args: -scratch ./ -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad_testem.mesh -dt 0.01 -tf 1 -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -state_fec_type HCURL -test_progress 0 -test_misfit_internal -test_misfit 1,0,0 -ls_scale 1.e12 -tv_alpha 1.e-12 -tv_beta 1.e-6 -test_newton -test_newton_noise 0.0 -newton_pc_type none -newton_snes_atol 1.e-6 -newton_snes_converged_reason -test_null 0 -mu_const_val 0.9 -mu_exclude_fn_bb 3000,7000,4000,8000 -mu_exclude_fn  -grid_src_n 1 -grid_src_bb 5000,7000,5000,7000 -grid_rcv_n 4,1 -grid_rcv_bb 5500,6500,5800,5800 -glvis 0
+      args: -newton_snes_max_it 4 -signal_scale 1.0 -scratch ./ -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad_testem.mesh -dt 0.01 -tf 1 -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -state_fec_type HCURL -test_progress 0 -test_misfit_internal -test_misfit 1,0,0 -ls_scale 1.e12 -tv_alpha 1.e-12 -tv_beta 1.e-6 -test_newton -test_newton_noise 0.0 -newton_pc_type none -newton_snes_atol 1.e-6 -newton_snes_converged_reason -test_null 0 -mu_const_val 0.9 -mu_exclude_fn_bb 3000,7000,4000,8000 -mu_exclude_fn  -grid_src_n 1 -grid_src_bb 5000,7000,5000,7000 -grid_rcv_n 4,1 -grid_rcv_bb 5500,6500,5800,5800 -glvis 0
 
 TEST*/
