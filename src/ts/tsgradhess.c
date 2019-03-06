@@ -263,6 +263,7 @@ static PetscErrorCode TSComputeHessian_MFFD(TS ts, PetscReal t0, PetscReal dt, P
 {
   PetscContainer c;
   TSHessian_MFFD *mffd;
+  Vec            G;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -285,7 +286,15 @@ static PetscErrorCode TSComputeHessian_MFFD(TS ts, PetscReal t0, PetscReal dt, P
 
   ierr = MatSetType(H,MATMFFD);CHKERRQ(ierr);
   ierr = MatSetUp(H);CHKERRQ(ierr);
-  ierr = MatMFFDSetBase(H,design,NULL);CHKERRQ(ierr);
+
+  /* sample at linearization point */
+  ierr = VecDuplicate(design,&G);CHKERRQ(ierr);
+  ierr = TSComputeHessianMFFD_Private(mffd,design,G);CHKERRQ(ierr);
+  ierr = MatMFFDSetBase(H,design,G);CHKERRQ(ierr);
+  /* MATMFFD does not take ownership of the base vector */
+  ierr = PetscObjectCompose((PetscObject)H,"__tsopt_mffd_base",(PetscObject)G);CHKERRQ(ierr);
+  ierr = VecDestroy(&G);CHKERRQ(ierr);
+
   ierr = MatMFFDSetFunction(H,(PetscErrorCode (*)(void*,Vec,Vec))TSComputeHessianMFFD_Private,mffd);CHKERRQ(ierr);
   ierr = MatAssemblyBegin(H,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(H,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
