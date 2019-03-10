@@ -68,6 +68,13 @@ void ParFiniteElementSpaceGetRangeAndDeriv(ParFiniteElementSpace& fes, int* r, i
    if (d) *d = gr[1];
 }
 
+double FunctionOfCoefficient::Eval(ElementTransformation &T,
+                              const IntegrationPoint &ip)
+{
+   g->SetTime(GetTime());
+   return f ? f(g->Eval(T,ip)) : g->Eval(T,ip);
+}
+
 ComponentCoefficient::ComponentCoefficient(VectorCoefficient& _VQ, int _c)
 {
    MFEM_VERIFY(_c > -1,"Invalid component " << _c );

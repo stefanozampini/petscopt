@@ -21,6 +21,19 @@ void MeshGetElementsTagged(mfem::Mesh*,bool(*)(const mfem::Vector&),mfem::Array<
 void FiniteElementSpaceGetRangeAndDeriv(mfem::FiniteElementSpace&,int*,int*);
 void ParFiniteElementSpaceGetRangeAndDeriv(mfem::ParFiniteElementSpace&,int*,int*);
 
+class FunctionOfCoefficient : public mfem::Coefficient
+{
+private:
+   double (*f)(double);
+   mfem::Coefficient *g;
+
+public:
+   // Result is f(g(x))
+   FunctionOfCoefficient(double (*_f)(double), mfem::Coefficient &_g): f(_f), g(&_g) { }
+
+   virtual double Eval(mfem::ElementTransformation&,const mfem::IntegrationPoint&);
+};
+
 class ComponentCoefficient : public mfem::Coefficient
 {
 private:
