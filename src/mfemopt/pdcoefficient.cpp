@@ -150,6 +150,18 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
 
    /* store values of projected initial coefficients
       and create actual coefficients to be used */
+   /*
+
+   TODO:
+      0 - 1 - 2
+      | v | w |
+      3 - 4 - 5
+      |   y   |
+      6 ----- 7
+
+      4 will have a value from project (v+w+y) != from P*true_dofs
+
+   */
    if (MQ) { mfem_error("Not yet implemented"); }
    else if (VQ)
    {
@@ -362,6 +374,13 @@ void PDCoefficient::Save(const char* filename)
       oofs.precision(8);
 
       pmesh->Print(oofs);
+      /* restore values from excluded regions */
+      ParGridFunction *gf = pcoeffgf[i];
+      const int st = i*gf->Size();
+      for (int j = 0; j < pcoeffiniti.Size(); j++)
+      {
+         (*gf)[pcoeffiniti[j]] = pcoeffinitv[j+st];
+      }
       pcoeffgf[i]->Save(oofs);
    }
 }
