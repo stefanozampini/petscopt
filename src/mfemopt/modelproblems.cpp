@@ -364,23 +364,33 @@ void ModelHeat::ComputeHessian(int A,int B,const Vector& tdstate,const Vector& s
 void ModelHeat::SetRHS(Coefficient* _rhs)
 {
    rhs = _rhs;
+   vrhs = NULL;
    delete rhsform;
-   rhsform  = new ParLinearForm(fes);
-   rhsform->AddDomainIntegrator(new DomainLFIntegrator(*rhs));
+   rhsform = NULL;
+   if (rhs)
+   {
+      rhsform  = new ParLinearForm(fes);
+      rhsform->AddDomainIntegrator(new DomainLFIntegrator(*rhs));
+   }
 }
 
 void ModelHeat::SetRHS(VectorCoefficient* _vrhs)
 {
+   rhs = NULL;
    vrhs = _vrhs;
    delete rhsform;
-   rhsform  = new ParLinearForm(fes);
-   if (fe_range == FiniteElement::SCALAR)
+   rhsform = NULL;
+   if (vrhs)
    {
-      rhsform->AddDomainIntegrator(new VectorDomainLFIntegrator(*vrhs));
-   }
-   else
-   {
-      rhsform->AddDomainIntegrator(new VectorFEDomainLFIntegrator(*vrhs));
+      rhsform  = new ParLinearForm(fes);
+      if (fe_range == FiniteElement::SCALAR)
+      {
+         rhsform->AddDomainIntegrator(new VectorDomainLFIntegrator(*vrhs));
+      }
+      else
+      {
+         rhsform->AddDomainIntegrator(new VectorFEDomainLFIntegrator(*vrhs));
+      }
    }
 }
 
