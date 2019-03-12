@@ -15,6 +15,21 @@ namespace mfemopt
 
 mfem::ParMesh* ParMeshTest(MPI_Comm,mfem::Mesh&);
 
+// Cannot inherit from ParMesh, since the default constructor is protected
+class ReplicatedParMesh
+{
+private:
+   MPI_Comm      parent_comm;
+   MPI_Comm      child_comm;
+   int           color;
+   mfem::ParMesh *parent_mesh;
+   mfem::ParMesh *child_mesh;
+
+public:
+   ReplicatedParMesh(MPI_Comm,mfem::Mesh&,int,bool=true);
+   virtual ~ReplicatedParMesh();
+};
+
 void MeshGetElementsTagged(mfem::Mesh*,const mfem::Array<int>&,mfem::Array<bool>&);
 void MeshGetElementsTagged(mfem::Mesh*,bool(*)(const mfem::Vector&),mfem::Array<bool>&);
 

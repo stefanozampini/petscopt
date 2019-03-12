@@ -1,4 +1,5 @@
 #include <mfemopt/mfemextra.hpp>
+#include <mfemopt/private/mfemoptpetscmacros.h>
 
 static void __mfemopt_snes_obj(mfem::Operator*,const mfem::Vector&,double*);
 static void __mfemopt_snes_postcheck(mfem::Operator*,const mfem::Vector&,mfem::Vector&,mfem::Vector&,bool&,bool&);
@@ -6,6 +7,48 @@ static void __mfemopt_snes_postcheck(mfem::Operator*,const mfem::Vector&,mfem::V
 namespace mfemopt
 {
 using namespace mfem;
+
+ReplicatedParMesh::ReplicatedParMesh(MPI_Comm comm, Mesh &mesh, int nrep, bool contig)
+{
+   PetscErrorCode ierr;
+   PetscSubcomm   subcomm;
+   PetscMPIInt    size;
+
+   ierr = MPI_Comm_size(comm,&size); CCHKERRQ(comm,ierr);
+   MFEM_VERIFY(!(size%nrep),"Size of comm must be a multiple of the number of replicas");
+   MFEM_VERIFY(mesh.Conforming(),"Not supported");
+
+   ierr = PetscSubcommCreate(comm, &subcomm); CCHKERRQ(comm,ierr);
+   ierr = PetscSubcommSetNumber(subcomm, (PetscInt)nrep); CCHKERRQ(comm,ierr);
+   ierr = PetscSubcommSetType(subcomm, contig ? PETSC_SUBCOMM_CONTIGUOUS : PETSC_SUBCOMM_INTERLACED); CCHKERRQ(comm,ierr);
+
+   ierr = PetscCommDuplicate(comm,&parent_comm,NULL); CCHKERRQ(comm,ierr);
+   ierr = PetscCommDuplicate(subcomm->child,&child_comm,NULL); CCHKERRQ(comm,ierr);
+   color = subcomm->color;
+
+   PetscMPIInt child_size, parent_size;
+   ierr = MPI_Comm_size(child_comm, &child_size); CCHKERRQ(child_comm,ierr);
+   ierr = MPI_Comm_size(parent_comm, &parent_size); CCHKERRQ(child_comm,ierr);
+
+   int *child_part = mesh.GeneratePartitioning(child_size, 1);
+
+   child_mesh = new ParMesh(child_comm, mesh, child_part, 1);
+   // there's no simple way to create a ParMesh and change the comm
+   parent_mesh = new ParMesh(parent_comm, mesh, child_part, 1);
+
+   delete [] child_part;
+
+   ierr = PetscSubcommDestroy(&subcomm); CCHKERRQ(comm,ierr);
+}
+
+ReplicatedParMesh::~ReplicatedParMesh()
+{
+   PetscErrorCode ierr;
+   ierr = PetscCommDestroy(&parent_comm); CCHKERRQ(PETSC_COMM_SELF,ierr);
+   ierr = PetscCommDestroy(&child_comm); CCHKERRQ(PETSC_COMM_SELF,ierr);
+   delete child_mesh;
+   delete parent_mesh;
+}
 
 ParMesh* ParMeshTest(MPI_Comm comm, Mesh &mesh)
 {
