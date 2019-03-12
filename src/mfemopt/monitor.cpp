@@ -36,6 +36,9 @@ void NewtonMonitor::MonitorSolver(PetscSolver *solver)
    ierr = SNESGetLineSearch(snes,&ls); PCHKERRQ(snes,ierr);
    ierr = SNESLineSearchGetLambda(ls,&lambda); PCHKERRQ(snes,ierr);
    ierr = VecDot(pG,dX,&inn); PCHKERRQ(snes,ierr);
+   /* Comment the next two lines to check against Georg's code */
+   ierr = SNESGetFunction(snes,&G,NULL,NULL); PCHKERRQ(snes,ierr);
+   ierr = VecCopy(G,pG); PCHKERRQ(snes,ierr);
    ierr = VecNorm(pG,NORM_2,&normg); PCHKERRQ(snes,ierr);
    if (!it) {
      PetscInt dofs;
