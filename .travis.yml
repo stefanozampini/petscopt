@@ -27,15 +27,15 @@ env:
     - PETSC_OPTIONS='-check_pointer_intensity 0 -malloc_test'
     - OPTFLAGS='-O'
     - CPPFLAGS="-Wno-unused-command-line-argument"
-    - PETSC_COMMIT=
-    - MFEM_COMMIT=f9833b30f066a0a948b4b1bc289b695404eabee1
+    - PETSC_COMMIT=1592aa04fb0ffa8c46393b8e153ea8340df451f9
+    - MFEM_COMMIT=1211d0d6542e4a82df8535a56ce7d002020eb292
 
   matrix:
 
     - MPI=mpich  INT64=0  SCALAR=real     PRECISION=double MFEM=1
 ###    - MPI=mpich  INT64=0  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
     - MPI=mpich  INT64=0  SCALAR=complex  PRECISION=double     LANGUAGE=C++
-#    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=double MFEM=1
+    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=double MFEM=1
 ###    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
 ##    - MPI=mpich  INT64=1  SCALAR=complex  PRECISION=double     LANGUAGE=C++
 
