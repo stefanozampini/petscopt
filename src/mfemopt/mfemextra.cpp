@@ -107,7 +107,7 @@ void ParFiniteElementSpaceGetRangeAndDeriv(ParFiniteElementSpace& fes, int* r, i
    int lr[2] = {-1,-1}, gr[2];
    FiniteElementSpaceGetRangeAndDeriv(fes,lr,lr+1);
    /* reduce for empty meshes */
-   MPI_Allreduce(&lr,&gr,2,MPI_INT,MPI_MAX,fes.GetParMesh()->GetComm());
+   MPI_Allreduce(lr,gr,2,MPI_INT,MPI_MAX,fes.GetParMesh()->GetComm());
    if (r) *r = gr[0];
    if (d) *d = gr[1];
 }
