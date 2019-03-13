@@ -602,7 +602,22 @@ TVRegularizer::TVRegularizer(PDCoefficient* _m_pd, double _alpha, double _beta, 
    delete pH;
 }
 
-void TVRegularizer::UpdateDual(const mfem::Vector& m, const mfem::Vector& dm, double lambda)
+void TVRegularizer::UpdateDual(const Vector& m)
+{
+   if (!m_pd) return;
+   if (!wkgf.Size()) return;
+   int n = P2D->Width();
+   double *data = m.GetData();
+   for (int i=0; i<wkgf.Size(); i++)
+   {
+      Vector pmi(data,n);
+      P2D->Mult(pmi,*wkgf[i]);
+      data += n;
+      pmi.SetData(NULL); /* XXX clang static analysis */
+   }
+}
+
+void TVRegularizer::UpdateDual(const Vector& m, const Vector& dm, double lambda)
 {
    Vector mk,dmk,wk,dwk;
    DenseMatrix dM;

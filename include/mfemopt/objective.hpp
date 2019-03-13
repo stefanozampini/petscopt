@@ -159,6 +159,7 @@ public:
    virtual void EvalGradient_M(const mfem::Vector&,const mfem::Vector&,double,mfem::Vector&);
    virtual void SetUpHessian_MM(const mfem::Vector&,const mfem::Vector&,double);
 
+   void UpdateDual(const mfem::Vector&);
    void UpdateDual(const mfem::Vector&,const mfem::Vector&,double);
 
    virtual ~TVRegularizer();
