@@ -260,7 +260,8 @@ public:
    virtual void ComputeObjective(const Vector&,double*) const;
    virtual void ComputeGradient(const Vector&,Vector&) const;
    virtual Operator& GetHessian(const Vector&) const;
-   virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&) const;
+   virtual void Update(int,const Vector&,const Vector&,const Vector&,const Vector&) const;
+   //virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&) const;
 };
 
 ImageFunctional::ImageFunctional(int _lsize, TikhonovRegularizer *_tk, TVRegularizer *_tv) : H(), tk(_tk), tv(_tv)
@@ -310,8 +311,25 @@ Operator& ImageFunctional::GetHessian(const Vector& u) const
    return H;
 }
 
+/* This method is called at the beginning of each nonlinear step
+   We use it to update the dual variables for the TV regularizer */
+void ImageFunctional::Update(int it, const Vector& F, const Vector& X,
+                             const Vector& dX, const Vector &pX) const
+{
+   if (!it)
+   {
+      tv->UpdateDual(X);
+   }
+   else
+   {
+      double lambda = pX.Size() ? (pX[0] - X[0])/dX[0] : 0.0;
+      tv->UpdateDual(pX,dX,lambda);
+   }
+}
+
 /* This method is called after a successful line search
    We use it to update the dual variable for the TV regularizer */
+#if 0
 void ImageFunctional::PostCheck(const Vector& X, Vector& Y, Vector &W, bool& cy, bool& cw) const
 {
    /* we don't change the step (Y) or the updated solution (W = X - lambda*Y) */
@@ -320,6 +338,7 @@ void ImageFunctional::PostCheck(const Vector& X, Vector& Y, Vector &W, bool& cy,
    double lambda = X.Size() ? (X[0] - W[0])/Y[0] : 0.0;
    tv->UpdateDual(X,Y,lambda);
 }
+#endif
 
 /* the main routine */
 int main(int argc, char* argv[])
@@ -451,7 +470,7 @@ int main(int argc, char* argv[])
     timeoutfactor: 3
     nsize: {{1 2}}
     suffix: tv_pd
-    args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-10 -ksp_atol 1.e-10 -ksp_type cg -pc_type gamg -primaldual 1 -symmetrize 1 -monitor 0 -snes_converged_reason
+    args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-10 -ksp_atol 1.e-10 -ksp_type cg -pc_type gamg -primaldual 1 -symmetrize 1 -monitor 0 -snes_converged_reason -snes_type {{newtonls newtontr}separate output}
 
   test:
     timeoutfactor: 3
