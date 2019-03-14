@@ -1,5 +1,7 @@
 #include <mfemopt/monitor.hpp>
+#include <mfemopt/optsolver.hpp>
 #include <mfemopt/private/mfemoptpetscmacros.h>
+#include <petsctao.h>
 #include <petscsnes.h>
 #include <petscdm.h>
 
@@ -40,29 +42,71 @@ void NewtonMonitor::MonitorSolver(PetscSolver *solver)
    ierr = SNESGetFunction(snes,&G,NULL,NULL); PCHKERRQ(snes,ierr);
    ierr = VecCopy(G,pG); PCHKERRQ(snes,ierr);
    ierr = VecNorm(pG,NORM_2,&normg); PCHKERRQ(snes,ierr);
-   if (!it) {
-     PetscInt dofs;
-
-     ierr = VecGetSize(X,&dofs); PCHKERRQ(snes,ierr);
-     ierr = PetscPrintf(PetscObjectComm((PetscObject)snes),"Number of dofs %D\n",dofs); PCHKERRQ(snes,ierr);
-     ierr = PetscPrintf(PetscObjectComm((PetscObject)snes),"it\tlit\tenergy\t\t(g,du)\t\t||g||_l2\tstep\n"); PCHKERRQ(snes,ierr);
-     lambda = 0.0;
-   }
    if (snesobj)
    {
       PetscReal f;
 
       ierr = SNESComputeObjective(snes,X,&f); PCHKERRQ(snes,ierr);
-      ierr = PetscPrintf(PetscObjectComm((PetscObject)snes),"%D\t%D\t%1.6e\t",it,lit,(double)f); PCHKERRQ(snes,ierr);
+      ierr = PetscPrintf(PetscObjectComm((PetscObject)snes),"it=%D\tlit=%D\tobj=%1.6e\t",it,lit,(double)f); PCHKERRQ(snes,ierr);
    }
    else
    {
-      ierr = PetscPrintf(PetscObjectComm((PetscObject)snes),"%D\t%D\t------------\t",it,lit); PCHKERRQ(snes,ierr);
+      ierr = PetscPrintf(PetscObjectComm((PetscObject)snes),"it=%D\tlit=%D\t------------\t",it,lit); PCHKERRQ(snes,ierr);
    }
-   ierr = PetscPrintf(PetscObjectComm((PetscObject)snes),"%1.6e\t%1.6e\t%1.6e\n",-(double)PetscRealPart(inn),(double)normg,(double)lambda); PCHKERRQ(snes,ierr);
+   ierr = PetscPrintf(PetscObjectComm((PetscObject)snes),"(g,du)=%1.6e\t||g||=%1.6e\tstep=%1.6e\n",-(double)PetscRealPart(inn),(double)normg,(double)lambda); PCHKERRQ(snes,ierr);
    ierr = SNESGetFunction(snes,&G,NULL,NULL); PCHKERRQ(snes,ierr);
    ierr = VecCopy(G,pG); PCHKERRQ(snes,ierr);
    ierr = DMRestoreNamedGlobalVector(dm,"mfemopt_prev_gradient",&pG); PCHKERRQ(snes,ierr);
+}
+
+void OptimizationMonitor::MonitorSolver(PetscSolver *solver)
+{
+   PetscOptimizationSolver *opt = dynamic_cast<PetscOptimizationSolver *>(solver);
+   MFEM_VERIFY(opt,"Not a optimization solver");
+
+   Tao tao = (Tao)(*opt);
+
+   KSP ksp;
+   PetscErrorCode ierr;
+   TaoLineSearch ls;
+   Vec X,dX = NULL,G,pG;
+   PetscReal lambda = 1.0,normg,f;
+   PetscScalar inn = 0.0;
+   PetscInt it,lit = 0;
+
+   ierr = TaoGetSolutionVector(tao,&X); PCHKERRQ(tao,ierr);
+   ierr = TaoGetGradientVector(tao,&G); PCHKERRQ(tao,ierr);
+   ierr = PetscObjectQuery((PetscObject)tao,"mfemopt_prev_gradient",(PetscObject*)&pG); PCHKERRQ(tao,ierr);
+   if (!pG) {
+     ierr = VecDuplicate(G,&pG); PCHKERRQ(G,ierr);
+     ierr = PetscObjectCompose((PetscObject)tao,"mfemopt_prev_gradient",(PetscObject)pG); PCHKERRQ(tao,ierr);
+     ierr = PetscObjectDereference((PetscObject)pG); PCHKERRQ(tao,ierr);
+   }
+   ierr = TaoGetKSP(tao,&ksp); PCHKERRQ(tao,ierr);
+   if (ksp)
+   {
+      ierr = KSPGetIterationNumber(ksp,&lit); PCHKERRQ(tao,ierr);
+   }
+   ierr = TaoGetIterationNumber(tao,&it); PCHKERRQ(tao,ierr);
+   ierr = TaoGetLineSearch(tao,&ls); PCHKERRQ(tao,ierr);
+   if (ls)
+   {
+      ierr = TaoLineSearchGetStepLength(ls,&lambda); PCHKERRQ(ls,ierr);
+      ierr = TaoLineSearchGetStepDirection(ls,&dX); PCHKERRQ(ls,ierr);
+   }
+   if (dX)
+   {
+      ierr = VecDot(pG,dX,&inn); PCHKERRQ(tao,ierr);
+      inn *= -1.0; /* Tao update is Xnew = Xold + lambda * dX, SNES update is Xnew = Xold - lambda * dX */
+   }
+   /* Comment the next two line to check against Georg's code */
+   ierr = VecCopy(G,pG); PCHKERRQ(tao,ierr);
+   ierr = VecNorm(pG,NORM_2,&normg); PCHKERRQ(tao,ierr);
+
+   ierr = TaoComputeObjective(tao,X,&f); PCHKERRQ(tao,ierr);
+   ierr = PetscPrintf(PetscObjectComm((PetscObject)tao),"it=%D\tlit %D\tobj=%1.6e\t",it,lit,(double)f); PCHKERRQ(tao,ierr);
+   ierr = PetscPrintf(PetscObjectComm((PetscObject)tao),"(g,du)=%1.6e\t||g||=%1.6e\tstep=%1.6e\n",-(double)PetscRealPart(inn),(double)normg,(double)lambda); PCHKERRQ(tao,ierr);
+   ierr = VecCopy(G,pG); PCHKERRQ(tao,ierr);
 }
 
 }

@@ -28,11 +28,9 @@ ObjectiveFunction::TestFDGradient, delta: 1e-06
 ObjectiveFunction::TestFDHessian design x design
 ||H||_inf = 5.33333e-09, ||H_fd||_inf = 5.33333e-09, ||H - H_fd||_inf = 7.1125e-12, ||H-H_fd||_inf/||H_fd||_inf = 0.00133359
 Initial objective 3.35128e-05 (LS 3.34677e-05, TV 4.50633e-08)
-Number of dofs 12
-it	lit	energy		(g,du)		||g||_l2	step
-0	0	3.351280e-05	-0.000000e+00	2.941560e-04	0.000000e+00
-1	8	4.391798e-06	-7.536484e-05	1.214943e-04	1.000000e+00
-2	8	6.196723e-08	-8.338042e-06	7.292188e-06	1.000000e+00
-3	10	4.533429e-08	-3.390895e-08	9.207491e-07	1.000000e+00
+it=0	lit=0	obj=3.351280e-05	(g,du)=-0.000000e+00	||g||=2.941560e-04	step=1.000000e+00
+it=1	lit=8	obj=4.391798e-06	(g,du)=-7.536484e-05	||g||=1.214943e-04	step=1.000000e+00
+it=2	lit=8	obj=6.196356e-08	(g,du)=-8.338071e-06	||g||=7.292329e-06	step=1.000000e+00
+it=3	lit=9	obj=4.530712e-08	(g,du)=-3.387889e-08	||g||=9.178356e-07	step=1.000000e+00
 Nonlinear newton_ solve converged due to CONVERGED_FNORM_ABS iterations 3
-Final objective 4.53343e-08 (LS 2.88077e-10, TV 4.50462e-08)
+Final objective 4.53071e-08 (LS 2.85128e-10, TV 4.5022e-08)

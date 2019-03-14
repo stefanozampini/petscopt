@@ -21,3 +21,4 @@ ReducedFunctional::TestFDHessian
 ||H||_inf = 0.0532998, ||H_fd||_inf = 0.0532998, ||H - H_fd||_inf = 2.12562e-10, ||H-H_fd||_inf/||H_fd||_inf = 3.98804e-09
 ---------------------------------------
 Nonlinear  solve converged due to CONVERGED_FNORM_RELATIVE iterations 10
+TAO solve converged due to CONVERGED_GATOL iterations 8

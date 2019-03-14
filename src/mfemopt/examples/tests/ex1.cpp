@@ -260,7 +260,8 @@ public:
    virtual void ComputeObjective(const Vector&,double*) const;
    virtual void ComputeGradient(const Vector&,Vector&) const;
    virtual Operator& GetHessian(const Vector&) const;
-   virtual void Update(int,const Vector&,const Vector&,const Vector&,const Vector&) const;
+   virtual void Update(const Vector&);
+   virtual void Update(int,const Vector&,const Vector&,const Vector&,const Vector&);
    //virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&) const;
 };
 
@@ -314,7 +315,7 @@ Operator& ImageFunctional::GetHessian(const Vector& u) const
 /* This method is called at the beginning of each nonlinear step
    We use it to update the dual variables for the TV regularizer */
 void ImageFunctional::Update(int it, const Vector& F, const Vector& X,
-                             const Vector& dX, const Vector &pX) const
+                             const Vector& dX, const Vector &pX)
 {
    if (!it)
    {
@@ -325,6 +326,11 @@ void ImageFunctional::Update(int it, const Vector& F, const Vector& X,
       double lambda = pX.Size() ? (pX[0] - X[0])/dX[0] : 0.0;
       tv->UpdateDual(pX,dX,lambda);
    }
+}
+
+void ImageFunctional::Update(const Vector& X)
+{
+   tv->UpdateDual(X);
 }
 
 /* This method is called after a successful line search
@@ -424,17 +430,32 @@ int main(int argc, char* argv[])
          MFEM_VERIFY(std::abs(f1+f2-f) < PETSC_SMALL,"Error eval " << std::abs(f1+f2-f));
       }
 
+      /* Test newton solver */
       PetscNonlinearSolverOpt newton(PETSC_COMM_WORLD,objective);
 
       NewtonMonitor mymonitor;
       if (mon) newton.SetMonitor(&mymonitor);
 
       /* solve via Newton */
+      u = 0.;
       newton.Mult(dummy,u);
       if (viz || save)
       {
          imgpd->UpdateCoefficient(u);
          if (save) imgpd->Save("reconstructed_image");
+         if (viz) imgpd->Visualize("RJlc");
+      }
+
+      /* Test optimization solver */
+      u = 0.;
+      PetscOptimizationSolver opt(PETSC_COMM_WORLD,objective,"opt_");
+      OptimizationMonitor myoptmonitor;
+      if (mon) opt.SetMonitor(&myoptmonitor);
+      opt.Solve(u);
+      if (viz || save)
+      {
+         imgpd->UpdateCoefficient(u);
+         if (save) imgpd->Save("reconstructed_image_opt");
          if (viz) imgpd->Visualize("RJlc");
       }
       delete imgpd;
@@ -452,30 +473,31 @@ int main(int argc, char* argv[])
     filter: sed -e "s/-nan/nan/g"
     nsize: {{1 2}}
     suffix: test
-    args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor 0 -snes_converged_reason -quad 0 -order 2
+    args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor 0 -snes_converged_reason -quad 0 -order 2 -opt_tao_converged_reason -opt_tao_type bnls
 
   test:
     filter: sed -e "s/-nan/nan/g"
     nsize: {{1 2}}
     suffix: test_pd
-    args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor 0 -snes_converged_reason -quad 0 -order 2 -primaldual
+    args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor 0 -snes_converged_reason -quad 0 -order 2 -primaldual -opt_tao_converged_reason -opt_tao_type ntr -opt_tao_ntr_pc_type gamg
 
   test:
     timeoutfactor: 3
     nsize: {{1 2}}
     suffix: tv
-    args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-10 -ksp_atol 1.e-10 -primaldual 0 -symmetrize 0 -monitor 0 -snes_converged_reason
+    args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-10 -ksp_atol 1.e-10 -primaldual 0 -symmetrize 0 -monitor 0 -snes_converged_reason -opt_tao_converged_reason -opt_tao_type nls -opt_tao_nls_ksp_type gmres
 
   test:
     timeoutfactor: 3
     nsize: {{1 2}}
+    requires: hypre
     suffix: tv_pd
-    args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-10 -ksp_atol 1.e-10 -ksp_type cg -pc_type gamg -primaldual 1 -symmetrize 1 -monitor 0 -snes_converged_reason -snes_type {{newtonls newtontr}separate output}
+    args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-10 -ksp_atol 1.e-10 -ksp_type cg -pc_type gamg -primaldual 1 -symmetrize 1 -monitor 0 -snes_converged_reason -snes_type {{newtonls newtontr}separate output} -opt_tao_type nls -opt_tao_converged_reason -opt_tao_converged_reason -opt_tao_gatol 1.e-10 -opt_tao_nls_pc_type hypre -opt_tao_nls_ksp_type cg
 
   test:
     timeoutfactor: 3
     nsize: {{1 2}}
     suffix: tv_pd_project
-    args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-10 -ksp_atol 1.e-10 -ksp_type cg -pc_type gamg -primaldual 1 -symmetrize 1 -project -monitor 0 -snes_converged_reason
+    args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-10 -ksp_atol 1.e-10 -ksp_type cg -pc_type gamg -primaldual 1 -symmetrize 1 -project -monitor 0 -snes_converged_reason -opt_tao_converged_reason -opt_tao_type nls -opt_tao_nls_ksp_type cg -opt_tao_nls_pc_type gamg -opt_tao_gatol 1.e-10 -opt_tao_nls_ksp_rtol 1.e-10
 
 TEST*/

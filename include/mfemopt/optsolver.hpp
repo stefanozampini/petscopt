@@ -20,12 +20,12 @@ protected:
 
 public:
    OptimizationSolver() : objective(NULL) { } ;
-   virtual void Init(ReducedFunctional *_f) { objective = _f; };
+   virtual void Init(ReducedFunctional& _f) { objective = &_f; };
    virtual void Solve(mfem::Vector&) = 0;
    virtual ~OptimizationSolver() { };
 };
 
-class PetscOptimizationSolver : public OptimizationSolver
+class PetscOptimizationSolver : public OptimizationSolver, public mfem::PetscSolver
 {
 private:
    Tao tao;
@@ -35,10 +35,10 @@ private:
 
 public:
    PetscOptimizationSolver(MPI_Comm, const std::string &prefix = std::string());
-   PetscOptimizationSolver(MPI_Comm, ReducedFunctional*, const std::string &prefix = std::string());
+   PetscOptimizationSolver(MPI_Comm, ReducedFunctional&, const std::string &prefix = std::string());
    operator Tao() const { return tao; }
 
-   virtual void Init(ReducedFunctional*);
+   virtual void Init(ReducedFunctional&);
    virtual void Solve(mfem::Vector&);
    void SetMonitor(mfem::PetscSolverMonitor*);
    virtual ~PetscOptimizationSolver();

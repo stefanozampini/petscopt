@@ -17,6 +17,14 @@ public:
    virtual ~NewtonMonitor() {};
 };
 
+class OptimizationMonitor : public mfem::PetscSolverMonitor
+{
+public:
+   OptimizationMonitor() : mfem::PetscSolverMonitor(false,false) {}
+   virtual void MonitorSolver(mfem::PetscSolver*);
+   virtual ~OptimizationMonitor() {};
+};
+
 }
 #endif
 
