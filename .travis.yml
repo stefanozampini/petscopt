@@ -27,8 +27,8 @@ env:
     - PETSC_OPTIONS='-check_pointer_intensity 0 -malloc_test'
     - OPTFLAGS='-O'
     - CPPFLAGS="-Wno-unused-command-line-argument"
-    - PETSC_COMMIT=1592aa04fb0ffa8c46393b8e153ea8340df451f9
-    - MFEM_COMMIT=1211d0d6542e4a82df8535a56ce7d002020eb292
+    - PETSC_COMMIT=3c22afaba2ce393b79c203f4b51ca59f7d08f428
+    - MFEM_COMMIT=ce74a99829edcc1193a944d0ca085bf9c97b4b3b
 
   matrix:
 
