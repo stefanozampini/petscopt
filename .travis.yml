@@ -28,7 +28,7 @@ env:
     - OPTFLAGS='-O'
     - CPPFLAGS="-Wno-unused-command-line-argument"
     - PETSC_COMMIT=3c22afaba2ce393b79c203f4b51ca59f7d08f428
-    - MFEM_COMMIT=ce74a99829edcc1193a944d0ca085bf9c97b4b3b
+    - MFEM_COMMIT=dde32310a0731310769de6462350d0a382711456
 
   matrix:
 
