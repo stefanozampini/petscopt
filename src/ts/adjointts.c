@@ -194,9 +194,9 @@ static PetscErrorCode AdjointTSPostEvent(TS adjts, PetscInt nevents, PetscInt ev
 
   PetscFunctionBegin;
   PetscCheckAdjointTS(adjts);
-  ierr = VecLockPush(U);CHKERRQ(ierr);
+  ierr = VecLockReadPush(U);CHKERRQ(ierr);
   ierr = AdjointTSComputeInitialConditions(adjts,NULL,PETSC_FALSE,PETSC_FALSE);CHKERRQ(ierr);
-  ierr = VecLockPop(U);CHKERRQ(ierr);
+  ierr = VecLockReadPop(U);CHKERRQ(ierr);
   ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
   adj_ctx->dirac_delta = PETSC_TRUE;
   PetscFunctionReturn(0);
@@ -759,9 +759,9 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
 
     ierr = TSGetSolution(adjts,&lambda);CHKERRQ(ierr);
     ierr = VecDuplicate(lambda,&adj_ctx->workinit);CHKERRQ(ierr);
-    ierr = VecLockPush(adj_ctx->workinit);CHKERRQ(ierr);
+    ierr = VecLockReadPush(adj_ctx->workinit);CHKERRQ(ierr);
   }
-  ierr = VecLockPop(adj_ctx->workinit);CHKERRQ(ierr);
+  ierr = VecLockReadPop(adj_ctx->workinit);CHKERRQ(ierr);
   ierr = VecSet(adj_ctx->workinit,0.0);CHKERRQ(ierr);
 
   if (adj_ctx->direction) {
@@ -1103,7 +1103,7 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
     }
   }
 initialize:
-  ierr = VecLockPush(adj_ctx->workinit);CHKERRQ(ierr);
+  ierr = VecLockReadPush(adj_ctx->workinit);CHKERRQ(ierr);
   if (apply) {
     Vec lambda;
 
@@ -1157,11 +1157,11 @@ initialize:
 
     ierr = TSGetTime(adjts,&t0);CHKERRQ(ierr);
     ierr = TSGetSolution(adjts,&lambda);CHKERRQ(ierr);
-    ierr = VecLockPush(lambda);CHKERRQ(ierr);
+    ierr = VecLockReadPush(lambda);CHKERRQ(ierr);
     PetscStackPush("ADJTS vector quadrature function");
     ierr = (*qeval_ctx->veval)(lambda,t0,qeval_ctx->wquad[qeval_ctx->old],qeval_ctx->veval_ctx);CHKERRQ(ierr);
     PetscStackPop;
-    ierr = VecLockPop(lambda);CHKERRQ(ierr);
+    ierr = VecLockReadPop(lambda);CHKERRQ(ierr);
     ierr = TSSetPostStep(adjts,TSQuadraturePostStep_Private);CHKERRQ(ierr); /* XXX */
   }
   PetscFunctionReturn(0);

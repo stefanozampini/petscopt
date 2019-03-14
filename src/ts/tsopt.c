@@ -576,9 +576,9 @@ PetscErrorCode TSSetUpFromDesign(TS ts,Vec x0,Vec design)
   ierr = TSGetTSOpt(ts,&tsopt);CHKERRQ(ierr);
   if (tsopt->setupfromdesign) {
 
-    ierr = VecLockPush(design);CHKERRQ(ierr);
+    ierr = VecLockReadPush(design);CHKERRQ(ierr);
     ierr = (*tsopt->setupfromdesign)(ts,x0,design,tsopt->setupfromdesignctx);CHKERRQ(ierr);
-    ierr = VecLockPop(design);CHKERRQ(ierr);
+    ierr = VecLockReadPop(design);CHKERRQ(ierr);
   }
   ierr = PetscLogEventEnd(TSOPT_Opt_SetUp,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);

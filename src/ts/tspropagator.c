@@ -86,9 +86,9 @@ static PetscErrorCode MatMultTranspose_Propagator(Mat A, Vec x, Vec y)
      Note that x0 should not be changed, as we are using the same design vector
      used in MatPropagatorUpdate_Propagator */
   ierr = TLMTSGetDesignVec(prop->lts,&tlmdesign);CHKERRQ(ierr);
-  ierr = VecLockPop(prop->x0);CHKERRQ(ierr);
+  ierr = VecLockReadPop(prop->x0);CHKERRQ(ierr);
   ierr = TSSetUpFromDesign(prop->model,prop->x0,tlmdesign);CHKERRQ(ierr);
-  ierr = VecLockPush(prop->x0);CHKERRQ(ierr);
+  ierr = VecLockReadPush(prop->x0);CHKERRQ(ierr);
 
   ierr = AdjointTSSetDesignVec(prop->adjlts,tlmdesign);CHKERRQ(ierr);
   ierr = AdjointTSSetTimeLimits(prop->adjlts,prop->t0,prop->tf);CHKERRQ(ierr);
@@ -148,9 +148,9 @@ static PetscErrorCode MatMult_Propagator(Mat A, Vec x, Vec y)
      Note that x0 should not be changed, as we are using the same design vector
      used in MatPropagatorUpdate_Propagator */
   ierr = TLMTSGetDesignVec(prop->lts,&tlmdesign);CHKERRQ(ierr);
-  ierr = VecLockPop(prop->x0);CHKERRQ(ierr);
+  ierr = VecLockReadPop(prop->x0);CHKERRQ(ierr);
   ierr = TSSetUpFromDesign(prop->model,prop->x0,tlmdesign);CHKERRQ(ierr);
-  ierr = VecLockPush(prop->x0);CHKERRQ(ierr);
+  ierr = VecLockReadPush(prop->x0);CHKERRQ(ierr);
 
   istr = PETSC_FALSE;
   if (prop->lts->adapt) {
@@ -202,9 +202,9 @@ static PetscErrorCode MatPropagatorUpdate_Propagator(Mat A, PetscReal t0, PetscR
   /* Need to setup the model TS, as the tlm solver depends on it (relevant callbacks) */
   ierr = TSSetUpFromDesign(prop->model,x0,design);CHKERRQ(ierr);
 
-  ierr = VecLockPop(prop->x0);CHKERRQ(ierr);
+  ierr = VecLockReadPop(prop->x0);CHKERRQ(ierr);
   ierr = VecCopy(x0,prop->x0);CHKERRQ(ierr);
-  ierr = VecLockPush(prop->x0);CHKERRQ(ierr);
+  ierr = VecLockReadPush(prop->x0);CHKERRQ(ierr);
   prop->t0 = t0;
   prop->tf = tf;
   ierr = TSTrajectoryDestroy(&prop->tj);CHKERRQ(ierr);
@@ -298,7 +298,7 @@ static PetscErrorCode TSCreatePropagatorMat_Private(TS ts, PetscReal t0, PetscRe
   ierr = MatShellSetOperation(*A,MATOP_MULT_TRANSPOSE,(void (*)())MatMultTranspose_Propagator);CHKERRQ(ierr);
   ierr = MatShellSetOperation(*A,MATOP_DESTROY,(void (*)())MatDestroy_Propagator);CHKERRQ(ierr);
   ierr = VecDuplicate(x0,&prop->x0);CHKERRQ(ierr);
-  ierr = VecLockPush(prop->x0);CHKERRQ(ierr); /* this vector is locked since it stores the initial conditions */
+  ierr = VecLockReadPush(prop->x0);CHKERRQ(ierr); /* this vector is locked since it stores the initial conditions */
   ierr = MatPropagatorUpdate_Propagator(*A,t0,dt,tf,x0,design);CHKERRQ(ierr);
   ierr = MatSetUp(*A);CHKERRQ(ierr);
   /* model sampling can terminate before tf due to events */

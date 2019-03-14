@@ -19,8 +19,8 @@ PetscErrorCode TSObjEval(TSObj funchead, Vec state, Vec design, PetscReal time, 
   PetscValidLogicalCollectiveReal(state,time,4);
   PetscValidPointer(val,5);
   ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
-  ierr = VecLockPush(state);CHKERRQ(ierr);
-  ierr = VecLockPush(design);CHKERRQ(ierr);
+  ierr = VecLockReadPush(state);CHKERRQ(ierr);
+  ierr = VecLockReadPush(design);CHKERRQ(ierr);
   *val = 0.0;
   while (link) {
     if (link->f && link->fixedtime <= PETSC_MIN_REAL) {
@@ -30,8 +30,8 @@ PetscErrorCode TSObjEval(TSObj funchead, Vec state, Vec design, PetscReal time, 
     }
     link = link->next;
   }
-  ierr = VecLockPop(state);CHKERRQ(ierr);
-  ierr = VecLockPop(design);CHKERRQ(ierr);
+  ierr = VecLockReadPop(state);CHKERRQ(ierr);
+  ierr = VecLockReadPop(design);CHKERRQ(ierr);
   ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -48,8 +48,8 @@ PetscErrorCode TSObjEvalFixed(TSObj funchead, Vec state, Vec design, PetscReal t
   PetscValidLogicalCollectiveReal(state,time,4);
   PetscValidPointer(val,5);
   ierr = PetscLogEventBegin(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
-  ierr = VecLockPush(state);CHKERRQ(ierr);
-  ierr = VecLockPush(design);CHKERRQ(ierr);
+  ierr = VecLockReadPush(state);CHKERRQ(ierr);
+  ierr = VecLockReadPush(design);CHKERRQ(ierr);
   *val = 0.0;
   while (link) {
     if (link->f && time == link->fixedtime) {
@@ -59,8 +59,8 @@ PetscErrorCode TSObjEvalFixed(TSObj funchead, Vec state, Vec design, PetscReal t
     }
     link = link->next;
   }
-  ierr = VecLockPop(state);CHKERRQ(ierr);
-  ierr = VecLockPop(design);CHKERRQ(ierr);
+  ierr = VecLockReadPop(state);CHKERRQ(ierr);
+  ierr = VecLockReadPop(design);CHKERRQ(ierr);
   ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -89,8 +89,8 @@ PetscErrorCode TSObjEval_U(TSObj funchead, Vec state, Vec design, PetscReal time
     PetscBool firstdone = PETSC_FALSE;
 
     link = funchead;
-    ierr = VecLockPush(state);CHKERRQ(ierr);
-    ierr = VecLockPush(design);CHKERRQ(ierr);
+    ierr = VecLockReadPush(state);CHKERRQ(ierr);
+    ierr = VecLockReadPush(design);CHKERRQ(ierr);
     while (link) {
       if (link->f_x && link->fixedtime <= PETSC_MIN_REAL) {
         if (!firstdone) {
@@ -103,8 +103,8 @@ PetscErrorCode TSObjEval_U(TSObj funchead, Vec state, Vec design, PetscReal time
       }
       link = link->next;
     }
-    ierr = VecLockPop(state);CHKERRQ(ierr);
-    ierr = VecLockPop(design);CHKERRQ(ierr);
+    ierr = VecLockReadPop(state);CHKERRQ(ierr);
+    ierr = VecLockReadPop(design);CHKERRQ(ierr);
   }
   ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -135,8 +135,8 @@ PetscErrorCode TSObjEvalFixed_U(TSObj funchead, Vec state, Vec design, PetscReal
     PetscBool firstdone = PETSC_FALSE;
 
     link = funchead;
-    ierr = VecLockPush(state);CHKERRQ(ierr);
-    ierr = VecLockPush(design);CHKERRQ(ierr);
+    ierr = VecLockReadPush(state);CHKERRQ(ierr);
+    ierr = VecLockReadPush(design);CHKERRQ(ierr);
     while (link) {
       if (link->f_x && link->fixedtime > PETSC_MIN_REAL && PetscAbsReal(link->fixedtime-time) < PETSC_SMALL) {
         if (!firstdone) {
@@ -149,8 +149,8 @@ PetscErrorCode TSObjEvalFixed_U(TSObj funchead, Vec state, Vec design, PetscReal
       }
       link = link->next;
     }
-    ierr = VecLockPop(state);CHKERRQ(ierr);
-    ierr = VecLockPop(design);CHKERRQ(ierr);
+    ierr = VecLockReadPop(state);CHKERRQ(ierr);
+    ierr = VecLockReadPop(design);CHKERRQ(ierr);
   }
   ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -180,8 +180,8 @@ PetscErrorCode TSObjEval_M(TSObj funchead, Vec state, Vec design, PetscReal time
     PetscBool firstdone = PETSC_FALSE;
 
     link = funchead;
-    ierr = VecLockPush(state);CHKERRQ(ierr);
-    ierr = VecLockPush(design);CHKERRQ(ierr);
+    ierr = VecLockReadPush(state);CHKERRQ(ierr);
+    ierr = VecLockReadPush(design);CHKERRQ(ierr);
     while (link) {
       if (link->f_m && link->fixedtime <= PETSC_MIN_REAL) {
         if (!firstdone) {
@@ -194,8 +194,8 @@ PetscErrorCode TSObjEval_M(TSObj funchead, Vec state, Vec design, PetscReal time
       }
       link = link->next;
     }
-    ierr = VecLockPop(state);CHKERRQ(ierr);
-    ierr = VecLockPop(design);CHKERRQ(ierr);
+    ierr = VecLockReadPop(state);CHKERRQ(ierr);
+    ierr = VecLockReadPop(design);CHKERRQ(ierr);
   }
   ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -225,8 +225,8 @@ PetscErrorCode TSObjEvalFixed_M(TSObj funchead, Vec state, Vec design, PetscReal
     PetscBool firstdone = PETSC_FALSE;
 
     link = funchead;
-    ierr = VecLockPush(state);CHKERRQ(ierr);
-    ierr = VecLockPush(design);CHKERRQ(ierr);
+    ierr = VecLockReadPush(state);CHKERRQ(ierr);
+    ierr = VecLockReadPush(design);CHKERRQ(ierr);
     while (link) {
       if (link->f_m && time == link->fixedtime) {
         if (!firstdone) {
@@ -239,8 +239,8 @@ PetscErrorCode TSObjEvalFixed_M(TSObj funchead, Vec state, Vec design, PetscReal
       }
       link = link->next;
     }
-    ierr = VecLockPop(state);CHKERRQ(ierr);
-    ierr = VecLockPop(design);CHKERRQ(ierr);
+    ierr = VecLockReadPop(state);CHKERRQ(ierr);
+    ierr = VecLockReadPop(design);CHKERRQ(ierr);
   }
   ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -271,9 +271,9 @@ PetscErrorCode TSObjEval_UU(TSObj funchead, Vec state, Vec design, PetscReal tim
     PetscBool firstdone = PETSC_FALSE;
 
     link = funchead;
-    ierr = VecLockPush(state);CHKERRQ(ierr);
-    ierr = VecLockPush(design);CHKERRQ(ierr);
-    ierr = VecLockPush(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPush(state);CHKERRQ(ierr);
+    ierr = VecLockReadPush(design);CHKERRQ(ierr);
+    ierr = VecLockReadPush(direction);CHKERRQ(ierr);
     while (link) {
       if (link->f_XX && link->fixedtime <= PETSC_MIN_REAL) {
         if (link->f_xx) { /* non-constant dependence */
@@ -296,9 +296,9 @@ PetscErrorCode TSObjEval_UU(TSObj funchead, Vec state, Vec design, PetscReal tim
       }
       link = link->next;
     }
-    ierr = VecLockPop(state);CHKERRQ(ierr);
-    ierr = VecLockPop(design);CHKERRQ(ierr);
-    ierr = VecLockPop(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPop(state);CHKERRQ(ierr);
+    ierr = VecLockReadPop(design);CHKERRQ(ierr);
+    ierr = VecLockReadPop(direction);CHKERRQ(ierr);
   }
   ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -329,9 +329,9 @@ PetscErrorCode TSObjEvalFixed_UU(TSObj funchead, Vec state, Vec design, PetscRea
     PetscBool firstdone = PETSC_FALSE;
 
     link = funchead;
-    ierr = VecLockPush(state);CHKERRQ(ierr);
-    ierr = VecLockPush(design);CHKERRQ(ierr);
-    ierr = VecLockPush(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPush(state);CHKERRQ(ierr);
+    ierr = VecLockReadPush(design);CHKERRQ(ierr);
+    ierr = VecLockReadPush(direction);CHKERRQ(ierr);
     while (link) {
       if (link->f_XX && time == link->fixedtime) {
         if (link->f_xx) { /* non-constant dependence */
@@ -354,9 +354,9 @@ PetscErrorCode TSObjEvalFixed_UU(TSObj funchead, Vec state, Vec design, PetscRea
       }
       link = link->next;
     }
-    ierr = VecLockPop(state);CHKERRQ(ierr);
-    ierr = VecLockPop(design);CHKERRQ(ierr);
-    ierr = VecLockPop(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPop(state);CHKERRQ(ierr);
+    ierr = VecLockReadPop(design);CHKERRQ(ierr);
+    ierr = VecLockReadPop(direction);CHKERRQ(ierr);
   }
   ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -387,9 +387,9 @@ PetscErrorCode TSObjEval_UM(TSObj funchead, Vec state, Vec design, PetscReal tim
     PetscBool firstdone = PETSC_FALSE;
 
     link = funchead;
-    ierr = VecLockPush(state);CHKERRQ(ierr);
-    ierr = VecLockPush(design);CHKERRQ(ierr);
-    ierr = VecLockPush(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPush(state);CHKERRQ(ierr);
+    ierr = VecLockReadPush(design);CHKERRQ(ierr);
+    ierr = VecLockReadPush(direction);CHKERRQ(ierr);
     while (link) {
       if (link->f_XM && link->fixedtime <= PETSC_MIN_REAL) {
         if (link->f_xm) { /* non-constant dependence */
@@ -412,9 +412,9 @@ PetscErrorCode TSObjEval_UM(TSObj funchead, Vec state, Vec design, PetscReal tim
       }
       link = link->next;
     }
-    ierr = VecLockPop(state);CHKERRQ(ierr);
-    ierr = VecLockPop(design);CHKERRQ(ierr);
-    ierr = VecLockPop(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPop(state);CHKERRQ(ierr);
+    ierr = VecLockReadPop(design);CHKERRQ(ierr);
+    ierr = VecLockReadPop(direction);CHKERRQ(ierr);
   }
   ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -445,9 +445,9 @@ PetscErrorCode TSObjEvalFixed_UM(TSObj funchead, Vec state, Vec design, PetscRea
     PetscBool firstdone = PETSC_FALSE;
 
     link = funchead;
-    ierr = VecLockPush(state);CHKERRQ(ierr);
-    ierr = VecLockPush(design);CHKERRQ(ierr);
-    ierr = VecLockPush(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPush(state);CHKERRQ(ierr);
+    ierr = VecLockReadPush(design);CHKERRQ(ierr);
+    ierr = VecLockReadPush(direction);CHKERRQ(ierr);
     while (link) {
       if (link->f_XM && time == link->fixedtime) {
         if (link->f_xm) { /* non-constant dependence */
@@ -470,9 +470,9 @@ PetscErrorCode TSObjEvalFixed_UM(TSObj funchead, Vec state, Vec design, PetscRea
       }
       link = link->next;
     }
-    ierr = VecLockPop(state);CHKERRQ(ierr);
-    ierr = VecLockPop(design);CHKERRQ(ierr);
-    ierr = VecLockPop(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPop(state);CHKERRQ(ierr);
+    ierr = VecLockReadPop(design);CHKERRQ(ierr);
+    ierr = VecLockReadPop(direction);CHKERRQ(ierr);
   }
   ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -503,9 +503,9 @@ PetscErrorCode TSObjEval_MU(TSObj funchead, Vec state, Vec design, PetscReal tim
     PetscBool firstdone = PETSC_FALSE;
 
     link = funchead;
-    ierr = VecLockPush(state);CHKERRQ(ierr);
-    ierr = VecLockPush(design);CHKERRQ(ierr);
-    ierr = VecLockPush(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPush(state);CHKERRQ(ierr);
+    ierr = VecLockReadPush(design);CHKERRQ(ierr);
+    ierr = VecLockReadPush(direction);CHKERRQ(ierr);
     while (link) {
       if (link->f_XM && link->fixedtime <= PETSC_MIN_REAL) {
         if (link->f_xm) { /* non-constant dependence */
@@ -528,9 +528,9 @@ PetscErrorCode TSObjEval_MU(TSObj funchead, Vec state, Vec design, PetscReal tim
       }
       link = link->next;
     }
-    ierr = VecLockPop(state);CHKERRQ(ierr);
-    ierr = VecLockPop(design);CHKERRQ(ierr);
-    ierr = VecLockPop(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPop(state);CHKERRQ(ierr);
+    ierr = VecLockReadPop(design);CHKERRQ(ierr);
+    ierr = VecLockReadPop(direction);CHKERRQ(ierr);
   }
   ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -561,9 +561,9 @@ PetscErrorCode TSObjEvalFixed_MU(TSObj funchead, Vec state, Vec design, PetscRea
     PetscBool firstdone = PETSC_FALSE;
 
     link = funchead;
-    ierr = VecLockPush(state);CHKERRQ(ierr);
-    ierr = VecLockPush(design);CHKERRQ(ierr);
-    ierr = VecLockPush(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPush(state);CHKERRQ(ierr);
+    ierr = VecLockReadPush(design);CHKERRQ(ierr);
+    ierr = VecLockReadPush(direction);CHKERRQ(ierr);
     while (link) {
       if (link->f_XM && time == link->fixedtime) {
         if (link->f_xm) { /* non-constant dependence */
@@ -586,9 +586,9 @@ PetscErrorCode TSObjEvalFixed_MU(TSObj funchead, Vec state, Vec design, PetscRea
       }
       link = link->next;
     }
-    ierr = VecLockPop(state);CHKERRQ(ierr);
-    ierr = VecLockPop(design);CHKERRQ(ierr);
-    ierr = VecLockPop(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPop(state);CHKERRQ(ierr);
+    ierr = VecLockReadPop(design);CHKERRQ(ierr);
+    ierr = VecLockReadPop(direction);CHKERRQ(ierr);
   }
   ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -619,9 +619,9 @@ PetscErrorCode TSObjEval_MM(TSObj funchead, Vec state, Vec design, PetscReal tim
     PetscBool firstdone = PETSC_FALSE;
 
     link = funchead;
-    ierr = VecLockPush(state);CHKERRQ(ierr);
-    ierr = VecLockPush(design);CHKERRQ(ierr);
-    ierr = VecLockPush(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPush(state);CHKERRQ(ierr);
+    ierr = VecLockReadPush(design);CHKERRQ(ierr);
+    ierr = VecLockReadPush(direction);CHKERRQ(ierr);
     while (link) {
       if (link->f_MM && link->fixedtime <= PETSC_MIN_REAL) {
         if (link->f_mm) { /* non-constant dependence */
@@ -644,9 +644,9 @@ PetscErrorCode TSObjEval_MM(TSObj funchead, Vec state, Vec design, PetscReal tim
       }
       link = link->next;
     }
-    ierr = VecLockPop(state);CHKERRQ(ierr);
-    ierr = VecLockPop(design);CHKERRQ(ierr);
-    ierr = VecLockPop(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPop(state);CHKERRQ(ierr);
+    ierr = VecLockReadPop(design);CHKERRQ(ierr);
+    ierr = VecLockReadPop(direction);CHKERRQ(ierr);
   }
   ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -677,9 +677,9 @@ PetscErrorCode TSObjEvalFixed_MM(TSObj funchead, Vec state, Vec design, PetscRea
     PetscBool firstdone = PETSC_FALSE;
 
     link = funchead;
-    ierr = VecLockPush(state);CHKERRQ(ierr);
-    ierr = VecLockPush(design);CHKERRQ(ierr);
-    ierr = VecLockPush(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPush(state);CHKERRQ(ierr);
+    ierr = VecLockReadPush(design);CHKERRQ(ierr);
+    ierr = VecLockReadPush(direction);CHKERRQ(ierr);
     while (link) {
       if (link->f_MM && time == link->fixedtime) {
         if (link->f_mm) { /* non-constant dependence */
@@ -702,9 +702,9 @@ PetscErrorCode TSObjEvalFixed_MM(TSObj funchead, Vec state, Vec design, PetscRea
       }
       link = link->next;
     }
-    ierr = VecLockPop(state);CHKERRQ(ierr);
-    ierr = VecLockPop(design);CHKERRQ(ierr);
-    ierr = VecLockPop(direction);CHKERRQ(ierr);
+    ierr = VecLockReadPop(state);CHKERRQ(ierr);
+    ierr = VecLockReadPop(design);CHKERRQ(ierr);
+    ierr = VecLockReadPop(direction);CHKERRQ(ierr);
   }
   ierr = PetscLogEventEnd(TSOPT_Obj_Eval,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);

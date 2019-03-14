@@ -533,9 +533,9 @@ PetscErrorCode TSComputeObjectiveAndGradient(TS ts, PetscReal t0, PetscReal dt, 
   ierr = TSSetMaxTime(ts,tf);CHKERRQ(ierr);
   ierr = TSSetMaxSteps(ts,PETSC_MAX_INT);CHKERRQ(ierr);
   ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_MATCHSTEP);CHKERRQ(ierr);
-  ierr = VecLockPush(design);CHKERRQ(ierr);
+  ierr = VecLockReadPush(design);CHKERRQ(ierr);
   ierr = TSComputeObjectiveAndGradient_Private(ts,X,design,gradient,obj);CHKERRQ(ierr);
-  ierr = VecLockPop(design);CHKERRQ(ierr);
+  ierr = VecLockReadPop(design);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 

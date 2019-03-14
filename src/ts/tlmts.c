@@ -424,7 +424,7 @@ PetscErrorCode TLMTSComputeInitialConditions(TS lts, PetscReal t0, Vec x0)
     ierr = TSSetSolution(lts,eta);CHKERRQ(ierr);
     ierr = PetscObjectDereference((PetscObject)eta);CHKERRQ(ierr);
   }
-  ierr = VecLockPush(x0);CHKERRQ(ierr);
+  ierr = VecLockReadPush(x0);CHKERRQ(ierr);
   ierr = TSGetTSOpt(tlm->model,&tsopt);CHKERRQ(ierr);
   ierr = TSOptHasGradientIC(tsopt,&has);CHKERRQ(ierr);
   if (!has) {
@@ -445,7 +445,7 @@ PetscErrorCode TLMTSComputeInitialConditions(TS lts, PetscReal t0, Vec x0)
     /* ierr = MatMult(F_m,x0,tlm->workrhs);CHKERRQ(ierr); */
     ierr = MatMult(F_m,tlm->mdelta,tlm->workrhs);CHKERRQ(ierr);
   }
-  ierr = VecLockPop(x0);CHKERRQ(ierr);
+  ierr = VecLockReadPop(x0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
