@@ -1,5 +1,7 @@
+#include <fstream>
 #include <mfemopt/mfemextra.hpp>
 #include <mfemopt/private/mfemoptpetscmacros.h>
+#include <petscsf.h>
 
 static void __mfemopt_snes_obj(mfem::Operator*,const mfem::Vector&,double*);
 static void __mfemopt_snes_postcheck(mfem::Operator*,const mfem::Vector&,mfem::Vector&,mfem::Vector&,bool&,bool&);
@@ -13,8 +15,10 @@ ReplicatedParMesh::ReplicatedParMesh(MPI_Comm comm, Mesh &mesh, int nrep, bool c
 {
    PetscErrorCode ierr;
    PetscSubcomm   subcomm;
-   PetscMPIInt    size;
+   MPI_Comm       rcomm;
+   PetscMPIInt    size,crank;
 
+   MFEM_VERIFY(nrep > 0,"Number of replicas should be positive");
    ierr = MPI_Comm_size(comm,&size); CCHKERRQ(comm,ierr);
    MFEM_VERIFY(!(size%nrep),"Size of comm must be a multiple of the number of replicas");
    MFEM_VERIFY(mesh.Conforming(),"Not supported");
@@ -23,18 +27,26 @@ ReplicatedParMesh::ReplicatedParMesh(MPI_Comm comm, Mesh &mesh, int nrep, bool c
    ierr = PetscSubcommSetNumber(subcomm, (PetscInt)nrep); CCHKERRQ(comm,ierr);
    ierr = PetscSubcommSetType(subcomm, contig ? PETSC_SUBCOMM_CONTIGUOUS : PETSC_SUBCOMM_INTERLACED); CCHKERRQ(comm,ierr);
 
-   ierr = PetscCommDuplicate(comm,&parent_comm,NULL); CCHKERRQ(comm,ierr);
-   ierr = PetscCommDuplicate(subcomm->child,&child_comm,NULL); CCHKERRQ(comm,ierr);
    color = subcomm->color;
+
+   /* original comm */
+   ierr = PetscCommDuplicate(comm,&parent_comm,NULL); CCHKERRQ(comm,ierr);
+   /* comm for replicated mesh */
+   ierr = PetscCommDuplicate(subcomm->child,&child_comm,NULL); CCHKERRQ(subcomm->child,ierr);
+   /* reduction comm */
+   ierr = MPI_Comm_rank(child_comm,&crank);CCHKERRQ(child_comm,ierr);
+   ierr = MPI_Comm_split(parent_comm,crank,color,&rcomm);CCHKERRQ(comm,ierr);
+   ierr = PetscCommDuplicate(rcomm,&red_comm,NULL); CCHKERRQ(rcomm,ierr);
+   ierr = MPI_Comm_free(&rcomm);CCHKERRQ(PETSC_COMM_SELF,ierr);
 
    PetscMPIInt child_size, parent_size;
    ierr = MPI_Comm_size(child_comm, &child_size); CCHKERRQ(child_comm,ierr);
-   ierr = MPI_Comm_size(parent_comm, &parent_size); CCHKERRQ(child_comm,ierr);
+   ierr = MPI_Comm_size(parent_comm, &parent_size); CCHKERRQ(parent_comm,ierr);
 
+   // This limits to conforming meshes
+   // (there's no simple way to create a ParMesh and change the comm)
    int *child_part = mesh.GeneratePartitioning(child_size, 1);
-
    child_mesh = new ParMesh(child_comm, mesh, child_part, 1);
-   // there's no simple way to create a ParMesh and change the comm
    parent_mesh = new ParMesh(parent_comm, mesh, child_part, 1);
 
    delete [] child_part;
@@ -47,8 +59,126 @@ ReplicatedParMesh::~ReplicatedParMesh()
    PetscErrorCode ierr;
    ierr = PetscCommDestroy(&parent_comm); CCHKERRQ(PETSC_COMM_SELF,ierr);
    ierr = PetscCommDestroy(&child_comm); CCHKERRQ(PETSC_COMM_SELF,ierr);
+   ierr = PetscCommDestroy(&red_comm); CCHKERRQ(PETSC_COMM_SELF,ierr);
    delete child_mesh;
    delete parent_mesh;
+}
+
+ReplicatedParFiniteElementSpace::ReplicatedParFiniteElementSpace(ReplicatedParMesh *pm, const FiniteElementCollection *f,
+                                                                 int dim, int ordering)
+{
+   cfes = new ParFiniteElementSpace(pm->GetChild(),f,dim,ordering);
+   pfes = new ParFiniteElementSpace(pm->GetParent(),f,dim,ordering);
+
+   /* SF for distribute/scatter */
+   PetscErrorCode ierr;
+   PetscInt nroots,nleaves,lsize;
+   PetscSFNode *iremote;
+   MPI_Comm red_comm;
+
+   /* True dofs */
+   lsize = (PetscInt)(cfes->GetTrueVSize());
+   nroots = pm->IsMaster() ? lsize : 0;
+   nleaves = lsize;
+   ierr = PetscMalloc1(nleaves,&iremote); CCHKERRQ(PETSC_COMM_SELF,ierr);
+   for (PetscInt i = 0; i < nleaves; i++)
+   {
+      iremote[i].rank  = 0;
+      iremote[i].index = i;
+   }
+   red_comm = pm->GetRedComm();
+   ierr = PetscSFCreate(red_comm,&red_T_sf); CCHKERRQ(red_comm,ierr);
+   ierr = PetscSFSetGraph(red_T_sf,nroots,nleaves,NULL,PETSC_OWN_POINTER,iremote,PETSC_OWN_POINTER); PCHKERRQ(red_T_sf,ierr);
+   ierr = PetscSFSetUp(red_T_sf); PCHKERRQ(red_T_sf,ierr);
+
+   /* Vdofs */
+   lsize = (PetscInt)(cfes->GetVSize());
+   nroots = pm->IsMaster() ? lsize : 0;
+   nleaves = lsize;
+   ierr = PetscMalloc1(nleaves,&iremote); CCHKERRQ(PETSC_COMM_SELF,ierr);
+   for (PetscInt i = 0; i < nleaves; i++)
+   {
+      iremote[i].rank  = 0;
+      iremote[i].index = i;
+   }
+   red_comm = pm->GetRedComm();
+   ierr = PetscSFCreate(red_comm,&red_V_sf); CCHKERRQ(red_comm,ierr);
+   ierr = PetscSFSetGraph(red_V_sf,nroots,nleaves,NULL,PETSC_OWN_POINTER,iremote,PETSC_OWN_POINTER); PCHKERRQ(red_V_sf,ierr);
+   ierr = PetscSFSetUp(red_V_sf); PCHKERRQ(red_V_sf,ierr);
+
+}
+
+void ReplicatedParFiniteElementSpace::Broadcast(const Vector& x, Vector &y)
+{
+   PetscErrorCode ierr;
+
+   PetscInt nleaves,nroots;
+   ierr = PetscSFGetGraph(red_V_sf,&nroots,&nleaves,NULL,NULL); PCHKERRQ(red_V_sf,ierr);
+   MFEM_VERIFY(x.Size() == nroots,"Invalid size for x: " << x.Size() << " < " << nroots);
+   MFEM_VERIFY(y.Size() == nleaves,"Invalid size for y: " << y.Size() << " < " << nleaves);
+
+   double *xd,*yd;
+   xd = x.GetData();
+   yd = y.GetData();
+   ierr = PetscSFBcastBegin(red_V_sf,MPI_DOUBLE_PRECISION,xd,yd); PCHKERRQ(red_V_sf,ierr);
+   ierr = PetscSFBcastEnd(red_V_sf,MPI_DOUBLE_PRECISION,xd,yd); PCHKERRQ(red_V_sf,ierr);
+}
+
+void ReplicatedParFiniteElementSpace::Reduce(const Vector& x, Vector &y, MPI_Op op)
+{
+   PetscErrorCode ierr;
+
+   PetscInt nleaves,nroots;
+   ierr = PetscSFGetGraph(red_V_sf,&nroots,&nleaves,NULL,NULL); PCHKERRQ(red_V_sf,ierr);
+   MFEM_VERIFY(x.Size() == nleaves,"Invalid size for x: " << x.Size() << " < " << nleaves);
+   MFEM_VERIFY(y.Size() == nroots,"Invalid size for y: " << y.Size() << " < " << nroots);
+
+   double *xd,*yd;
+   xd = x.GetData();
+   yd = y.GetData();
+   ierr = PetscSFReduceBegin(red_V_sf,MPI_DOUBLE_PRECISION,xd,yd,op); PCHKERRQ(red_V_sf,ierr);
+   ierr = PetscSFReduceEnd(red_V_sf,MPI_DOUBLE_PRECISION,xd,yd,op); PCHKERRQ(red_V_sf,ierr);
+}
+
+void ReplicatedParFiniteElementSpace::TBroadcast(const Vector& x, Vector &y)
+{
+   PetscErrorCode ierr;
+
+   PetscInt nleaves,nroots;
+   ierr = PetscSFGetGraph(red_T_sf,&nroots,&nleaves,NULL,NULL); PCHKERRQ(red_T_sf,ierr);
+   MFEM_VERIFY(x.Size() == nroots,"Invalid size for x: " << x.Size() << " < " << nroots);
+   MFEM_VERIFY(y.Size() == nleaves,"Invalid size for y: " << y.Size() << " < " << nleaves);
+
+   double *xd,*yd;
+   xd = x.GetData();
+   yd = y.GetData();
+   ierr = PetscSFBcastBegin(red_T_sf,MPI_DOUBLE_PRECISION,xd,yd); PCHKERRQ(red_T_sf,ierr);
+   ierr = PetscSFBcastEnd(red_T_sf,MPI_DOUBLE_PRECISION,xd,yd); PCHKERRQ(red_T_sf,ierr);
+}
+
+void ReplicatedParFiniteElementSpace::TReduce(const Vector& x, Vector &y, MPI_Op op)
+{
+   PetscErrorCode ierr;
+
+   PetscInt nleaves,nroots;
+   ierr = PetscSFGetGraph(red_T_sf,&nroots,&nleaves,NULL,NULL); PCHKERRQ(red_T_sf,ierr);
+   MFEM_VERIFY(x.Size() == nleaves,"Invalid size for x: " << x.Size() << " < " << nleaves);
+   MFEM_VERIFY(y.Size() == nroots,"Invalid size for y: " << y.Size() << " < " << nroots);
+
+   double *xd,*yd;
+   xd = x.GetData();
+   yd = y.GetData();
+   ierr = PetscSFReduceBegin(red_T_sf,MPI_DOUBLE_PRECISION,xd,yd,op); PCHKERRQ(red_T_sf,ierr);
+   ierr = PetscSFReduceEnd(red_T_sf,MPI_DOUBLE_PRECISION,xd,yd,op); PCHKERRQ(red_T_sf,ierr);
+}
+
+ReplicatedParFiniteElementSpace::~ReplicatedParFiniteElementSpace()
+{
+   PetscErrorCode ierr;
+   ierr = PetscSFDestroy(&red_V_sf); CCHKERRQ(PETSC_COMM_SELF,ierr);
+   ierr = PetscSFDestroy(&red_T_sf); CCHKERRQ(PETSC_COMM_SELF,ierr);
+   delete cfes;
+   delete pfes;
 }
 
 ParMesh* ParMeshTest(MPI_Comm comm, Mesh &mesh)
@@ -62,6 +192,20 @@ ParMesh* ParMeshTest(MPI_Comm comm, Mesh &mesh)
    ParMesh *pmesh = new ParMesh(comm,mesh,test_partitioning);
    delete[] test_partitioning;
    return pmesh;
+}
+
+void ParMeshPrint(ParMesh& mesh, const char* filename)
+{
+   PetscMPIInt rank;
+   MPI_Comm_rank(mesh.GetComm(),&rank);
+
+   std::ostringstream fname;
+   fname << filename  << "." << std::setfill('0') << std::setw(6) << rank;
+
+   std::ofstream oofs(fname.str().c_str());
+   oofs.precision(8);
+
+   mesh.Print(oofs);
 }
 
 void MeshGetElementsTagged(Mesh *mesh, bool (*tag_fn)(const Vector&),Array<bool>& tag)

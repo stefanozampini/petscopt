@@ -9,11 +9,14 @@
 #include <mfem/mesh/pmesh.hpp>
 #include <mfem/fem/coefficient.hpp>
 #include <mfem/linalg/petsc.hpp>
+#include <petscsftypes.h>
 
 namespace mfemopt
 {
 
 mfem::ParMesh* ParMeshTest(MPI_Comm,mfem::Mesh&);
+
+void ParMeshPrint(mfem::ParMesh& mesh, const char* filename);
 
 // Cannot inherit from ParMesh, since the default constructor is protected
 class ReplicatedParMesh
@@ -21,13 +24,40 @@ class ReplicatedParMesh
 private:
    MPI_Comm      parent_comm;
    MPI_Comm      child_comm;
+   MPI_Comm      red_comm;
    int           color;
    mfem::ParMesh *parent_mesh;
    mfem::ParMesh *child_mesh;
 
 public:
    ReplicatedParMesh(MPI_Comm,mfem::Mesh&,int,bool=true);
+   inline mfem::ParMesh* GetChild() { return child_mesh; }
+   inline mfem::ParMesh* GetParent() { return parent_mesh; }
+   inline int GetColor() { return color; }
+   inline MPI_Comm GetRedComm() { return red_comm; }
+   bool IsMaster() { return color ? false : true; }
    virtual ~ReplicatedParMesh();
+};
+
+class ReplicatedParFiniteElementSpace
+{
+private:
+   mfem::ParFiniteElementSpace *cfes;
+   mfem::ParFiniteElementSpace *pfes;
+
+   PetscSF red_V_sf;
+   PetscSF red_T_sf;
+
+public:
+   ReplicatedParFiniteElementSpace(ReplicatedParMesh*,const mfem::FiniteElementCollection*,
+                                   int=1,int=mfem::Ordering::byNODES);
+   void Broadcast(const mfem::Vector&,mfem::Vector&);
+   void Reduce(const mfem::Vector&,mfem::Vector&,MPI_Op = MPI_SUM);
+   void TBroadcast(const mfem::Vector&,mfem::Vector&);
+   void TReduce(const mfem::Vector&,mfem::Vector&,MPI_Op = MPI_SUM);
+   inline mfem::ParFiniteElementSpace* GetParent() { return pfes; }
+   inline mfem::ParFiniteElementSpace* GetChild() { return cfes; }
+   virtual ~ReplicatedParFiniteElementSpace();
 };
 
 void MeshGetElementsTagged(mfem::Mesh*,const mfem::Array<int>&,mfem::Array<bool>&);
