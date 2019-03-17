@@ -28,7 +28,7 @@ static double _ricker_v(double t)
 }
 
 VectorRickerSource::VectorRickerSource(const Vector& _loc, const Vector& _dir,
-                                       double _freq, double _tps, double _s) : VectorDeltaCoefficient(0)
+                                       double _freq, double _tps, double _s) : VectorDeltaCoefficient(_dir.Size())
 {
    freq = _freq;
    tps  = _tps;
