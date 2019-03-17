@@ -30,7 +30,7 @@ ObjectiveFunction::TestFDHessian design x design
 Initial objective 3.35128e-05 (LS 3.34677e-05, TV 4.50633e-08)
 it=0	lit=0	obj=3.351280e-05	(g,du)=-0.000000e+00	||g||=2.941560e-04	step=1.000000e+00
 it=1	lit=8	obj=4.391798e-06	(g,du)=-7.536484e-05	||g||=1.214943e-04	step=1.000000e+00
-it=2	lit=8	obj=6.196356e-08	(g,du)=-8.338071e-06	||g||=7.292329e-06	step=1.000000e+00
-it=3	lit=9	obj=4.530712e-08	(g,du)=-3.387889e-08	||g||=9.178356e-07	step=1.000000e+00
+it=2	lit=8	obj=6.196577e-08	(g,du)=-8.338053e-06	||g||=7.292246e-06	step=1.000000e+00
+it=3	lit=10	obj=4.534580e-08	(g,du)=-3.391350e-08	||g||=9.211350e-07	step=1.000000e+00
 Nonlinear newton_ solve converged due to CONVERGED_FNORM_ABS iterations 3
-Final objective 4.53071e-08 (LS 2.85128e-10, TV 4.5022e-08)
+Final objective 4.53458e-08 (LS 2.90487e-10, TV 4.50553e-08)

@@ -230,7 +230,7 @@ public:
    virtual void ComputeGradient(const Vector&,Vector&) const;
    virtual Operator& GetHessian(const Vector&) const;
    virtual void Update(int,const Vector&,const Vector&,const Vector&,const Vector&) const;
-   virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&) const;
+   //virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&) const;
    virtual ~RegularizedMultiSourceMisfit() { delete H; }
 };
 
@@ -691,26 +691,23 @@ void RegularizedMultiSourceMisfit::Update(int it, const Vector& F, const Vector&
 {
    if (!it)
    {
-      //reg->ResetDual(X);
+      reg->UpdateDual(X);
    }
    else
    {
       double lambda = pX.Size() ? (pX[0] - X[0])/dX[0] : 0.0;
-      //std::cout << "OK" << lambda << ": " << pX.Size() << std::endl;
-      ////px.Print();
-      //dX.Print();
       reg->UpdateDual(pX,dX,lambda);
    }
 }
 
-void RegularizedMultiSourceMisfit::PostCheck(const Vector& X, Vector& Y, Vector &W, bool& cy, bool& cw) const
-{
-   /* we don't change the step (Y) or the updated solution (W = X - lambda*Y) */
-   cy = false;
-   cw = false;
-   double lambda = X.Size() ? (X[0] - W[0])/Y[0] : 0.0;
-   reg->UpdateDual(X,Y,lambda);
-}
+//void RegularizedMultiSourceMisfit::PostCheck(const Vector& X, Vector& Y, Vector &W, bool& cy, bool& cw) const
+//{
+//   /* we don't change the step (Y) or the updated solution (W = X - lambda*Y) */
+//   cy = false;
+//   cw = false;
+//   double lambda = X.Size() ? (X[0] - W[0])/Y[0] : 0.0;
+//   reg->UpdateDual(X,Y,lambda);
+//}
 
 /*
    The hessian of the full objective

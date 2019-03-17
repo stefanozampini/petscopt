@@ -7,7 +7,6 @@ Receivers matrix
 Initial objective 0.0139964 (LS 0.00134734, TV 0.0126491)
 it=0	lit=0	obj=1.399645e-02	(g,du)=-0.000000e+00	||g||=1.498014e-02	step=1.000000e+00
 it=1	lit=3	obj=1.396081e-02	(g,du)=-7.038806e-05	||g||=9.067581e-05	step=1.000000e+00
-it=2	lit=3	obj=1.396078e-02	(g,du)=-5.978381e-08	||g||=6.545869e-06	step=1.000000e+00
-it=3	lit=3	obj=1.396078e-02	(g,du)=-1.777982e-10	||g||=4.503197e-07	step=1.000000e+00
-Nonlinear newton_ solve converged due to CONVERGED_FNORM_ABS iterations 3
-Final objective 0.0139608 (LS 0.00129267, TV 0.0126681)
+it=2	lit=3	obj=1.396078e-02	(g,du)=-5.641177e-08	||g||=5.458610e-07	step=1.000000e+00
+Nonlinear newton_ solve converged due to CONVERGED_FNORM_ABS iterations 2
+Final objective 0.0139608 (LS 0.00129268, TV 0.0126681)
