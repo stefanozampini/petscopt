@@ -1,4 +1,4 @@
-static const char help[] = "Tests a parameter dependent one-dimensional diffusion.";
+static const char help[] = "Tests PDOperator assembly.";
 
 #include <petscopt.h>
 #include <mfemopt.hpp>
@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
 {
    MFEMInitializePetsc(&argc,&argv,NULL,help);
 
-   char meshfile[PETSC_MAX_PATH_LEN] = "../../../../share/petscopt/meshes/inline-quad.mesh";
+   char meshfile[PETSC_MAX_PATH_LEN] = "../../../../share/petscopt/meshes/inline_quad.mesh";
    PetscInt srl = 0, prl = 0, ncrl = 0;
 
    FECType   s_fec_type = FEC_H1;
