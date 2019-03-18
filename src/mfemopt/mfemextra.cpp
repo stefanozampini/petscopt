@@ -21,7 +21,6 @@ ReplicatedParMesh::ReplicatedParMesh(MPI_Comm comm, Mesh &mesh, int nrep, bool c
    MFEM_VERIFY(nrep > 0,"Number of replicas should be positive");
    ierr = MPI_Comm_size(comm,&size); CCHKERRQ(comm,ierr);
    MFEM_VERIFY(!(size%nrep),"Size of comm must be a multiple of the number of replicas");
-   MFEM_VERIFY(mesh.Conforming(),"Not supported");
 
    ierr = PetscSubcommCreate(comm, &subcomm); CCHKERRQ(comm,ierr);
    ierr = PetscSubcommSetNumber(subcomm, (PetscInt)nrep); CCHKERRQ(comm,ierr);
@@ -43,14 +42,12 @@ ReplicatedParMesh::ReplicatedParMesh(MPI_Comm comm, Mesh &mesh, int nrep, bool c
    ierr = MPI_Comm_size(child_comm, &child_size); CCHKERRQ(child_comm,ierr);
    ierr = MPI_Comm_size(parent_comm, &parent_size); CCHKERRQ(parent_comm,ierr);
 
-   // This limits to conforming meshes
-   // (there's no simple way to create a ParMesh and change the comm)
    int *child_part = mesh.GeneratePartitioning(child_size, 1);
    child_mesh = new ParMesh(child_comm, mesh, child_part, 1);
+   if (!contig) for (int i = 0; i < mesh.GetNE(); i++) child_part[i] *= nrep;
    parent_mesh = new ParMesh(parent_comm, mesh, child_part, 1);
 
    delete [] child_part;
-
    ierr = PetscSubcommDestroy(&subcomm); CCHKERRQ(comm,ierr);
 }
 
@@ -105,7 +102,6 @@ ReplicatedParFiniteElementSpace::ReplicatedParFiniteElementSpace(ReplicatedParMe
    ierr = PetscSFCreate(red_comm,&red_V_sf); CCHKERRQ(red_comm,ierr);
    ierr = PetscSFSetGraph(red_V_sf,nroots,nleaves,NULL,PETSC_OWN_POINTER,iremote,PETSC_OWN_POINTER); PCHKERRQ(red_V_sf,ierr);
    ierr = PetscSFSetUp(red_V_sf); PCHKERRQ(red_V_sf,ierr);
-
 }
 
 void ReplicatedParFiniteElementSpace::Broadcast(const Vector& x, Vector &y)
@@ -114,8 +110,8 @@ void ReplicatedParFiniteElementSpace::Broadcast(const Vector& x, Vector &y)
 
    PetscInt nleaves,nroots;
    ierr = PetscSFGetGraph(red_V_sf,&nroots,&nleaves,NULL,NULL); PCHKERRQ(red_V_sf,ierr);
-   MFEM_VERIFY(x.Size() == nroots,"Invalid size for x: " << x.Size() << " < " << nroots);
-   MFEM_VERIFY(y.Size() == nleaves,"Invalid size for y: " << y.Size() << " < " << nleaves);
+   MFEM_VERIFY(x.Size() >= nroots,"Invalid size for x: " << x.Size() << " < " << nroots);
+   MFEM_VERIFY(y.Size() >= nleaves,"Invalid size for y: " << y.Size() << " < " << nleaves);
 
    double *xd,*yd;
    xd = x.GetData();
@@ -130,8 +126,8 @@ void ReplicatedParFiniteElementSpace::Reduce(const Vector& x, Vector &y, MPI_Op 
 
    PetscInt nleaves,nroots;
    ierr = PetscSFGetGraph(red_V_sf,&nroots,&nleaves,NULL,NULL); PCHKERRQ(red_V_sf,ierr);
-   MFEM_VERIFY(x.Size() == nleaves,"Invalid size for x: " << x.Size() << " < " << nleaves);
-   MFEM_VERIFY(y.Size() == nroots,"Invalid size for y: " << y.Size() << " < " << nroots);
+   MFEM_VERIFY(x.Size() >= nleaves,"Invalid size for x: " << x.Size() << " < " << nleaves);
+   MFEM_VERIFY(y.Size() >= nroots,"Invalid size for y: " << y.Size() << " < " << nroots);
 
    double *xd,*yd;
    xd = x.GetData();
@@ -146,8 +142,8 @@ void ReplicatedParFiniteElementSpace::TBroadcast(const Vector& x, Vector &y)
 
    PetscInt nleaves,nroots;
    ierr = PetscSFGetGraph(red_T_sf,&nroots,&nleaves,NULL,NULL); PCHKERRQ(red_T_sf,ierr);
-   MFEM_VERIFY(x.Size() == nroots,"Invalid size for x: " << x.Size() << " < " << nroots);
-   MFEM_VERIFY(y.Size() == nleaves,"Invalid size for y: " << y.Size() << " < " << nleaves);
+   MFEM_VERIFY(x.Size() >= nroots,"Invalid size for x: " << x.Size() << " < " << nroots);
+   MFEM_VERIFY(y.Size() >= nleaves,"Invalid size for y: " << y.Size() << " < " << nleaves);
 
    double *xd,*yd;
    xd = x.GetData();
@@ -162,8 +158,8 @@ void ReplicatedParFiniteElementSpace::TReduce(const Vector& x, Vector &y, MPI_Op
 
    PetscInt nleaves,nroots;
    ierr = PetscSFGetGraph(red_T_sf,&nroots,&nleaves,NULL,NULL); PCHKERRQ(red_T_sf,ierr);
-   MFEM_VERIFY(x.Size() == nleaves,"Invalid size for x: " << x.Size() << " < " << nleaves);
-   MFEM_VERIFY(y.Size() == nroots,"Invalid size for y: " << y.Size() << " < " << nroots);
+   MFEM_VERIFY(x.Size() >= nleaves,"Invalid size for x: " << x.Size() << " < " << nleaves);
+   MFEM_VERIFY(y.Size() >= nroots,"Invalid size for y: " << y.Size() << " < " << nroots);
 
    double *xd,*yd;
    xd = x.GetData();
