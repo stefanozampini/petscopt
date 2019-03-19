@@ -49,10 +49,12 @@ void NCRefinement(ParMesh *mesh, int (*fn)(const Vector&))
       if (refineme) el_to_refine.Append(e);
    }
    mesh->GeneralRefinement(el_to_refine,-1);
+#if 0
    if (mesh->Nonconforming())
    {
       mesh->Rebalance();
    }
+#endif
 }
 
 /* experimental */
@@ -199,7 +201,7 @@ protected:
    mutable PetscParVector *M;
 
 public:
-   MultiSourceMisfit(ParFiniteElementSpace*,PDCoefficient*,Coefficient*,Operator::Type,Operator::Type,PetscBCHandler*,DenseMatrix&,DenseMatrix&,bool,double,double,double,double,const char*);
+   MultiSourceMisfit(ParFiniteElementSpace*,PDCoefficient*,Coefficient*,Operator::Type,Operator::Type,PetscBCHandler*,DenseMatrix&,int,DenseMatrix&,bool,double,double,double,double,const char*);
 
    MPI_Comm GetComm() const { return comm; }
    void RunTests(bool=true);
@@ -222,13 +224,16 @@ public:
    mutable Operator *H;
    mutable MultiSourceMisfit *obj;
    mutable TVRegularizer *reg;
+   DataReplicator *drep;
    ParameterMap *pmap;
    bool tvopt;
 
-   RegularizedMultiSourceMisfit(MultiSourceMisfit*,TVRegularizer*,ParameterMap* = NULL,bool tvopt = false);
+   RegularizedMultiSourceMisfit(MultiSourceMisfit*,TVRegularizer*,DataReplicator*,ParameterMap*,bool tvopt = false);
    virtual void ComputeObjective(const Vector&,double*) const;
    virtual void ComputeGradient(const Vector&,Vector&) const;
    virtual Operator& GetHessian(const Vector&) const;
+   virtual void ComputeGuess(Vector&) const;
+
    virtual void Update(int,const Vector&,const Vector&,const Vector&,const Vector&) const;
    //virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&) const;
    virtual ~RegularizedMultiSourceMisfit() { delete H; }
@@ -239,6 +244,7 @@ class RegularizedMultiSourceMisfitHessian: public Operator
 private:
    Operator *Hobj,*Hreg;
    ParameterMap *pmap;
+   DataReplicator *drep;
    bool tvopt;
 
 public:
@@ -251,7 +257,8 @@ public:
 MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient* mu, Coefficient* sigma,
                                      Operator::Type oid, Operator::Type jid,
                                      PetscBCHandler* _bchandler,
-                                     DenseMatrix& srcpoints, DenseMatrix& recpoints,
+                                     DenseMatrix& srcpoints, int srcgid,
+                                     DenseMatrix& recpoints,
                                      bool scalar, double _scale_ls,
                                      double _t0, double _dt, double _tf,
                                      const char *scratch)
@@ -294,7 +301,7 @@ MultiSourceMisfit::MultiSourceMisfit(ParFiniteElementSpace* _fes, PDCoefficient*
       for (int j = 0; j < recpoints.Width(); j++)
       {
          std::stringstream tmp;
-         tmp << scratch << "/src-" << i << "-rec-" << j << ".txt";
+         tmp << scratch << "/src-" << i + srcgid << "-rec-" << j << ".txt";
          receivers.Append(new Receiver(tmp.str()));
       }
       lsobj.Append(new TDLeastSquares(receivers,_fes,true));
@@ -622,26 +629,44 @@ MultiSourceMisfitHessian::~MultiSourceMisfitHessian()
    for (int i = 0; i < arrayS.Size(); i++) { delete arrayS[i]; }
 }
 
-RegularizedMultiSourceMisfit::RegularizedMultiSourceMisfit(MultiSourceMisfit *_obj, TVRegularizer *_reg, ParameterMap *_pmap, bool _tvopt)
+RegularizedMultiSourceMisfit::RegularizedMultiSourceMisfit(MultiSourceMisfit *_obj, TVRegularizer *_reg, DataReplicator *_drep, ParameterMap *_pmap, bool _tvopt)
 {
    obj   = _obj;
    reg   = _reg;
+   drep  = _drep;
    pmap  = _pmap;
    tvopt = _tvopt;
    H     = NULL;
 
-   height = width = _obj->Height();
+   height = width = drep->IsMaster() ? _obj->Height() : 0.0;
+}
+
+void RegularizedMultiSourceMisfit::ComputeGuess(Vector& m) const
+{
+   Vector dummy(obj->Height());
+   dummy = 0.0;
+   if (drep->IsMaster())
+   {
+      obj->ComputeGuess(dummy);
+   }
+
+   m.SetSize(Height());
+   m = 0.0;
+   drep->Reduce("opt_data",dummy,m);
 }
 
 void RegularizedMultiSourceMisfit::ComputeObjective(const Vector& m, double *f) const
 {
    Vector pm(m.Size());
-   if (pmap) pmap->Map(m,pm);
-   else pm = m;
+   pmap->Map(m,pm);
 
-   double f1,f2;
-   Vector dummy;
-   obj->ComputeObjective(pm,&f1);
+   double f1 = 0.0,f2 = 0.0;
+   Vector dummy(obj->Height());
+   drep->Broadcast("opt_data",pm,dummy);
+   obj->ComputeObjective(dummy,&f1);
+   f2 = 0.0;
+   drep->Reduce(f1,&f2);
+   drep->Broadcast(f2,&f1);
    if (tvopt)
    {
       reg->Eval(dummy,m,0.,&f2);
@@ -656,26 +681,28 @@ void RegularizedMultiSourceMisfit::ComputeObjective(const Vector& m, double *f) 
 void RegularizedMultiSourceMisfit::ComputeGradient(const Vector& m, Vector& g) const
 {
    Vector pm(m.Size());
-   if (pmap) pmap->Map(m,pm);
-   else pm = m;
+   pmap->Map(m,pm);
 
-   Vector dummy;
-   Vector g1(pm.Size()),g2(pm.Size());
+   Vector dummy(obj->Height());
+   Vector g1(g.Size()),g2(dummy.Size());
 
-   obj->ComputeGradient(pm,g1);
+   drep->Broadcast("opt_data",pm,dummy);
+   obj->ComputeGradient(dummy,g2);
+   g1 = 0.0;
+   drep->Reduce("opt_data",g2,g1);
+
    if (tvopt)
    {
-      if (pmap) pmap->GradientMap(m,g1,true,g);
-      else g = g1;
-      reg->EvalGradient_M(dummy,m,0.,g2);
-      g += g2;
+      pmap->GradientMap(m,g1,true,g);
+      reg->EvalGradient_M(dummy,m,0.,g1);
+      g += g1;
    }
    else
    {
-      reg->EvalGradient_M(dummy,pm,0.,g2);
-      g1 += g2;
-      if (pmap) pmap->GradientMap(m,g1,true,g);
-      else g = g1;
+      Vector g3(g.Size());
+      reg->EvalGradient_M(dummy,pm,0.,g3);
+      g1 += g3;
+      pmap->GradientMap(m,g1,true,g);
    }
 }
 
@@ -725,12 +752,14 @@ RegularizedMultiSourceMisfitHessian::RegularizedMultiSourceMisfitHessian(const R
    height = width = _m.Size();
    pmap = _rmsobj->pmap;
    tvopt = _rmsobj->tvopt;
+   drep = _rmsobj->drep;
 
    Vector pm(_m.Size());
-   if (pmap) pmap->Map(_m,pm);
-   else pm = _m;
+   pmap->Map(_m,pm);
 
-   Hobj = &( _rmsobj->obj->GetHessian(pm));
+   Vector pmrep(_rmsobj->obj->Height());
+   drep->Broadcast("opt_data",pm,pmrep);
+   Hobj = &( _rmsobj->obj->GetHessian(pmrep));
 
    if (tvopt)
    {
@@ -738,11 +767,14 @@ RegularizedMultiSourceMisfitHessian::RegularizedMultiSourceMisfitHessian(const R
       _rmsobj->reg->SetUpHessian_MM(dummy,_m,0.);
       Hreg = _rmsobj->reg->GetHessianOperator_MM();
 
-      if (pmap && pmap->SecondOrder())
+      if (pmap->SecondOrder())
       {
-         Vector g1(pm.Size());
+         Vector g1(pm.Size()),g1rep(_rmsobj->obj->Height());
 
-         _rmsobj->obj->ComputeGradient(pm,g1);
+         _rmsobj->obj->ComputeGradient(pmrep,g1rep);
+         g1 = 0.0;
+         drep->Reduce("opt_data",g1rep,g1);
+
          pmap->SetUpHessianMap(_m,g1);
       }
    }
@@ -752,11 +784,13 @@ RegularizedMultiSourceMisfitHessian::RegularizedMultiSourceMisfitHessian(const R
       _rmsobj->reg->SetUpHessian_MM(dummy,pm,0.);
       Hreg = _rmsobj->reg->GetHessianOperator_MM();
 
-      if (pmap && pmap->SecondOrder())
+      if (pmap->SecondOrder())
       {
-         Vector g1(pm.Size()),g2(pm.Size());
+         Vector g1(pm.Size()),g1rep(_rmsobj->obj->Height()),g2(pm.Size());
 
-         _rmsobj->obj->ComputeGradient(pm,g1);
+         _rmsobj->obj->ComputeGradient(pmrep,g1rep);
+         g1 = 0.0;
+         drep->Reduce("opt_data",g1rep,g1);
          _rmsobj->reg->EvalGradient_M(dummy,pm,0.,g2);
          g1 += g2;
          pmap->SetUpHessianMap(_m,g1);
@@ -768,32 +802,27 @@ void RegularizedMultiSourceMisfitHessian::Mult(const Vector& x, Vector& y) const
 {
    Vector px(x.Size());
 
-   if (pmap)
-   {
-      const Vector& m = pmap->GetParameter();
-      pmap->GradientMap(m,x,false,px);
-   }
-   else px = x;
+   const Vector& m = pmap->GetParameter();
+   pmap->GradientMap(m,x,false,px);
 
    Vector py1(px.Size()),py2(px.Size());
-   Hobj->Mult(px,py1);
+
+   Vector pxrep(Hobj->Width()),py1rep(Hobj->Height());
+   drep->Broadcast("opt_data",px,pxrep);
+   Hobj->Mult(pxrep,py1rep);
+   py1 = 0.0;
+   drep->Reduce("opt_data",py1rep,py1);
+
    if (tvopt)
    {
       Vector y2(x.Size());
 
-      if (pmap)
+      const Vector& m = pmap->GetParameter();
+      pmap->GradientMap(m,py1,true,y);
+      if (pmap->SecondOrder())
       {
-         const Vector& m = pmap->GetParameter();
-         pmap->GradientMap(m,py1,true,y);
-         if (pmap->SecondOrder())
-         {
-            pmap->HessianMult(x,y2);
-            y += y2;
-         }
-      }
-      else
-      {
-         y = py1;
+         pmap->HessianMult(x,y2);
+         y += y2;
       }
 
       y2 = 0.0;
@@ -804,21 +833,15 @@ void RegularizedMultiSourceMisfitHessian::Mult(const Vector& x, Vector& y) const
    {
       Hreg->Mult(px,py2);
       py1 += py2;
-      if (pmap)
-      {
-         const Vector& m = pmap->GetParameter();
-         pmap->GradientMap(m,py1,true,y);
-         if (pmap->SecondOrder())
-         {
-            Vector y2(x.Size());
 
-            pmap->HessianMult(x,y2);
-            y += y2;
-         }
-      }
-      else
+      const Vector& m = pmap->GetParameter();
+      pmap->GradientMap(m,py1,true,y);
+      if (pmap->SecondOrder())
       {
-         y = py1;
+         Vector y2(x.Size());
+
+         pmap->HessianMult(x,y2);
+         y += y2;
       }
    }
 }
@@ -828,32 +851,28 @@ void RegularizedMultiSourceMisfitHessian::MultTranspose(const Vector& x, Vector&
 {
    Vector px(x.Size());
 
-   if (pmap)
-   {
-      const Vector& m = pmap->GetParameter();
-      pmap->GradientMap(m,x,false,px);
-   }
-   else px = x;
+   const Vector& m = pmap->GetParameter();
+   pmap->GradientMap(m,x,false,px);
 
    Vector py1(px.Size()),py2(px.Size());
-   Hobj->Mult(px,py1); /* the Hessian of the misfit function is symmetric */
+
+   /* the Hessian of the misfit function is symmetric */
+   Vector pxrep(Hobj->Width()),py1rep(Hobj->Height());
+   drep->Broadcast("opt_data",px,pxrep);
+   Hobj->Mult(pxrep,py1rep);
+   py1 = 0.0;
+   drep->Reduce("opt_data",py1rep,py1);
+
    if (tvopt)
    {
       Vector y2(x.Size());
 
-      if (pmap)
+      const Vector& m = pmap->GetParameter();
+      pmap->GradientMap(m,py1,true,y);
+      if (pmap->SecondOrder())
       {
-         const Vector& m = pmap->GetParameter();
-         pmap->GradientMap(m,py1,true,y);
-         if (pmap->SecondOrder())
-         {
-            pmap->HessianMult(x,y2);
-            y += y2;
-         }
-      }
-      else
-      {
-         y = py1;
+         pmap->HessianMult(x,y2);
+         y += y2;
       }
 
       y2 = 0.0;
@@ -864,26 +883,20 @@ void RegularizedMultiSourceMisfitHessian::MultTranspose(const Vector& x, Vector&
    {
       Hreg->MultTranspose(px,py2);
       py1 += py2;
-      if (pmap)
-      {
-         const Vector& m = pmap->GetParameter();
-         pmap->GradientMap(m,py1,true,y);
-         if (pmap->SecondOrder())
-         {
-            Vector y2(x.Size());
 
-            pmap->HessianMult(x,y2);
-            y += y2;
-         }
-      }
-      else
+      const Vector& m = pmap->GetParameter();
+      pmap->GradientMap(m,py1,true,y);
+      if (pmap->SecondOrder())
       {
-         y = py1;
+         Vector y2(x.Size());
+
+         pmap->HessianMult(x,y2);
+         y += y2;
       }
    }
 }
 
-#if 1
+#if 0
 PetscParMatrix* RegularizedMultiSourceMisfitHessian::CreatePmat() const
 {
    MPI_Comm comm = PETSC_COMM_WORLD/*XXX*/;
@@ -995,7 +1008,7 @@ public:
       Array<ParGridFunction*> gf = m->GetCoeffs();
       pmap = _pmap;
       u = gf[0];
-      vt = _vt;
+      vt =  _vt;
       name = _name;
       pause = true;
       if (vt > 0)
@@ -1005,7 +1018,7 @@ public:
          sout.open(vishost, visport);
          if (!sout)
          {
-            if (!PetscGlobalRank)
+            if (!PetscGlobalRank) /* XXX */
                std::cout << "Unable to connect to GLVis server at "
                     << vishost << ':' << visport << std::endl;
             if (!PetscGlobalRank)
@@ -1103,6 +1116,10 @@ int main(int argc, char *argv[])
    PetscReal scale_ls = 1.0;
    PetscBool exact_sample = PETSC_TRUE;
 
+   PetscInt  nrep = 1;
+   PetscBool contig = PETSC_TRUE;
+   bool master = true;
+
    FECType   s_fec_type = FEC_H1;
    PetscInt  s_ord = 1;
    OIDType   s_oid_type = OID_MATAIJ, s_jid_type = OID_MATAIJ;
@@ -1128,6 +1145,9 @@ int main(int argc, char *argv[])
       PetscErrorCode ierr;
 
       ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"Options for Heat equation",NULL);CHKERRQ(ierr);
+
+      ierr = PetscOptionsInt("-nrep","Number of replicas",NULL,nrep,&nrep,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsBool("-contig","Contiguous replicas",NULL,contig,&contig,NULL);CHKERRQ(ierr);
 
       /* Simulation parameters */
       ierr = PetscOptionsEnum("-state_oid_type","Operator::Type for state",NULL,OIDTypes,(PetscEnum)s_oid_type,(PetscEnum*)&s_oid_type,NULL);CHKERRQ(ierr);
@@ -1240,6 +1260,7 @@ int main(int argc, char *argv[])
 
    /* Create mesh and finite element space for the independent variable */
    ParMesh *pmesh = NULL;
+   ReplicatedParMesh *rpmesh = NULL;
    {
       Mesh *mesh = new Mesh(meshfile, 1, 1);
       MFEM_VERIFY(mesh->SpaceDimension() == mesh->Dimension(),"Embedded meshes not supported")
@@ -1255,27 +1276,30 @@ int main(int argc, char *argv[])
       }
       else
       {
-         pmesh = new ParMesh(PETSC_COMM_WORLD, *mesh);
-
-         //PetscInt nsub_sources = 1; //,nsub_color = 0;
-         //PetscErrorCode ierr;
-         //ierr = PetscOptionsGetInt(NULL,NULL,"-nsub_src",&nsub_sources,NULL);CHKERRQ(ierr);
-         //ReplicatedParMesh tm(PETSC_COMM_WORLD,*mesh,nsub_sources);
-
-         //ParMesh cm;
-         //cm  = *pmesh;
-         //cm.Print();
+         rpmesh = new ReplicatedParMesh(PETSC_COMM_WORLD, *mesh, nrep, contig);
+         pmesh = rpmesh->GetChild();
       }
       delete mesh;
       for (int lev = 0; lev < prl; lev++)
       {
          pmesh->UniformRefinement();
+         if (rpmesh)
+         {
+            rpmesh->GetParent()->UniformRefinement();
+         }
       }
       for (int lev = 0; lev < ncrl; lev++)
       {
          NCRefinement(pmesh,refine_fn);
+         if (rpmesh)
+         {
+            NCRefinement(rpmesh->GetParent(),refine_fn);
+         }
       }
    }
+
+   DataReplicator *drep = new DataReplicator(PETSC_COMM_WORLD, rpmesh ? nrep : 1, contig);
+   master = drep->IsMaster();
 
    /* Simulation space */
    bool scalar = true;
@@ -1423,63 +1447,69 @@ int main(int argc, char *argv[])
    /* Exact solution */
    Vector muv_exact(mu_pd->GetLocalSize());
    mu_pd->GetCurrentVector(muv_exact);
-   if (glvis) mu_pd->Visualize();
 
    /* Multi-source sampling */
-   for (int i = 0; i < srcpoints.Width(); i++)
+   if (master)
    {
-      ParGridFunction *u = new ParGridFunction(s_fes);
-      HypreParVector *U = u->GetTrueDofs();
-      *U = 0.0;
-
-      std::stringstream tmp1,tmp2;
-      tmp1 << "Fwd source - " << i;
-      tmp2 << scratchdir << "/src-" << i << "-rec";
-      UserMonitor *monitor = new UserMonitor(u,viz,tmp1.str());
-      ReceiverMonitor *rmonitor = new ReceiverMonitor(u,recpoints,tmp2.str());
-
-      ModelHeat *heat;
-      if (exact_sample) heat =new ModelHeat(mu,sigma,s_fes,oid);
-      else heat = new ModelHeat(mu_pd,sigma,s_fes,oid);
-      heat->SetBCHandler(bchandler); /* XXX so many times setting the object -> add specialized constructor for odesolver? */
-
-      Vector srcctr;
-      srcpoints.GetColumn(i,srcctr);
-      if (vrick)
+      for (int i = 0; i < srcpoints.Width(); i++)
       {
-         vrick->SetDeltaCenter(srcctr);
-         heat->SetRHS(vrick);
+         ParGridFunction *u = new ParGridFunction(s_fes);
+         HypreParVector *U = u->GetTrueDofs();
+         *U = 0.0;
+
+         std::stringstream tmp1,tmp2;
+         tmp1 << "Fwd source - " << i;
+         tmp2 << scratchdir << "/src-" << i << "-rec";
+         UserMonitor *monitor = new UserMonitor(u,viz,tmp1.str());
+         ReceiverMonitor *rmonitor = new ReceiverMonitor(u,recpoints,tmp2.str());
+
+         ModelHeat *heat;
+         if (exact_sample) heat =new ModelHeat(mu,sigma,s_fes,oid);
+         else heat = new ModelHeat(mu_pd,sigma,s_fes,oid);
+         heat->SetBCHandler(bchandler); /* XXX so many times setting the object -> add specialized constructor for odesolver? */
+
+         Vector srcctr;
+         srcpoints.GetColumn(i,srcctr);
+         if (vrick)
+         {
+            vrick->SetDeltaCenter(srcctr);
+            heat->SetRHS(vrick);
+         }
+         else if (rick)
+         {
+            rick->SetDeltaCenter(srcctr);
+            heat->SetRHS(rick);
+         }
+
+         PetscODESolver *odesolver = new PetscODESolver(pmesh->GetComm(),"model_");
+         odesolver->Init(*heat,PetscODESolver::ODE_SOLVER_LINEAR);
+         odesolver->SetBCHandler(bchandler);
+         odesolver->SetPreconditionerFactory(heat->GetPreconditionerFactory());
+         odesolver->SetJacobianType(jid);
+         odesolver->SetMonitor(rmonitor);
+         odesolver->SetMonitor(monitor);
+
+         double tt0 = t0, tdt = dt, ttf = tf;
+         odesolver->Run(*U,tt0,tdt,ttf);
+
+         delete monitor;
+         delete rmonitor; /* this triggers the dumping of the data */
+         delete odesolver;
+         delete heat;
+         delete u;
+         delete U;
       }
-      else if (rick)
-      {
-         rick->SetDeltaCenter(srcctr);
-         heat->SetRHS(rick);
-      }
-
-      PetscODESolver *odesolver = new PetscODESolver(pmesh->GetComm(),"model_");
-      odesolver->Init(*heat,PetscODESolver::ODE_SOLVER_LINEAR);
-      odesolver->SetBCHandler(bchandler);
-      odesolver->SetPreconditionerFactory(heat->GetPreconditionerFactory());
-      odesolver->SetJacobianType(jid);
-      odesolver->SetMonitor(rmonitor);
-      odesolver->SetMonitor(monitor);
-
-      double tt0 = t0, tdt = dt, ttf = tf;
-      odesolver->Run(*U,tt0,tdt,ttf);
-
-      delete monitor;
-      delete rmonitor; /* this triggers the dumping of the data */
-      delete odesolver;
-      delete heat;
-      delete u;
-      delete U;
    }
+   /* wait for completion */
+   MPI_Barrier(PETSC_COMM_WORLD);
 
    /* The misfit function */
-   MultiSourceMisfit *obj = new MultiSourceMisfit(s_fes,mu_pd,sigma,oid,jid,bchandler,srcpoints,recpoints,scalar,scale_ls,t0,dt,tf,scratchdir);
+   int srcgid;
+   drep->Split(srcpoints,srcpoints,&srcgid);
+   MultiSourceMisfit *obj = new MultiSourceMisfit(s_fes,mu_pd,sigma,oid,jid,bchandler,srcpoints,srcgid,recpoints,scalar,scale_ls,t0,dt,tf,scratchdir);
 
    /* Tests internal objects inside the misfit function */
-   if (test_misfit_internal)
+   if (test_misfit_internal && master)
    {
       obj->RunTests(test_progress);
    }
@@ -1492,35 +1522,43 @@ int main(int argc, char *argv[])
       else muv = muv_exact;
 
       double f1,f2;
-      PetscParVector g1(PETSC_COMM_WORLD,muv), g2(PETSC_COMM_WORLD,muv);
+      PetscParVector g1(pmesh->GetComm(),muv), g2(pmesh->GetComm(),muv);
       obj->ComputeObjectiveAndGradient(muv,&f1,g1);
       obj->ComputeObjective(muv,&f2);
       obj->ComputeGradient(muv,g2);
       MFEM_VERIFY(std::abs(f1-f2) < PETSC_SMALL,"Error on misfit computations! " << f1 << ", " << f2)
       g1 -= g2;
-      f1 = ParNormlp(g1,infinity(),PETSC_COMM_WORLD);
+      f1 = ParNormlp(g1,infinity(),pmesh->GetComm());
       MFEM_VERIFY(f1 < PETSC_SMALL,"Error on misfit computations! gradient error " << f1)
-      PetscPrintf(PETSC_COMM_WORLD,"Misfit objective %g\n",f2);
+
+      f1 = 0.0;
+      drep->Reduce(f2,&f1);
+      PetscPrintf(PETSC_COMM_WORLD,"Misfit objective %g\n",f1);
+#if 0
+      g1 = 0.0;
+      drep->Reduce("test",g2,g1);
+      if (drep->IsMaster()) g1.Print();
+#endif
    }
 
    /* FD test for misfit function gradient */
-   if (test_misfit[1])
+   if (master && test_misfit[1])
    {
       Vector muv;
       if (!test_null) obj->ComputeGuess(muv);
       else muv = muv_exact;
 
-      obj->TestFDGradient(PETSC_COMM_WORLD,muv,1.e-8,test_progress);
+      obj->TestFDGradient(pmesh->GetComm(),muv,1.e-8,test_progress);
    }
 
    /* matrix-free FD test for misfit function hessian */
-   if (test_misfit[2])
+   if (master && test_misfit[2])
    {
       Vector muv;
       if (!test_null) obj->ComputeGuess(muv);
       else muv = muv_exact;
 
-      obj->TestFDHessian(PETSC_COMM_WORLD,muv);
+      obj->TestFDHessian(pmesh->GetComm(),muv);
    }
 
 #if 0
@@ -1543,23 +1581,26 @@ int main(int argc, char *argv[])
    /* Map from optimization variables to model variables */
    PointwiseMap pmap(mu_m,m_mu,dmu_dm,dmu_dm);
 
-   /* Total variation regularizer */
+   /* Coefficient to be regularized */
    PDCoefficient *mu_inv_pd = NULL;
    FunctionOfCoefficient *mu_inv = NULL;
-   if (tvopt)
-   {
-      mu_inv = new FunctionOfCoefficient(m_mu,*mu);
-      if (mu_excl_fn) mu_inv_pd = new PDCoefficient(*mu_inv,pmesh,mu_fec,excl_fn);
-      else mu_inv_pd = new PDCoefficient(*mu_inv,pmesh,mu_fec,mu_excl_a);
-   }
+   mu_inv = new FunctionOfCoefficient(tvopt ? m_mu : NULL,*mu);
+   if (mu_excl_fn) mu_inv_pd = new PDCoefficient(*mu_inv,rpmesh ? rpmesh->GetParent() : pmesh,mu_fec,excl_fn);
+   else mu_inv_pd = new PDCoefficient(*mu_inv,rpmesh ? rpmesh->GetParent() : pmesh,mu_fec,mu_excl_a);
+   if (glvis) mu_inv_pd->Visualize();
 
-   TVRegularizer *tv = new TVRegularizer(tvopt ? mu_inv_pd : mu_pd,tva,tvb,tvpd);
+   /* Total variation regularizer */
+   TVRegularizer *tv = new TVRegularizer(mu_inv_pd,tva,tvb,tvpd);
    tv->Symmetrize(tvsy);
    tv->Project(tvpr);
+
+   /* The full objective: misfit + regularization */
+   RegularizedMultiSourceMisfit *robj = new RegularizedMultiSourceMisfit(obj,tv,drep,&pmap,tvopt);
+
    if (test_misfit_internal)
    {
       Vector muv;
-      if (!test_null) obj->ComputeGuess(muv);
+      if (!test_null) robj->ComputeGuess(muv);
       else muv = muv_exact;
       Vector dummy;
       double f;
@@ -1577,14 +1618,12 @@ int main(int argc, char *argv[])
       tv->TestFDHessian(comm,dummy,m,0.0);
    }
 
-   /* The full objective: misfit + regularization */
-   RegularizedMultiSourceMisfit *robj = new RegularizedMultiSourceMisfit(obj,tv,&pmap,tvopt);
 
    /* Test callbacks for full objective */
    if (test_misfit_reg[0])
    {
       Vector muv;
-      if (!test_null) obj->ComputeGuess(muv);
+      if (!test_null) robj->ComputeGuess(muv);
       else muv = muv_exact;
 
       /* Misfit in terms of mu, the optimization variable is the inverse of the map */
@@ -1600,7 +1639,7 @@ int main(int argc, char *argv[])
    if (test_misfit_reg[1])
    {
       Vector muv;
-      if (!test_null) obj->ComputeGuess(muv);
+      if (!test_null) robj->ComputeGuess(muv);
       else muv = muv_exact;
 
       /* Misfit in terms of mu, the optimization variable is the inverse of the map */
@@ -1625,11 +1664,11 @@ int main(int argc, char *argv[])
 #endif
       NewtonMonitor mymonitor;
       newton.SetMonitor(&mymonitor);
-      UserMonitor solmonitor(mu_pd,&pmap,glvis ? 1 : 0,"Newton solution");
+      UserMonitor solmonitor(mu_inv_pd,NULL,glvis ? 1 : 0,"Newton solution");
       if (glvis) newton.SetMonitor(&solmonitor);
 
       Vector muv;
-      if (!test_null) obj->ComputeGuess(muv);
+      if (!test_null) robj->ComputeGuess(muv);
       else muv = muv_exact;
 
       Vector dummy,u(muv.Size());
@@ -1667,6 +1706,10 @@ int main(int argc, char *argv[])
    {
       mu_pd->Save("saved");
    }
+
+   if (rpmesh) pmesh = NULL;
+   delete rpmesh;
+   delete drep;
 
    delete robj;
    delete tv;
