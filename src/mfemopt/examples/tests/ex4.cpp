@@ -1,12 +1,6 @@
 static const char help[] = "Tests Replicated{ParMesh|ParFiniteElementSpace}.";
 
-//include <petscopt.h>
 #include <mfemopt.hpp>
-
-//#include <mfem.hpp>
-
-//#include <iostream>
-//#include <sstream>
 
 typedef enum {FEC_L2, FEC_H1, FEC_HCURL, FEC_HDIV} FECType;
 static const char *FECTypes[] = {"L2","H1","HCURL","HDIV","FecType","FEC_",0};
@@ -46,9 +40,10 @@ int main(int argc, char *argv[])
 
    char      meshfile[PETSC_MAX_PATH_LEN] = "../../../../share/petscopt/meshes/inline_quad.mesh";
    PetscInt  srl = 0, nrep = 1;
-   PetscBool contig = PETSC_TRUE;
+   PetscBool contig = PETSC_TRUE, nc_mesh = PETSC_FALSE;
    FECType   fec_type = FEC_H1;
    bool      scal = true;
+   double    norm;
 
    /* Process options */
    {
@@ -59,6 +54,7 @@ int main(int argc, char *argv[])
       ierr = PetscOptionsInt("-srl","Number of sequential refinements",NULL,srl,&srl,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsInt("-nrep","Number of replicas",NULL,nrep,&nrep,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-contig","Contiguous or interleaved splitting",NULL,contig,&contig,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsBool("-nc_mesh","NC mesh",NULL,nc_mesh,&nc_mesh,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsEnum("-fec_type","FEC to be tested","",FECTypes,(PetscEnum)fec_type,(PetscEnum*)&fec_type,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsEnd();CHKERRQ(ierr);
    }
@@ -68,6 +64,7 @@ int main(int argc, char *argv[])
    {
       mesh->UniformRefinement();
    }
+   if (nc_mesh) mesh->EnsureNCMesh();
    dim = mesh->Dimension();
    int sdim = mesh->SpaceDimension();
 
@@ -117,13 +114,13 @@ int main(int argc, char *argv[])
    {
       FunctionCoefficient E(Es_fun);
       x_ex->ProjectCoefficient(E);
-      x_ex->ParallelAverage(*px_ex);
+      x_ex->ParallelProject(*px_ex);
    }
    else
    {
       VectorFunctionCoefficient E(sdim, Ev_fun);
       x_ex->ProjectCoefficient(E);
-      x_ex->ParallelAverage(*px_ex);
+      x_ex->ParallelProject(*px_ex);
    }
 
    ParGridFunction *x = new ParGridFunction(ppfes);
@@ -131,25 +128,73 @@ int main(int argc, char *argv[])
    PetscParVector *px = new PetscParVector(ppfes);
    PetscParVector *py = new PetscParVector(cpfes);
 
-   *x = *x_ex;
-   *x *= (-1.0*nrep);
    *y = PETSC_MAX_REAL;
-
-   *px = *px_ex;
-   *px *= (-1.0*nrep);
    *py = PETSC_MAX_REAL;
 
    /* Broadcast/Reduce GridFunction */
+   *x = 0.0;
    pfes->Broadcast(*x_ex,*y);
    pfes->Reduce(*y,*x);
-   double norm = ParNormlp(*x,2,PETSC_COMM_WORLD);
+   *x *= -1.0/nrep;
+   *x += *x_ex;
+   norm = ParNormlp(*x,2,PETSC_COMM_WORLD);
    MFEM_VERIFY(norm < PETSC_SMALL,"Error vdofs " << norm);
 
    /* Broadcast/Reduce distributed vector */
+   *px = 0.0;
    pfes->TBroadcast(*px_ex,*py);
    pfes->TReduce(*py,*px);
-   double pnorm = ParNormlp(*px,2,PETSC_COMM_WORLD);
-   MFEM_VERIFY(pnorm < PETSC_SMALL,"Error true dofs " << pnorm);
+   *px *= -1.0/nrep;
+   *px += *px_ex;
+   norm = ParNormlp(*px,2,PETSC_COMM_WORLD);
+   MFEM_VERIFY(norm < PETSC_SMALL,"Error true dofs " << norm);
+
+   /* Use replicator class */
+   DataReplicator *drep = new DataReplicator(PETSC_COMM_WORLD,nrep,contig);
+
+   *y = PETSC_MAX_REAL;
+   *py = PETSC_MAX_REAL;
+
+   double f_ex = 1.6792302;
+   double f1, f2 = PETSC_MAX_REAL;
+
+   *x = 0.0;
+   drep->Broadcast("gridf",*x_ex,*y);
+   drep->Reduce("gridf",*y,*x);
+   *x *= -1.0/nrep;
+   *x += *x_ex;
+   norm = ParNormlp(*x,2,PETSC_COMM_WORLD);
+   MFEM_VERIFY(norm < PETSC_SMALL,"Error drep " << norm);
+
+   *px = 0.0;
+   drep->Broadcast("distv",*px_ex,*py);
+   drep->Reduce("distv",*py,*px);
+   *px *= -1.0/nrep;
+   *px += *px_ex;
+   norm = ParNormlp(*px,2,PETSC_COMM_WORLD);
+   MFEM_VERIFY(norm < PETSC_SMALL,"Error drep " << norm);
+
+   f1 = 0.0;
+   drep->Broadcast(f_ex,&f2);
+   drep->Reduce(f2,&f1);
+   f1 = drep->IsMaster() ? f1 - f_ex*nrep : f1;
+   f1 = std::abs(f1);
+   MFEM_VERIFY(f1 < PETSC_SMALL,"Error drep " << f1);
+
+   int m = 3,n = 5;
+   DenseMatrix work(m,n), lwork;
+   for (int j = 0; j < n; j++)
+     for (int i = 0; i < m; i++)
+       work(i,j) = 100.*j + i;
+   drep->Split(work,lwork);
+   norm = 0.0;
+   f1 = lwork.FNorm2();
+   drep->Reduce(f1,&norm);
+   norm = drep->IsMaster() ? norm - work.FNorm2() : 0.0;
+   norm = std::abs(norm);
+   MFEM_VERIFY(norm < PETSC_SMALL,"Error split " << norm);
+
+   delete drep;
 
    delete x_ex;
    delete x;

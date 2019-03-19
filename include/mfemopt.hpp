@@ -14,5 +14,6 @@
 #include <mfemopt/monitor.hpp>
 #include <mfemopt/random.hpp>
 #include <mfemopt/mfemextra.hpp>
+#include <mfemopt/datareplicator.hpp>
 
 #endif
