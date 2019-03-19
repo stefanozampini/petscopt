@@ -548,8 +548,8 @@ TVRegularizer::TVRegularizer(PDCoefficient* _m_pd, double _alpha, double _beta, 
    Array<ParGridFunction*> &pgf = m_pd->GetDerivCoeffs();
    if (!pgf.Size()) return;
    const FiniteElement *el = pgf[0]->ParFESpace()->GetFE(0);
-   const int dim = el->GetDim();
-   const int ord = el->GetOrder();
+   const int dim = el ? el->GetDim() : 0;
+   const int ord = el ? el->GetOrder() : 1;
    L2_FECollection *l2 = new L2_FECollection(ord, dim); /* XXX the correct space should have the same order I think */
    ParFiniteElementSpace *gfes = new ParFiniteElementSpace(pgf[0]->ParFESpace()->GetParMesh(), l2, dim);
    for (int i = 0; i < pgf.Size(); i++)

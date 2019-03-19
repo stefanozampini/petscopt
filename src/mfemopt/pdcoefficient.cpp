@@ -113,12 +113,13 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
    {
       static const Geometry::Type geoms[3] =
       { Geometry::SEGMENT, Geometry::TRIANGLE, Geometry::TETRAHEDRON };
-      fe = fec->FiniteElementForGeometry(geoms[pfes->GetMesh()->Dimension()-1]);
+      fe = fec->FiniteElementForGeometry(geoms[mesh->Dimension()-1]);
    }
    else
    {
       fe = fec->FiniteElementForGeometry(mesh->GetElementBaseGeometry(0));
    }
+   /* XXX these, and ngf need to be reduced on the comm */
    order = fe->GetOrder();
    bool scalar = (fe->GetRangeType() == FiniteElement::SCALAR);
 
