@@ -27,8 +27,8 @@ env:
     - PETSC_OPTIONS='-check_pointer_intensity 0 -malloc_test'
     - OPTFLAGS='-O'
     - CPPFLAGS="-Wno-unused-command-line-argument"
-    - PETSC_COMMIT=3c22afaba2ce393b79c203f4b51ca59f7d08f428
-    - MFEM_COMMIT=dde32310a0731310769de6462350d0a382711456
+    - PETSC_COMMIT=
+    - MFEM_COMMIT=0c1318dfd363afca4de3486501155fa85fbdac3a
 
   matrix:
 
@@ -102,7 +102,7 @@ install:
   - cd $PETSC_DIR
   - git fetch
   - git clean -q -d -x -f
-  - git reset --hard ${PETSC_COMMIT:-master}
+  - git reset --hard ${PETSC_COMMIT:-origin/master}
   - ./configure PETSC_ARCH=arch-test --with-cc=mpicc --with-cxx=mpicxx --with-fc=0 --with-debugging=${DBG:-0} --with-clanguage=${LANGUAGE:-C} --with-64-bit-indices=${INT64:-0} --with-scalar-type=${SCALAR:-real} --with-precision=${PRECISION:-double} --download-mfem=${MFEM:-0} --download-hypre=${MFEM:-0} --download-metis=${MFEM:-0} --download-mfem-commit=${MFEM_COMMIT:-master} $BLASLAPACK COPTFLAGS="$OPTFLAGS" CXXOPTFLAGS="$OPTFLAGS" FOPTFLAGS="$OPTFLAGS" --CPPFLAGS="$CPPFLAGS" --CXXCPPFLAGS="$CPPFLAGS" || /bin/sh -c "tail -2500 configure.log; false"
   - make MAKE_NP=$(nproc) PETSC_ARCH=arch-test || /bin/sh -c "if [ -f arch-test/lib/petsc/conf/mfem.errorflg ]; then tail -200 arch-test/lib/petsc/conf/mfem.log; fi; tail -200 make.log; false"
   - cd $PETSCOPT_DIR
