@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
       {
          mesh->UniformRefinement();
       }
-      mesh->EnsureNCMesh();
+      if (ncrl) mesh->EnsureNCMesh();
       for (int lev = 0; lev < ncrl; lev++)
       {
          NCRefinement(mesh,refine_fn);
@@ -260,6 +260,7 @@ int main(int argc, char *argv[])
    PDCoefficient *mu_pd = NULL;
    BilinearFormIntegrator *mu_bilin = NULL;
    PDBilinearFormIntegrator *mu_bilin_pd = NULL;
+   /* scalar space for param */
    if (mu_scal)
    {
       if (mu_excl_fn) mu_pd = new PDCoefficient(*mu,pmesh,mu_fec,excl_fn);
@@ -267,16 +268,18 @@ int main(int argc, char *argv[])
       if (glvis) mu_pd->Visualize();
 
       ParFiniteElementSpace* fes = new ParFiniteElementSpace(pmesh,s_fec);
-      if (s_scal)
+
+      if (s_scal) /* test scalar space intergrators */
       {
          mu_bilin    = new MassIntegrator(*mu);
          mu_bilin_pd = new PDMassIntegrator(*mu_pd);
       }
-      else
+      else /* test vector space integrators */
       {
          mu_bilin    = new VectorFEMassIntegrator(*mu);
          mu_bilin_pd = new PDVectorFEMassIntegrator(*mu_pd);
       }
+
       TestOperator    op(fes,mu_bilin);
       TestOperator op_pd(fes,mu_bilin_pd);
 
@@ -292,6 +295,7 @@ int main(int argc, char *argv[])
       delete mu_bilin;
       delete mu_bilin_pd;
 
+      /* test vector coefficient with vector integrators */
       if (!s_scal)
       {
          if (mu_excl_fn) mu_pd = new PDCoefficient(*mu_vec,pmesh,mu_fec,excl_fn);
@@ -318,7 +322,7 @@ int main(int argc, char *argv[])
       }
       delete fes;
    }
-   else if (!s_scal)
+   else if (!s_scal) /* vector space for param */
    {
       if (mu_excl_fn) mu_pd = new PDCoefficient(*mu_vec,pmesh,mu_fec,excl_fn);
       else            mu_pd = new PDCoefficient(*mu_vec,pmesh,mu_fec,mu_excl_a);
@@ -336,7 +340,7 @@ int main(int argc, char *argv[])
 #endif
       {
          fes         = new ParFiniteElementSpace(pmesh,s_fec);
-         mu_bilin    = new VectorFEMassIntegrator(*mu);
+         mu_bilin    = new VectorFEMassIntegrator(*mu_vec);
          mu_bilin_pd = new PDVectorFEMassIntegrator(*mu_pd);
       }
       TestOperator    op(fes,mu_bilin);
