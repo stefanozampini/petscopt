@@ -16,7 +16,7 @@ namespace mfemopt
 class PDCoefficient
 {
 private:
-   int lsize,lvsize;
+   int lsize;
    int order;
    bool usederiv;
    bool usefuncs;
@@ -38,6 +38,7 @@ private:
    mfem::Array<mfem::ParGridFunction*> pgradgf;
    mfem::Array<mfem::ParGridFunction*> deriv_coeffgf;
    mfem::Array<mfem::ParGridFunction*> deriv_work_coeffgf;
+   mfem::Array<mfem::Vector*> pcoeffv0;
    mfem::PetscParMatrix* P;
    mfem::PetscParMatrix* R;
 
@@ -51,7 +52,7 @@ protected:
    void ElemDeriv(int,int,int,double=1.0);
 
 public:
-   PDCoefficient() : lsize(0), lvsize(0), order(-1), usederiv(false), deriv_s_coeff(NULL), deriv_m_coeff(NULL), s_coeff(NULL), m_coeff(NULL), P(NULL) {}
+   PDCoefficient() : lsize(0), order(-1), usederiv(false), deriv_s_coeff(NULL), deriv_m_coeff(NULL), s_coeff(NULL), m_coeff(NULL), P(NULL) {}
    PDCoefficient(mfem::Coefficient&,mfem::ParMesh*,const mfem::FiniteElementCollection*,
                  const mfem::Array<int>&);
    PDCoefficient(mfem::Coefficient&,mfem::ParMesh*,const mfem::FiniteElementCollection*,
@@ -75,9 +76,9 @@ public:
    mfem::PetscParMatrix* GetP() { return P; }
    mfem::Array<bool>& GetExcludedElements() { return pcoeffexcl; }
    int GetLocalSize() { return lsize; }
-   int GetLocalVSize() { return lvsize; }
    int GetOrder() { return order; }
    void GetCurrentVector(mfem::Vector&);
+   void GetInitialVector(mfem::Vector&);
    void SetUseDerivCoefficients(bool=true);
    void UpdateCoefficient(const mfem::Vector&);
    void UpdateCoefficientWithGF(const mfem::Vector&,mfem::Array<mfem::ParGridFunction*>&);

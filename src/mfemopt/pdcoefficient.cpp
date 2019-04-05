@@ -35,13 +35,17 @@ void PDCoefficient::Reset()
    {
       delete deriv_work_coeffgf[i];
    }
+   for (int i=0; i<pcoeffv0.Size(); i++)
+   {
+      delete pcoeffv0[i];
+   }
    pcoeffgf.SetSize(0);
    pgradgf.SetSize(0);
    deriv_coeffgf.SetSize(0);
    deriv_work_coeffgf.SetSize(0);
+   pcoeffv0.SetSize(0);
    global_cols.SetSize(0);
    delete pfes;
-   lvsize = 0;
    lsize = 0;
    order = -1;
    for (unsigned int i=0; i<souts.size(); i++)
@@ -99,7 +103,6 @@ PDCoefficient::PDCoefficient(VectorCoefficient& Q, ParMesh *mesh, const FiniteEl
 void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficient *MQ, ParMesh *mesh, const FiniteElementCollection *fec, const Array<bool>& excl)
 {
    lsize = 0;
-   lvsize = 0;
    usederiv = false;
    deriv_s_coeff = NULL;
    deriv_m_coeff = NULL;
@@ -108,20 +111,31 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
    P = NULL;
    R = NULL;
 
-   const FiniteElement *fe;
-   if (!mesh->GetNE())
-   {
-      static const Geometry::Type geoms[3] =
-      { Geometry::SEGMENT, Geometry::TRIANGLE, Geometry::TETRAHEDRON };
-      fe = fec->FiniteElementForGeometry(geoms[mesh->Dimension()-1]);
-   }
-   else
+   const FiniteElement *fe = NULL;
+   if (mesh->GetNE())
    {
       fe = fec->FiniteElementForGeometry(mesh->GetElementBaseGeometry(0));
    }
-   /* XXX these, and ngf need to be reduced on the comm */
-   order = fe->GetOrder();
-   bool scalar = (fe->GetRangeType() == FiniteElement::SCALAR);
+   /* Reduce on the comm */
+   bool scalar;
+   {
+      int loc[2] = {-1,-1};
+      int glob[2];
+
+      if (fe)
+      {
+         loc[0] = fe->GetOrder();
+         loc[1] = fe->GetRangeType();
+      }
+      MPI_Allreduce(loc,glob,2,MPI_INT,MPI_MAX,mesh->GetComm());
+      if (loc[0] != -1)
+      {
+         MFEM_VERIFY(loc[0] == glob[0],"Different order not supported " << loc[0] << " != " << glob[0]); /* XXX Not exhaustive check */
+         MFEM_VERIFY(loc[1] == glob[1],"Different range not supported " << loc[1] << " != " << glob[1]); /* XXX Not exhaustive check */
+      }
+      order = glob[0];
+      scalar = (glob[1] == FiniteElement::SCALAR);
+   }
 
    /* store values of projected initial coefficients
       and create actual coefficients to be used */
@@ -151,18 +165,6 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
 
    /* store values of projected initial coefficients
       and create actual coefficients to be used */
-   /*
-
-   TODO:
-      0 - 1 - 2
-      | v | w |
-      3 - 4 - 5
-      |   y   |
-      6 ----- 7
-
-      4 will have a value from project (v+w+y) != from P*true_dofs
-
-   */
    if (MQ) { mfem_error("Not yet implemented"); }
    else if (VQ)
    {
@@ -177,7 +179,6 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
 
             ComponentCoefficient Q(*VQ,i);
             *pcoeffgf[i] = 0.0;
-            //pcoeffgf[i]->ProjectCoefficient(Q);
             pcoeffgf[i]->ProjectDiscCoefficient(Q,GridFunction::ARITHMETIC);
          }
          /* XXX MASK */
@@ -199,9 +200,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
          deriv_coeffgf.Append(new ParGridFunction(pfes));
          deriv_work_coeffgf.Append(new ParGridFunction(pfes));
          pgradgf.Append(new ParGridFunction(pfes));
-
          *pcoeffgf[0] = 0.0;
-         //pcoeffgf[0]->ProjectCoefficient(*VQ);
          pcoeffgf[0]->ProjectDiscCoefficient(*VQ,GridFunction::ARITHMETIC);
 
          m_coeff = new DiagonalMatrixCoefficient(new VectorGridFunctionCoefficient(pcoeffgf[0]),true);
@@ -216,17 +215,34 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
       pgradgf.Append(new ParGridFunction(pfes));
 
       *pcoeffgf[0] = 0.0;
-      //pcoeffgf[0]->ProjectCoefficient(*Q);
       pcoeffgf[0]->ProjectDiscCoefficient(*Q,GridFunction::ARITHMETIC);
       s_coeff = new GridFunctionCoefficient(pcoeffgf[0]);
       deriv_s_coeff = new GridFunctionCoefficient(deriv_coeffgf[0]);
    }
 
+   /* Store conforming initial values and distribute, because
+      the code always uses P to compute the vdofs values
+      When using a H1 space, in the case of element-wise jumps below
+
+      0 - 1 - 2
+      | v | w |
+      3 - 4 - 5
+      |   y   |
+      6 ----- 7
+
+      vdof #4 will have a value from project (v+w+y) and
+      a value from P*true_dofs_vals ((y+v) + (y+w))/2
+   */
    for (int i = 0; i < ngf; i++)
    {
-      lvsize += pcoeffgf[i]->ParFESpace()->GetVSize();
+      int tvsize = pcoeffgf[i]->ParFESpace()->GetTrueVSize();
+
+      pcoeffv0.Append(new Vector(tvsize));
+      pcoeffgf[i]->ParallelProject(*pcoeffv0[i]);
+      pcoeffgf[i]->Distribute(*pcoeffv0[i]);
    }
 
+   /* process excluded elements */
    pcoeffexcl.SetSize(mesh->GetNE());
    pcoeffexcl = false;
    for (int i = 0; i < std::min(pcoeffexcl.Size(),excl.Size()); i++) pcoeffexcl[i] = excl[i];
@@ -237,6 +253,49 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
 
    if (has)
    {
+      /* excluded elements mark their dofs as fixed */
+      Array<int> vdofs_mark(pfes->Dof_TrueDof_Matrix()->Height());
+      Array<int> tdofs_mark(pfes->Dof_TrueDof_Matrix()->Width());
+      vdofs_mark = 0;
+      tdofs_mark = 0;
+      for (int i = 0; i < mesh->GetNE(); i++)
+      {
+         if (pcoeffexcl[i])
+         {
+            Array<int> dofs;
+            pfes->GetElementVDofs(i,dofs);
+            for (int j = 0; j < dofs.Size(); j++) vdofs_mark[dofs[j]] = 1;
+         }
+      }
+
+      /* reduce the vdofs marker */
+      pfes->Synchronize(vdofs_mark);
+
+      /* make it conforming */
+      pfes->GetRestrictionMatrix()->BooleanMult(vdofs_mark,tdofs_mark);
+      pfes->Dof_TrueDof_Matrix()->BooleanMult(1,tdofs_mark,1,vdofs_mark);
+
+      /* store vdofs indices and initial values from excluded regions */
+      pcoeffiniti.Reserve(vdofs_mark.Size());
+      for (int i = 0; i < vdofs_mark.Size(); i++)
+      {
+         if (vdofs_mark[i])
+         {
+            pcoeffiniti.Append(i);
+         }
+      }
+      pcoeffinitv.SetSize(pcoeffiniti.Size()*ngf);
+      for (int g = 0; g < ngf; g++)
+      {
+         ParGridFunction *vgf = pcoeffgf[g];
+         const int st = g*vgf->Size();
+         for (int i = 0; i < pcoeffiniti.Size(); i++)
+         {
+            pcoeffinitv[i+st] = (*vgf)[pcoeffiniti[i]];
+         }
+      }
+
+      /* dof_truedof on active dofs */
       PetscParMatrix *PT = new PetscParMatrix(pfes->Dof_TrueDof_Matrix(),Operator::PETSC_MATAIJ);
       Array<PetscInt> rows(PT->GetNumRows());
       PetscInt rst = PT->GetRowStart();
@@ -245,70 +304,6 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
          rows[i] = i + rst;
       }
 
-      Array<int> vdofs_mark(pfes->Dof_TrueDof_Matrix()->Height()),tdofs_mark(pfes->Dof_TrueDof_Matrix()->Width());
-      vdofs_mark = 0;
-      tdofs_mark = 0;
-      for (int i = 0; i < mesh->GetNE(); i++)
-      {
-         if (!pcoeffexcl[i])
-         {
-            Array<int> dofs;
-            pfes->GetElementVDofs(i,dofs);
-            for (int j = 0; j < dofs.Size(); j++) vdofs_mark[dofs[j]] = 1;
-         }
-      }
-
-      /* need to reduce the vdofs_markers */
-      pfes->Synchronize(vdofs_mark);
-
-      /* For nonconforming meshes, we may want to include all the true dofs until
-         all vdofs are represented by true dofs in the optimization process? */
-      PetscInt cum = 0,maxcum = 0;
-      PetscOptionsGetInt(NULL,NULL,"-mfemopt_ncsquare",&maxcum,NULL);
-      PetscBool done = maxcum > 0 ? PETSC_FALSE : PETSC_TRUE;
-      while (!done && cum < maxcum)
-      {
-        int b = vdofs_mark.Sum();
-        pfes->Dof_TrueDof_Matrix()->BooleanMultTranspose(1,vdofs_mark,1,tdofs_mark);
-        pfes->Dof_TrueDof_Matrix()->BooleanMult(1,tdofs_mark,1,vdofs_mark);
-        int a = vdofs_mark.Sum();
-        PetscBool ldone = (PetscBool)(a == b);
-        MPI_Allreduce(&ldone,&done,1,MPIU_BOOL,MPI_LOR,mesh->GetComm());
-        cum++;
-      }
-      MFEM_VERIFY(done,"Internal error: try with a value for -mfemopt_ncsquare greater than " << maxcum);
-      pfes->Dof_TrueDof_Matrix()->BooleanMultTranspose(1,vdofs_mark,1,tdofs_mark);
-
-      /* store local vdofs indices for excluded regions */
-      Array<int> initi(pfes->Dof_TrueDof_Matrix()->Height());
-      {
-         int cum = 0;
-         for (int i = 0; i < vdofs_mark.Size(); i++)
-         {
-            if (!vdofs_mark[i])
-            {
-               initi[cum++] = i;
-            }
-         }
-         initi.SetSize(cum);
-      }
-
-      /* we don't exclude those elements that are
-         neighbours of the domain of interest */
-      for (int i = 0; i < mesh->GetNE(); i++)
-      {
-         if (pcoeffexcl[i])
-         {
-            Array<int> dofs;
-            pfes->GetElementVDofs(i,dofs);
-            for (int j = 0; j < dofs.Size(); j++)
-            {
-               if (vdofs_mark[dofs[j]]) { pcoeffexcl[i] = false; break; }
-            }
-         }
-      }
-
-      /* restrict on active dofs */
       Array<PetscInt> local_cols;
       global_cols.Reserve(PT->Width());
       local_cols.Reserve(PT->Width());
@@ -316,7 +311,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
 
       for (int i = 0; i < tdofs_mark.Size(); i++)
       {
-         if (tdofs_mark[i])
+         if (!tdofs_mark[i])
          {
             global_cols.Append(i + cst);
             local_cols.Append(i);
@@ -325,6 +320,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
       P = new PetscParMatrix(*PT,rows,global_cols);
       delete PT;
 
+      /* Restriction on active dofs */
       for (int i = 0; i < rows.Size(); i++)
       {
          rows[i] = i;
@@ -332,20 +328,8 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
       PT = new PetscParMatrix(pfes->GetRestrictionMatrix());
       R = new PetscParMatrix(*PT,local_cols,rows);
       delete PT;
-
-      initi.Copy(pcoeffiniti);
-      pcoeffinitv.SetSize(initi.Size()*ngf);
-      for (int g = 0; g < ngf; g++)
-      {
-         ParGridFunction *vgf = pcoeffgf[g];
-         const int st = g*vgf->Size();
-         for (int i = 0; i < initi.Size(); i++)
-         {
-            pcoeffinitv[i+st] = (*vgf)[initi[i]];
-         }
-      }
    }
-   else
+   else /* no elements to be excluded, convert to PETSc operators for later usage */
    {
       P = new PetscParMatrix(pfes->Dof_TrueDof_Matrix(),Operator::PETSC_MATAIJ);
       R = new PetscParMatrix(PETSC_COMM_SELF,pfes->GetRestrictionMatrix());
@@ -375,6 +359,8 @@ void PDCoefficient::Save(const char* filename)
       oofs.precision(8);
 
       pmesh->Print(oofs);
+      // XXX SHOULD I DO THIS HERE ?
+#if 0
       /* restore values from excluded regions */
       ParGridFunction *gf = pcoeffgf[i];
       const int st = i*gf->Size();
@@ -382,6 +368,7 @@ void PDCoefficient::Save(const char* filename)
       {
          (*gf)[pcoeffiniti[j]] = pcoeffinitv[j+st];
       }
+#endif
       pcoeffgf[i]->Save(oofs);
    }
 }
@@ -506,10 +493,24 @@ void PDCoefficient::GetCurrentVector(Vector& m)
    MFEM_VERIFY(m.Size() == lsize,"Invalid Vector size " << m.Size() << "!. Should be " << lsize);
    double *data = m.GetData();
    int n = P->Width();
-   for (int i=0; i<pgradgf.Size(); i++)
+   for (int i=0; i<pcoeffgf.Size(); i++)
    {
       Vector pmi(data,n);
       R->Mult(*pcoeffgf[i],pmi);
+      data += n;
+      pmi.SetData(NULL); /* XXX clang static analysis */
+   }
+}
+
+void PDCoefficient::GetInitialVector(Vector& m)
+{
+   MFEM_VERIFY(m.Size() == lsize,"Invalid Vector size " << m.Size() << "!. Should be " << lsize);
+   double *data = m.GetData();
+   int n = P->Width();
+   for (int i=0; i<pcoeffv0.Size(); i++)
+   {
+      Vector pmi(data,n);
+      R->Mult(*pcoeffv0[i],pmi);
       data += n;
       pmi.SetData(NULL); /* XXX clang static analysis */
    }
