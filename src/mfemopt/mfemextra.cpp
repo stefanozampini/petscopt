@@ -204,19 +204,33 @@ void ParMeshPrint(ParMesh& mesh, const char* filename)
    mesh.Print(oofs);
 }
 
-void MeshGetElementsTagged(Mesh *mesh, bool (*tag_fn)(const Vector&),Array<bool>& tag)
+void MeshGetElementsTagged(Mesh *mesh, bool (*tag_fn)(const Vector&), Array<bool>& tag, bool center)
 {
    tag.SetSize(mesh->GetNE());
+   tag = true;
    Vector pt(mesh->SpaceDimension());
    for (int e = 0; e < mesh->GetNE(); e++)
    {
-      mesh->GetElementTransformation(e)->Transform(
-         Geometries.GetCenter(mesh->GetElementBaseGeometry(e)), pt);
-      tag[e] = (*tag_fn)(pt);
+      if (center)
+      {
+         mesh->GetElementTransformation(e)->Transform(
+            Geometries.GetCenter(mesh->GetElementBaseGeometry(e)), pt);
+         tag[e] = (*tag_fn)(pt);
+      }
+      else
+      {
+         Array<int> vv;
+         mesh->GetElementVertices(e,vv);
+         for (int v = 0; v < vv.Size(); v++)
+         {
+            mesh->GetNode(vv[v], pt.GetData());
+            tag[e] = tag[e] && (*tag_fn)(pt);
+         }
+      }
    }
 }
 
-void MeshGetElementsTagged(Mesh *mesh,const Array<int>& which_tag,Array<bool>& tag)
+void MeshGetElementsTagged(Mesh *mesh, const Array<int>& which_tag, Array<bool>& tag)
 {
    tag.SetSize(mesh->GetNE());
    for (int i = 0; i < mesh->GetNE(); i++)

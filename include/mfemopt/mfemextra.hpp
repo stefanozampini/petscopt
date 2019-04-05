@@ -61,7 +61,7 @@ public:
 };
 
 void MeshGetElementsTagged(mfem::Mesh*,const mfem::Array<int>&,mfem::Array<bool>&);
-void MeshGetElementsTagged(mfem::Mesh*,bool(*)(const mfem::Vector&),mfem::Array<bool>&);
+void MeshGetElementsTagged(mfem::Mesh*,bool(*)(const mfem::Vector&),mfem::Array<bool>&,bool = false);
 
 void FiniteElementSpaceGetRangeAndDeriv(mfem::FiniteElementSpace&,int*,int*);
 void ParFiniteElementSpaceGetRangeAndDeriv(mfem::ParFiniteElementSpace&,int*,int*);
