@@ -653,6 +653,7 @@ void RegularizedMultiSourceMisfit::ComputeGuess(Vector& m) const
    m.SetSize(Height());
    m = 0.0;
    drep->Reduce("opt_data",dummy,m);
+   pmap->InverseMap(m,m);
 }
 
 void RegularizedMultiSourceMisfit::ComputeObjective(const Vector& m, double *f) const
@@ -1133,7 +1134,8 @@ int main(int argc, char *argv[])
    PetscReal tva = 1.0, tvb = 0.1;
    PetscBool tvopt = PETSC_FALSE, tvpd = PETSC_TRUE, tvsy = PETSC_FALSE, tvpr = PETSC_FALSE;
 
-   PetscBool test_part = PETSC_FALSE, test_null = PETSC_FALSE, test_newton = PETSC_FALSE, test_progress = PETSC_TRUE;
+   PetscBool test_part = PETSC_FALSE, test_null = PETSC_FALSE, test_progress = PETSC_TRUE;
+   PetscBool test_newton = PETSC_FALSE, test_opt = PETSC_FALSE;
    PetscBool test_misfit[3] = {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}, test_misfit_reg[2] = {PETSC_FALSE,PETSC_FALSE}, test_misfit_internal = PETSC_FALSE;
    PetscReal test_newton_noise = 0.0;
    PetscBool glvis = PETSC_TRUE, save = PETSC_FALSE;
@@ -1204,6 +1206,7 @@ int main(int argc, char *argv[])
 
       ierr = PetscOptionsBool("-test_partitioning","Test with a fixed element partition",NULL,test_part,&test_part,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-test_newton","Test Newton solver",NULL,test_newton,&test_newton,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsBool("-test_opt","Test Optimization solver",NULL,test_opt,&test_opt,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsReal("-test_newton_noise","Test Newton solver: noise level",NULL,test_newton_noise,&test_newton_noise,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-test_null","Use exact solution when testing",NULL,test_null,&test_null,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-test_progress","Report progress when testing",NULL,test_progress,&test_progress,NULL);CHKERRQ(ierr);
@@ -1618,18 +1621,16 @@ int main(int argc, char *argv[])
       tv->TestFDHessian(comm,dummy,m,0.0);
    }
 
-
    /* Test callbacks for full objective */
    if (test_misfit_reg[0])
    {
-      Vector muv;
-      if (!test_null) robj->ComputeGuess(muv);
-      else muv = muv_exact;
-      if (!master) muv.SetSize(0);
-
-      /* Misfit in terms of mu, the optimization variable is the inverse of the map */
-      Vector m(muv.Size());
-      pmap.InverseMap(muv,m);
+      Vector m(muv_exact.Size());
+      if (!test_null) robj->ComputeGuess(m);
+      else
+      {
+         pmap.InverseMap(muv_exact,m);
+      }
+      if (!master) m.SetSize(0);
 
       double f;
       robj->ComputeObjective(m,&f);
@@ -1639,21 +1640,21 @@ int main(int argc, char *argv[])
    /* Test callbacks for full objective gradient */
    if (test_misfit_reg[1])
    {
-      Vector muv;
-      if (!test_null) robj->ComputeGuess(muv);
-      else muv = muv_exact;
-      if (!master) muv.SetSize(0);
-
-      /* Misfit in terms of mu, the optimization variable is the inverse of the map */
-      Vector m(muv.Size());
-      pmap.InverseMap(muv,m);
+      Vector m(muv_exact.Size());
+      if (!test_null) robj->ComputeGuess(m);
+      else
+      {
+         pmap.InverseMap(muv_exact,m);
+      }
+      if (!master) m.SetSize(0);
 
       Vector y(m.Size());
       robj->Mult(m,y);
    }
 
    /* Test Newton solver */
-   if (test_newton) {
+   if (test_newton)
+   {
       PetscNonlinearSolverOpt newton(PETSC_COMM_WORLD,*robj,"newton_");
 
       newton.SetJacobianType(Operator::PETSC_MATSHELL);
@@ -1669,13 +1670,13 @@ int main(int argc, char *argv[])
       UserMonitor solmonitor(mu_inv_pd,NULL,glvis ? 1 : 0,"Newton solution");
       if (glvis) newton.SetMonitor(&solmonitor);
 
-      Vector muv;
-      if (!test_null) robj->ComputeGuess(muv);
-      else muv = muv_exact;
-      if (!master) muv.SetSize(0);
-
-      Vector dummy,u(muv.Size());
-      pmap.InverseMap(muv,u);
+      Vector u(muv_exact.Size());
+      if (!test_null) robj->ComputeGuess(u);
+      else
+      {
+         pmap.InverseMap(muv_exact,u);
+      }
+      if (!master) u.SetSize(0);
 
       GaussianNoise nnoise;
       Vector vnoise;
@@ -1690,6 +1691,7 @@ int main(int argc, char *argv[])
       PetscPrintf(PETSC_COMM_WORLD,"Initial objective %g (LS %g, TV %g)\n",f1,f2,f1-f2);
       tv->SetScale(tva);
 
+      Vector dummy;
       newton.Mult(dummy,u);
 
       robj->ComputeObjective(u,&f1);
@@ -1703,13 +1705,58 @@ int main(int argc, char *argv[])
       //u[2] = -1e6;
       //mu_pd->UpdateCoefficient(u);
       //mu_pd->Visualize("RJlc");
-
+      if (save)
+      {
+         mu_inv_pd->UpdateCoefficient(u);
+         mu_inv_pd->Save("newton_solution");
+      }
    }
-   if (save)
+
+   /* Test Optimization solver */
+   if (test_opt)
    {
-      mu_pd->Save("saved");
-   }
+      PetscOptimizationSolver opt(PETSC_COMM_WORLD,*robj,"opt_");
 
+      OptimizationMonitor mymonitor;
+      opt.SetMonitor(&mymonitor);
+      UserMonitor solmonitor(mu_inv_pd,NULL,glvis ? 1 : 0,"TAO solution");
+      if (glvis) opt.SetMonitor(&solmonitor);
+
+      // TODO check guess with TAO
+      Vector u(muv_exact.Size());
+      if (!test_null) robj->ComputeGuess(u);
+      else
+      {
+         pmap.InverseMap(muv_exact,u);
+      }
+      if (!master) u.SetSize(0);
+
+      GaussianNoise nnoise;
+      Vector vnoise;
+      nnoise.random(vnoise,u.Size());
+      vnoise *= test_newton_noise;
+      u += vnoise;
+
+      double f1,f2;
+      robj->ComputeObjective(u,&f1);
+      tv->SetScale(0.0);
+      robj->ComputeObjective(u,&f2);
+      PetscPrintf(PETSC_COMM_WORLD,"OPT: Initial objective %g (LS %g, TV %g)\n",f1,f2,f1-f2);
+      tv->SetScale(tva);
+
+      opt.Solve(u);
+
+      robj->ComputeObjective(u,&f1);
+      tv->SetScale(0.0);
+      robj->ComputeObjective(u,&f2);
+      PetscPrintf(PETSC_COMM_WORLD,"OPT: Final objective %g (LS %g, TV %g)\n",f1,f2,f1-f2);
+
+      if (save)
+      {
+         mu_inv_pd->UpdateCoefficient(u);
+         mu_inv_pd->Save("tao_solution");
+      }
+   }
    if (rpmesh) pmesh = NULL;
    delete rpmesh;
    delete drep;
@@ -1755,6 +1802,9 @@ int main(int argc, char *argv[])
      test:
        suffix: newton_full
        args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 10 -newton_snes_rtol 1.e-6 -newton_snes_atol 1.e-6 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1
+     test:
+       suffix: taonewton_full
+       args: -glvis 0 -test_newton 0 -test_opt -opt_tao_converged_reason -opt_tao_max_it 10 -opt_tao_gttol 1.e-6 -opt_tao_gatol 1.e-6 -opt_tao_type nls -opt_tao_nls_ksp_type fgmres -opt_tao_nls_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1
 
    test:
       suffix: em_test
