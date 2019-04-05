@@ -67,7 +67,7 @@ PetscReal excl_fn_bb[6] = {-1.0,1.0,-1.0,1.0,-1.0,1.0};
 
 static bool excl_fn(const Vector &x)
 {
-   for (int d = 0; d < x.Size(); d++) if (x(d) < excl_fn_bb[2*d] || x(d) > excl_fn_bb[2*d+1]) return true;
+   for (int d = 0; d < x.Size(); d++) if (x(d) <= excl_fn_bb[2*d] || x(d) >= excl_fn_bb[2*d+1]) return true;
    return false;
 }
 
@@ -1625,6 +1625,7 @@ int main(int argc, char *argv[])
       Vector muv;
       if (!test_null) robj->ComputeGuess(muv);
       else muv = muv_exact;
+      if (!master) muv.SetSize(0);
 
       /* Misfit in terms of mu, the optimization variable is the inverse of the map */
       Vector m(muv.Size());
@@ -1641,6 +1642,7 @@ int main(int argc, char *argv[])
       Vector muv;
       if (!test_null) robj->ComputeGuess(muv);
       else muv = muv_exact;
+      if (!master) muv.SetSize(0);
 
       /* Misfit in terms of mu, the optimization variable is the inverse of the map */
       Vector m(muv.Size());
@@ -1670,6 +1672,7 @@ int main(int argc, char *argv[])
       Vector muv;
       if (!test_null) robj->ComputeGuess(muv);
       else muv = muv_exact;
+      if (!master) muv.SetSize(0);
 
       Vector dummy,u(muv.Size());
       pmap.InverseMap(muv,u);
