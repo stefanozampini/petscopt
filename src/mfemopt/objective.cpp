@@ -280,12 +280,13 @@ void ObjectiveFunction::TestFDHessian(MPI_Comm comm, const Vector& xIn, const Ve
 }
 
 // TikhonovRegularizer
-TikhonovRegularizer::TikhonovRegularizer(PDCoefficient *_u0) : ObjectiveFunction(false,true)
+TikhonovRegularizer::TikhonovRegularizer(PDCoefficient *_u) : ObjectiveFunction(false,true)
 {
-   Array<ParGridFunction*> &pgf = _u0->GetCoeffs();
+   Array<ParGridFunction*> &pgf = _u->GetCoeffs();
    if (!pgf.Size()) return;
    MFEM_VERIFY(pgf.Size() == 1,"Not yet coded");
 
+   /* TODO: make it customizable */
    BilinearForm *m = new BilinearForm(pgf[0]->ParFESpace());
    m->AddDomainIntegrator(new MassIntegrator());
    m->Assemble(0);
@@ -298,13 +299,13 @@ TikhonovRegularizer::TikhonovRegularizer(PDCoefficient *_u0) : ObjectiveFunction
                                            Operator::PETSC_MATAIJ);
    delete m;
 
-   PetscParMatrix *P = _u0->GetP();
+   PetscParMatrix *P = _u->GetP();
 
    H_MM = RAP(tM,P);
    delete tM;
 
    u0 = new PetscParVector(*P);
-   _u0->GetCurrentVector(*u0);
+   _u->GetInitialVector(*u0);
 }
 
 void TikhonovRegularizer::Eval(const mfem::Vector& u,const mfem::Vector& m,double t,double* f)
@@ -353,7 +354,6 @@ TDLeastSquares::TDLeastSquares() : ObjectiveFunction(true,false)
 {
    Init();
 }
-
 
 TDLeastSquares::TDLeastSquares(const Array<Receiver*>& _receivers, ParFiniteElementSpace* _fe, bool _own_recv) : ObjectiveFunction(true,false)
 {
