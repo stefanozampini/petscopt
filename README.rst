@@ -6,7 +6,8 @@ Overview
 --------
 
 This framework provides high-level abstraction to compute gradient,
-hessians and tangent linear models for PDE-constrained optimization.
+hessians and tangent linear models for PDE-constrained optimization
+problems with ODE constraints.
 It is based on `PETSc <http://www.mcs.anl.gov/petsc/>`_, the
 *Portable, Extensible Toolkit for Scientific Computation*. The FEM
 capability is based on the C++ library `MFEM <http://www.mfem.org/>`_.
@@ -18,7 +19,7 @@ Basic Installation
 First `install PETSc
 <http://www.mcs.anl.gov/petsc/documentation/installation.html>`_,
 and then set appropriate values for ``PETSC_DIR`` and ``PETSC_ARCH`` in your
-environment::
+environment (PETSc version greater or equal 3.11 is required)::
 
   $ export PETSC_DIR=/home/user/petsc
   $ export PETSC_ARCH=arch-linux2-c-debug
@@ -39,11 +40,11 @@ Example codes are located at ``src/ts/examples/tests`` and ``src/tao/examples/te
 MFEM support
 ------------
 
-In order to enable the MFEM based FEM layer, you have two options
+In order to enable the MFEM based FEM layer (MFEM version greater or equal 4.0 must be used), you have two options
 
-  **recommended**: Configure PETSc using --download-mfem --download-hypre --download-metis
+  **recommended**: Configure PETSc using --download-mfem --download-mfem-commit=a4f7d192216121f0099e641aad2445edc1eea343 --download-hypre --download-metis
 
-  **harder**: After having built PETSc, follow the instructions to `build MFEM <https://mfem.org/building/>`_, and enable PETSc as a third-party package via ``MFEM_USE_PETSC=YES``. Then set the environment variable ``MFEM_DIR``::
+  **harder**: After having built PETSc, follow the instructions to `build MFEM <https://mfem.org/building/>`_, and enable PETSc as a third-party package via ``MFEM_USE_PETSC=YES``. A version including commit a4f7d192216121f0099e641aad2445edc1eea343 must be used. Then set the environment variable ``MFEM_DIR``::
 
               $ export MFEM_DIR=_location_of_MFEM_
 
