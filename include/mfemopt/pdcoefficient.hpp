@@ -20,6 +20,7 @@ private:
    int order;
    bool usederiv;
    bool usefuncs;
+   bool incl_bdr; /* XXX custom */
 
    mfem::ParFiniteElementSpace* pfes;
 
@@ -30,9 +31,15 @@ private:
    mfem::MatrixCoefficient* m_coeff;
 
    mfem::Array<PetscInt> global_cols;
+
    mfem::Array<bool>   pcoeffexcl;
+   mfem::Array<bool>   sforminteg;
    mfem::Array<int>    pcoeffiniti;
    mfem::Array<double> pcoeffinitv;
+   mfem::Array<int>    piniti;
+   mfem::Array<double> pinitv;
+   mfem::Array<int>    pactii;
+   mfem::Vector        pwork;
 
    mfem::Array<mfem::ParGridFunction*> pcoeffgf;
    mfem::Array<mfem::ParGridFunction*> pgradgf;
@@ -42,17 +49,23 @@ private:
    mfem::PetscParMatrix* P;
    mfem::PetscParMatrix* R;
 
+   mfem::ParGridFunction* l2gf;
+
    std::vector<mfem::socketstream*> souts;
 
-   void Reset();
+   void Init();
    void Init(mfem::Coefficient*,mfem::VectorCoefficient*,mfem::MatrixCoefficient*,mfem::ParMesh*,const mfem::FiniteElementCollection*,const mfem::Array<bool>&);
+   void Reset();
+   void SetUpOperators();
+   void FillExcl();
+   void UpdateExcl();
 
 protected:
    friend class PDBilinearFormIntegrator;
    void ElemDeriv(int,int,int,double=1.0);
 
 public:
-   PDCoefficient() : lsize(0), order(-1), usederiv(false), deriv_s_coeff(NULL), deriv_m_coeff(NULL), s_coeff(NULL), m_coeff(NULL), P(NULL) {}
+   PDCoefficient();
    PDCoefficient(mfem::Coefficient&,mfem::ParMesh*,const mfem::FiniteElementCollection*,
                  const mfem::Array<int>&);
    PDCoefficient(mfem::Coefficient&,mfem::ParMesh*,const mfem::FiniteElementCollection*,
@@ -75,18 +88,21 @@ public:
    mfem::Array<PetscInt>& GetGlobalCols() { return global_cols; }
    mfem::PetscParMatrix* GetP() { return P; }
    mfem::Array<bool>& GetExcludedElements() { return pcoeffexcl; }
+   mfem::Array<bool>& GetActiveElements() { return sforminteg; }
    int GetLocalSize() { return lsize; }
    int GetOrder() { return order; }
    void GetCurrentVector(mfem::Vector&);
    void GetInitialVector(mfem::Vector&);
    void SetUseDerivCoefficients(bool=true);
-   void UpdateCoefficient(const mfem::Vector&);
-   void UpdateCoefficientWithGF(const mfem::Vector&,mfem::Array<mfem::ParGridFunction*>&);
-   void UpdateGradient(mfem::Vector&);
+   void Distribute(const mfem::Vector&);
+   void Distribute(const mfem::Vector&,mfem::Array<mfem::ParGridFunction*>&);
+   void Assemble(mfem::Vector&);
    void Save(const char*);
    void SaveExcl(const char*);
    void SaveVisIt(const char*);
    void Visualize(const char* = NULL);
+
+   void Update();
    ~PDCoefficient();
 };
 

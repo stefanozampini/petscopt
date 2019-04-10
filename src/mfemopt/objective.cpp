@@ -638,8 +638,8 @@ void TVRegularizer::UpdateDual(const Vector& m, const Vector& dm, double lambda)
       ParFiniteElementSpace *pfes2 = pgf2[i]->ParFESpace();
       MFEM_VERIFY(mesh == pfes2->GetParMesh(),"Different meshes not supported");
    }
-   m_pd->UpdateCoefficientWithGF(m,pgf);
-   m_pd->UpdateCoefficientWithGF(dm,pgf2);
+   m_pd->Distribute(m,pgf);
+   m_pd->Distribute(dm,pgf2);
 
    Array<bool>& integ_exclude = m_pd->GetExcludedElements();
    double llopt = std::numeric_limits<double>::max(), lopt;
@@ -737,7 +737,7 @@ void TVRegularizer::Eval(const Vector& state, const Vector& m, double time, doub
       MFEM_VERIFY(mesh == pfes->GetParMesh(),"Different meshes not supported");
    }
 
-   m_pd->UpdateCoefficientWithGF(m,pgf);
+   m_pd->Distribute(m,pgf);
 
    double lf = 0.0;
    Array<bool>& integ_exclude = m_pd->GetExcludedElements();
@@ -776,7 +776,7 @@ void TVRegularizer::EvalGradient_M(const Vector& state, const Vector& m, double 
       MFEM_VERIFY(mesh == pfes->GetParMesh(),"Different meshes not supported");
    }
 
-   m_pd->UpdateCoefficientWithGF(m,pgf);
+   m_pd->Distribute(m,pgf);
 
    Array<ParGridFunction*> &pgradgf = m_pd->GetGradCoeffs();
    for (int pg = 0; pg < pgf.Size(); pg++) *pgradgf[pg] = 0.0;
@@ -798,7 +798,7 @@ void TVRegularizer::EvalGradient_M(const Vector& state, const Vector& m, double 
          pgradgf[pg]->AddElementVector(vdofs,elgrad);
       }
    }
-   m_pd->UpdateGradient(g);
+   m_pd->Assemble(g);
 }
 
 void TVRegularizer::SetUpHessian_MM(const Vector& x,const Vector& m,double t)
@@ -815,7 +815,7 @@ void TVRegularizer::SetUpHessian_MM(const Vector& x,const Vector& m,double t)
       MFEM_VERIFY(mesh == pfes->GetParMesh(),"Different meshes not supported");
    }
 
-   m_pd->UpdateCoefficientWithGF(m,pgf);
+   m_pd->Distribute(m,pgf);
 
    if (!ljacs.Size())
    {

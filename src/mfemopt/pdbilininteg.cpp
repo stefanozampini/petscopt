@@ -15,13 +15,7 @@ void PDBilinearFormIntegrator::UpdateCoefficient(const Vector& m)
 {
    if (!pdcoeff) return;
    pdcoeff->SetUseDerivCoefficients(false);
-   pdcoeff->UpdateCoefficient(m);
-}
-
-void PDBilinearFormIntegrator::UpdateGradient(Vector& g)
-{
-   if (!pdcoeff) return;
-   pdcoeff->UpdateGradient(g);
+   pdcoeff->Distribute(m);
 }
 
 void PDBilinearFormIntegrator::GetCurrentVector(Vector& m)
@@ -71,16 +65,16 @@ void PDBilinearFormIntegrator::ComputeGradient_Internal(ParGridFunction *sgf, co
 
    /* updates deriv_work_coeff: this also flags the needed coefficient for the element assembly */
    pdcoeff->SetUseDerivCoefficients();
-   pdcoeff->UpdateCoefficient(pertIn);
+   pdcoeff->Distribute(pertIn);
 
    /* XXX different adjoint space */
    if (!sworkgf) sworkgf = new ParGridFunction(sfes);
    *sworkgf = 0.0;
 
-   mfem::Array<bool>& elexcl = pdcoeff->GetExcludedElements();
+   mfem::Array<bool>& elactive = pdcoeff->GetActiveElements();
    for (int e = 0; e < pmesh->GetNE(); e++)
    {
-      if (elexcl[e]) continue;
+      if (!elactive[e]) continue;
 
       sfes->GetElementVDofs(e, vdofs);
       sgf->GetSubVector(vdofs, svals);
@@ -149,10 +143,10 @@ void PDBilinearFormIntegrator::ComputeGradientAdjoint_Internal(ParGridFunction *
    /* needed by element assembly */
    pdcoeff->SetUseDerivCoefficients();
 
-   mfem::Array<bool>& elexcl = pdcoeff->GetExcludedElements();
+   mfem::Array<bool>& elactive = pdcoeff->GetActiveElements();
    for (int e = 0; e < pmesh->GetNE(); e++)
    {
-      if (elexcl[e]) continue;
+      if (!elactive[e]) continue;
       sfes->GetElementVDofs(e, vdofs);
       sgf->GetSubVector(vdofs, svals);
       agf->GetSubVector(vdofs, avals);
@@ -181,7 +175,7 @@ void PDBilinearFormIntegrator::ComputeGradientAdjoint_Internal(ParGridFunction *
    }
    /* disable usage of deriv_work_coeffs */
    pdcoeff->SetUseDerivCoefficients(false);
-   UpdateGradient(g);
+   pdcoeff->Assemble(g);
 }
 
 void PDBilinearFormIntegrator::PushPDIntRule(const FiniteElement &el,

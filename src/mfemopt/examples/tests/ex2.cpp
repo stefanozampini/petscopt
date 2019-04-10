@@ -1052,7 +1052,7 @@ public:
          else pu = X;
          if (m)
          {
-            m->UpdateCoefficient(pu); /* XXX WITH GF! */
+            m->Distribute(pu); /* XXX WITH GF! */
          }
          else
          {
@@ -1564,23 +1564,6 @@ int main(int argc, char *argv[])
       obj->TestFDHessian(pmesh->GetComm(),muv);
    }
 
-#if 0
-   {
-      Vector muv;
-      if (!test_null) obj->ComputeGuess(muv);
-      else muv = muv_exact;
-
-      Operator &H = obj->GetHessian(muv);
-      PetscParMatrix pH(PETSC_COMM_WORLD,&H,Operator::PETSC_MATAIJ);
-      MatViewFromOptions(pH,NULL,"-hessian_view");
-      //Vector xx(muv.Size()),yy(muv.Size());
-      //xx = 1.0;
-      //H.Mult(xx,yy);
-      //std::cout << "HESS OUT " << std::endl;
-      //yy.Print(std::cout,1);
-   }
-#endif
-
    /* Map from optimization variables to model variables */
    PointwiseMap pmap(mu_m,m_mu,dmu_dm,dmu_dm);
 
@@ -1707,8 +1690,8 @@ int main(int argc, char *argv[])
       //mu_pd->Visualize("RJlc");
       if (save)
       {
-         mu_inv_pd->UpdateCoefficient(u);
-         mu_inv_pd->Save("newton_solution");
+         mu_inv_pd->Distribute(u);
+         mu_inv_pd->Save("solution");
       }
    }
 
@@ -1753,7 +1736,7 @@ int main(int argc, char *argv[])
 
       if (save)
       {
-         mu_inv_pd->UpdateCoefficient(u);
+         mu_inv_pd->Distribute(u);
          mu_inv_pd->Save("tao_solution");
       }
    }

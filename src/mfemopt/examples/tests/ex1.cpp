@@ -441,7 +441,7 @@ int main(int argc, char* argv[])
       newton.Mult(dummy,u);
       if (viz || save)
       {
-         imgpd->UpdateCoefficient(u);
+         imgpd->Distribute(u);
          if (save) imgpd->Save("reconstructed_image");
          if (viz) imgpd->Visualize("RJlc");
       }
@@ -454,7 +454,7 @@ int main(int argc, char* argv[])
       opt.Solve(u);
       if (viz || save)
       {
-         imgpd->UpdateCoefficient(u);
+         imgpd->Distribute(u);
          if (save) imgpd->Save("reconstructed_image_opt");
          if (viz) imgpd->Visualize("RJlc");
       }
