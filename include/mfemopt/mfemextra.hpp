@@ -107,14 +107,6 @@ public:
    virtual ~DiagonalMatrixCoefficient();
 };
 
-class PetscNonlinearSolverOpt : public mfem::PetscNonlinearSolver
-{
-public:
-   PetscNonlinearSolverOpt(MPI_Comm,ReducedFunctional&,
-                           const std::string& = std::string(),
-                           bool = true);
-};
-
 }
 #endif
 

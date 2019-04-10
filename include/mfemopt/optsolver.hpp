@@ -19,7 +19,8 @@ protected:
    ReducedFunctional *objective;
 
 public:
-   OptimizationSolver() : objective(NULL) { } ;
+   bool iterative_mode; /* MFEM */
+   OptimizationSolver() : objective(NULL), iterative_mode(false) { } ;
    virtual void Init(ReducedFunctional& _f) { objective = &_f; };
    virtual void Solve(mfem::Vector&) = 0;
    virtual ~OptimizationSolver() { };
@@ -42,6 +43,14 @@ public:
    virtual void Solve(mfem::Vector&);
    void SetMonitor(mfem::PetscSolverMonitor*);
    virtual ~PetscOptimizationSolver();
+};
+
+class PetscNonlinearSolverOpt : public mfem::PetscNonlinearSolver
+{
+public:
+   PetscNonlinearSolverOpt(MPI_Comm,ReducedFunctional&,
+                           const std::string& = std::string(),
+                           bool = true);
 };
 
 }

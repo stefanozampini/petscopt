@@ -103,9 +103,8 @@ void PetscOptimizationSolver::SetMonitor(PetscSolverMonitor *ctx)
 
 void PetscOptimizationSolver::Solve(Vector& sol)
 {
-   sol.SetSize(objective->Height());
-   objective->ComputeGuess(sol);
-   objective->Update(sol);
+   if (!iterative_mode) objective->ComputeGuess(sol); /* XXX remove ? */
+   objective->Update(sol); /* XXX rename ? */
 
    PetscParVector X(PetscObjectComm((PetscObject)tao),sol);
    X.PlaceArray(sol.GetData());

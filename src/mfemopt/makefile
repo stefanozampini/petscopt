@@ -7,7 +7,7 @@ CFLAGS    =
 FFLAGS    =
 SOURCECPP = coefficients.cpp nonlininteg.cpp objective.cpp parametermap.cpp pdbilininteg.cpp \
             pdcoefficient.cpp pdoperator.cpp petsctaosolver.cpp receiver.cpp reducedfunctional.cpp \
-            modelproblems.cpp monitor.cpp random.cpp mfemextra.cpp datareplicator.cpp
+            modelproblems.cpp monitor.cpp random.cpp mfemextra.cpp datareplicator.cpp optsolver.cpp
 SOURCEF   =
 SOURCEH   =
 DIRS      = examples
