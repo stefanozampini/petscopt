@@ -29,10 +29,33 @@ public:
    DataReplicator(MPI_Comm,int,bool=true);
    inline int GetColor() { return color; }
    bool IsMaster() { return color ? false : true; }
-   void Broadcast(std::string name,const mfem::Vector&,mfem::Vector&);
+
+   void Broadcast(const std::string&,int,const void*,int,void*,MPI_Datatype);
+   void Broadcast(const std::string&,const mfem::Array<bool>&,mfem::Array<bool>&);
+   void Broadcast(const mfem::Array<bool>&,mfem::Array<bool>&);
+
+   void Broadcast(const std::string&,const mfem::Array<int>&,mfem::Array<int>&);
+   void Broadcast(const mfem::Array<int>&,mfem::Array<int>&);
+
+   void Broadcast(const std::string&,const mfem::Vector&,mfem::Vector&);
+   void Broadcast(const mfem::Vector&,mfem::Vector&);
+
    void Broadcast(double,double*);
-   void Reduce(std::string name,const mfem::Vector&,mfem::Vector&,MPI_Op = MPI_SUM);
+   void Broadcast(int,int*);
+
+   void Reduce(const std::string&,int,const void*,int,void*,MPI_Datatype,MPI_Op);
+
+   void Reduce(const std::string&,const mfem::Array<bool>&,mfem::Array<bool>&,MPI_Op = MPI_LOR);
+   void Reduce(const mfem::Array<bool>&,mfem::Array<bool>&,MPI_Op = MPI_LOR);
+
+   void Reduce(const std::string&,const mfem::Array<int>&,mfem::Array<int>&,MPI_Op = MPI_SUM);
+   void Reduce(const mfem::Array<int>&,mfem::Array<int>&,MPI_Op = MPI_SUM);
+
+   void Reduce(const std::string&,const mfem::Vector&,mfem::Vector&,MPI_Op = MPI_SUM);
+   void Reduce(const mfem::Vector&,mfem::Vector&,MPI_Op = MPI_SUM);
+
    void Reduce(double,double*,MPI_Op = MPI_SUM);
+
    void Split(int,int*,int*);
    void Split(const mfem::DenseMatrix&,mfem::DenseMatrix&,int* = NULL);
    virtual ~DataReplicator();

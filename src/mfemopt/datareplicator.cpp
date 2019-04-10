@@ -72,47 +72,57 @@ void DataReplicator::Split(const DenseMatrix& work, DenseMatrix &swork, int *oc)
    if (oc) *oc = c;
 }
 
-void DataReplicator::Broadcast(std::string name, const Vector& x, Vector &y)
+static PetscSF NewSF(MPI_Comm comm, const std::string& name, PetscInt nroots, PetscInt nleaves)
 {
    PetscErrorCode ierr;
-   PetscInt nleaves,nroots;
+   PetscSFNode *iremote;
+   ierr = PetscMalloc1(nleaves,&iremote); CCHKERRQ(PETSC_COMM_SELF,ierr);
+   for (PetscInt i = 0; i < nleaves; i++)
+   {
+      iremote[i].rank  = 0;
+      iremote[i].index = i;
+   }
    PetscSF sf;
-
-   std::map<std::string,PetscSF>::iterator it;
-   it = sfmap.find(name);
-   if (it == sfmap.end())
-   {
-      PetscSFNode *iremote;
-      nroots = IsMaster() ? x.Size() : 0;
-      nleaves = y.Size();
-      ierr = PetscMalloc1(nleaves,&iremote); CCHKERRQ(PETSC_COMM_SELF,ierr);
-      for (PetscInt i = 0; i < nleaves; i++)
-      {
-         iremote[i].rank  = 0;
-         iremote[i].index = i;
-      }
-      ierr = PetscSFCreate(red_comm,&sf); CCHKERRQ(red_comm,ierr);
-      ierr = PetscSFSetGraph(sf,nroots,nleaves,NULL,PETSC_OWN_POINTER,iremote,PETSC_OWN_POINTER); PCHKERRQ(sf,ierr);
-      ierr = PetscSFSetUp(sf); PCHKERRQ(sf,ierr);
-      sfmap.insert(std::pair<std::string,PetscSF>(name,sf));
-   }
-   else
-   {
-      sf = it->second;
-   }
-
-   ierr = PetscSFGetGraph(sf,&nroots,&nleaves,NULL,NULL); PCHKERRQ(sf,ierr);
-   MFEM_VERIFY(x.Size() >= nroots,"Invalid size for x: " << x.Size() << " < " << nroots);
-   MFEM_VERIFY(y.Size() >= nleaves,"Invalid size for y: " << y.Size() << " < " << nleaves);
-
-   double *xd,*yd;
-   xd = x.GetData();
-   yd = y.GetData();
-   ierr = PetscSFBcastBegin(sf,MPI_DOUBLE_PRECISION,xd,yd); PCHKERRQ(sf,ierr);
-   ierr = PetscSFBcastEnd(sf,MPI_DOUBLE_PRECISION,xd,yd); PCHKERRQ(sf,ierr);
+   ierr = PetscSFCreate(comm,&sf); CCHKERRQ(comm,ierr);
+   ierr = PetscSFSetGraph(sf,nroots,nleaves,NULL,PETSC_OWN_POINTER,iremote,PETSC_OWN_POINTER); PCHKERRQ(sf,ierr);
+   ierr = PetscSFSetUp(sf); PCHKERRQ(sf,ierr);
+   return sf;
 }
 
-void DataReplicator::Reduce(std::string name, const Vector& x, Vector &y, MPI_Op op)
+void DataReplicator::Broadcast(const Vector& x, Vector &y)
+{
+   std::string s;
+   Broadcast(s,x,y);
+}
+
+void DataReplicator::Broadcast(const std::string& name, const Vector& x, Vector &y)
+{
+   Broadcast(name,x.Size(),x.GetData(),y.Size(),y.GetData(),MPI_DOUBLE_PRECISION);
+}
+
+void DataReplicator::Broadcast(const Array<bool>& x, Array<bool> &y)
+{
+   std::string s;
+   Broadcast(s,x,y);
+}
+
+void DataReplicator::Broadcast(const std::string& name, const Array<bool>& x, Array<bool> &y)
+{
+   Broadcast(name,x.Size(),x.GetData(),y.Size(),y.GetData(),MPI::BOOL);
+}
+
+void DataReplicator::Broadcast(const Array<int>& x, Array<int> &y)
+{
+   std::string s;
+   Broadcast(s,x,y);
+}
+
+void DataReplicator::Broadcast(const std::string& name, const Array<int>& x, Array<int> &y)
+{
+   Broadcast(name,x.Size(),x.GetData(),y.Size(),y.GetData(),MPI_INT);
+}
+
+void DataReplicator::Broadcast(const std::string& name, int nin, const void* datain, int nout, void *dataout, MPI_Datatype unit)
 {
    PetscErrorCode ierr;
    PetscInt nleaves,nroots;
@@ -122,19 +132,11 @@ void DataReplicator::Reduce(std::string name, const Vector& x, Vector &y, MPI_Op
    it = sfmap.find(name);
    if (it == sfmap.end())
    {
-      PetscSFNode *iremote;
-      nroots = IsMaster() ? y.Size() : 0;
-      nleaves = x.Size();
-      ierr = PetscMalloc1(nleaves,&iremote); CCHKERRQ(PETSC_COMM_SELF,ierr);
-      for (PetscInt i = 0; i < nleaves; i++)
-      {
-         iremote[i].rank  = 0;
-         iremote[i].index = i;
-      }
-      ierr = PetscSFCreate(red_comm,&sf); CCHKERRQ(red_comm,ierr);
-      ierr = PetscSFSetGraph(sf,nroots,nleaves,NULL,PETSC_OWN_POINTER,iremote,PETSC_OWN_POINTER); PCHKERRQ(sf,ierr);
-      ierr = PetscSFSetUp(sf); PCHKERRQ(sf,ierr);
-      sfmap.insert(std::pair<std::string,PetscSF>(name,sf));
+
+      nroots = IsMaster() ? nin : 0;
+      nleaves = nout;
+      sf = NewSF(red_comm,name,nroots,nleaves);
+      if (name.length()) sfmap.insert(std::pair<std::string,PetscSF>(name,sf));
    }
    else
    {
@@ -142,22 +144,94 @@ void DataReplicator::Reduce(std::string name, const Vector& x, Vector &y, MPI_Op
    }
 
    ierr = PetscSFGetGraph(sf,&nroots,&nleaves,NULL,NULL); PCHKERRQ(sf,ierr);
-   MFEM_VERIFY(x.Size() >= nleaves,"Invalid size for x: " << x.Size() << " < " << nleaves);
-   MFEM_VERIFY(y.Size() >= nroots,"Invalid size for y: " << y.Size() << " < " << nroots);
+   MFEM_VERIFY(nin >= nroots,"Invalid size for input: " << nin << " < " << nroots);
+   MFEM_VERIFY(nout >= nleaves,"Invalid size for output: " << nout << " < " << nleaves);
 
-   double *xd,*yd;
-   xd = x.GetData();
-   yd = y.GetData();
-   ierr = PetscSFReduceBegin(sf,MPI_DOUBLE_PRECISION,xd,yd,op); PCHKERRQ(sf,ierr);
-   ierr = PetscSFReduceEnd(sf,MPI_DOUBLE_PRECISION,xd,yd,op); PCHKERRQ(sf,ierr);
+   ierr = PetscSFBcastBegin(sf,unit,datain,dataout); PCHKERRQ(sf,ierr);
+   ierr = PetscSFBcastEnd(sf,unit,datain,dataout); PCHKERRQ(sf,ierr);
+   if (!name.length())
+   {
+      ierr = PetscSFDestroy(&sf); CCHKERRQ(PETSC_COMM_SELF,ierr);
+   }
+}
+
+void DataReplicator::Reduce(const Vector& x, Vector &y, MPI_Op op)
+{
+   std::string s;
+   Reduce(s,x,y,op);
+}
+
+void DataReplicator::Reduce(const std::string& name, const Vector& x, Vector &y, MPI_Op op)
+{
+   Reduce(name,x.Size(),x.GetData(),y.Size(),y.GetData(),MPI_DOUBLE_PRECISION,op);
+}
+
+void DataReplicator::Reduce(const Array<bool>& x, Array<bool> &y, MPI_Op op)
+{
+   std::string s;
+   Reduce(s,x,y,op);
+}
+
+void DataReplicator::Reduce(const std::string& name, const Array<bool>& x, Array<bool> &y, MPI_Op op)
+{
+   Reduce(name,x.Size(),x.GetData(),y.Size(),y.GetData(),MPI::BOOL,op);
+}
+
+void DataReplicator::Reduce(const Array<int>& x, Array<int> &y, MPI_Op op)
+{
+   std::string s;
+   Reduce(s,x,y,op);
+}
+
+void DataReplicator::Reduce(const std::string& name, const Array<int>& x, Array<int> &y, MPI_Op op)
+{
+   Reduce(name,x.Size(),x.GetData(),y.Size(),y.GetData(),MPI_INT,op);
+}
+
+void DataReplicator::Reduce(const std::string& name, int nin, const void* datain, int nout, void *dataout, MPI_Datatype unit, MPI_Op op)
+{
+   PetscErrorCode ierr;
+   PetscInt nleaves,nroots;
+   PetscSF sf;
+
+   std::map<std::string,PetscSF>::iterator it;
+   it = sfmap.find(name);
+   if (it == sfmap.end())
+   {
+      nroots = IsMaster() ? nout : 0;
+      nleaves = nin;
+      sf = NewSF(red_comm,name,nroots,nleaves);
+      if (name.length()) sfmap.insert(std::pair<std::string,PetscSF>(name,sf));
+   }
+   else
+   {
+      sf = it->second;
+   }
+
+   ierr = PetscSFGetGraph(sf,&nroots,&nleaves,NULL,NULL); PCHKERRQ(sf,ierr);
+   MFEM_VERIFY(nin >= nleaves,"Invalid size for input: " << nin << " < " << nleaves);
+   MFEM_VERIFY(nout >= nroots,"Invalid size for output: " << nout << " < " << nroots);
+
+   ierr = PetscSFReduceBegin(sf,unit,datain,dataout,op); PCHKERRQ(sf,ierr);
+   ierr = PetscSFReduceEnd(sf,unit,datain,dataout,op); PCHKERRQ(sf,ierr);
+   if (!name.length())
+   {
+      ierr = PetscSFDestroy(&sf); CCHKERRQ(PETSC_COMM_SELF,ierr);
+   }
 }
 
 void DataReplicator::Broadcast(double in, double *out)
 {
-   Vector X(1),Y(1);
-   X[0] = in;
-   Broadcast("_mfemopt_data_repl_scalar",X,Y);
-   *out = Y[0];
+   double tout;
+   Broadcast("_mfemopt_data_repl_scalar",1,&in,1,&tout,MPI_DOUBLE_PRECISION);
+   *out = tout;
+}
+
+void DataReplicator::Broadcast(int in, int *out)
+{
+   int tout;
+   Broadcast("_mfemopt_data_repl_scalar",1,&in,1,&tout,MPI_INT);
+   *out = tout;
 }
 
 void DataReplicator::Reduce(double in, double *out, MPI_Op op)

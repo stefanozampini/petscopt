@@ -1,4 +1,4 @@
-static const char help[] = "Tests Replicated{ParMesh|ParFiniteElementSpace}.";
+static const char help[] = "Tests Replicated{ParMesh|ParFiniteElementSpace} and the DataReplicator class.";
 
 #include <mfemopt.hpp>
 
@@ -180,6 +180,13 @@ int main(int argc, char *argv[])
    f1 = drep->IsMaster() ? f1 - f_ex*nrep : f1;
    f1 = std::abs(f1);
    MFEM_VERIFY(f1 < PETSC_SMALL,"Error drep " << f1);
+
+   //int if1 = 0, if2;
+   //drep->Broadcast(-17,&if2);
+   //drep->Reduce(if2,&if1);
+   //if1 = drep->IsMaster() ? if1 - (-17)*nrep : if1;
+   //if1 = std::abs(if1);
+   //MFEM_VERIFY(!if1,"Error drep " << if1);
 
    int m = 3,n = 5;
    DenseMatrix work(m,n), lwork;
