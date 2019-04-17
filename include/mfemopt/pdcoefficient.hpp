@@ -51,6 +51,22 @@ private:
 
    mfem::ParGridFunction* l2gf;
 
+   class BCHandler : public mfem::PetscBCHandler
+   {
+   private:
+      mfem::Array<double> vals;
+
+   public:
+      BCHandler();
+      BCHandler(mfem::Array<int>&,mfem::Array<double>&);
+      void Update(mfem::Array<int>&,mfem::Array<double>&);
+      virtual void Eval(double,mfem::Vector&);
+   };
+   mfem::Array<int> ess_tdof_list;
+   mfem::Array<double> ess_tdof_vals;
+
+   BCHandler bchandler;
+
    std::vector<mfem::socketstream*> souts;
 
    void Init();
@@ -101,6 +117,8 @@ public:
    void SaveExcl(const char*);
    void SaveVisIt(const char*);
    void Visualize(const char* = NULL);
+
+   mfem::PetscBCHandler* GetBCHandler() { return &bchandler; }
 
    void Update();
    ~PDCoefficient();

@@ -414,6 +414,49 @@ void PDCoefficient::SetUpOperators()
          }
       }
 
+      /* list of essential dofs (single component) */
+      Array<int> esslist;
+      esslist.SetSize(0);
+      esslist.Reserve(pactii.Size());
+      if (incl_bdr)
+      {
+         Array<int> tdofs_markb(pfes->Dof_TrueDof_Matrix()->Width());
+         Array<int> vdofs_markb(pfes->Dof_TrueDof_Matrix()->Height());
+         vdofs_markb = 0;
+         tdofs_markb = 0;
+         for (int i = 0; i < mesh->GetNE(); i++)
+         {
+            if (pcoeffexcl[i])
+            {
+               Array<int> dofs;
+               pfes->GetElementVDofs(i,dofs);
+               for (int j = 0; j < dofs.Size(); j++) vdofs_markb[dofs[j]] = 1;
+            }
+         }
+
+         /* reduce the vdofs marker */
+         pfes->Synchronize(vdofs_markb);
+
+         /* make it conforming */
+         pfes->GetRestrictionMatrix()->BooleanMult(vdofs_markb,tdofs_markb);
+         pfes->Dof_TrueDof_Matrix()->BooleanMult(1,tdofs_markb,1,vdofs_markb);
+         Array<int> ess_vdofs;
+
+         for (int i = 0; i < vdofs_markb.Size(); i++)
+         {
+            if (vdofs_markb[i] && !vdofs_mark[i]) continue;
+            vdofs_markb[i] = 0;
+         }
+         pfes->GetRestrictionMatrix()->BooleanMult(vdofs_markb,tdofs_markb);
+         for (int i = 0; i < pactii.Size(); i++)
+         {
+            if (tdofs_markb[pactii[i]])
+            {
+               esslist.Append(i);
+            }
+         }
+      }
+
       /* extract submatrices */
       Array<PetscInt> rows(PT->GetNumRows());
       PetscInt rst = PT->GetRowStart();
@@ -435,6 +478,8 @@ void PDCoefficient::SetUpOperators()
       /* store true- and v- dofs for excluded regions */
       pcoeffinitv.SetSize(pcoeffiniti.Size()*pcoeffgf.Size());
       pinitv.SetSize(piniti.Size()*pcoeffgf.Size());
+      ess_tdof_list.SetSize(esslist.Size()*pcoeffgf.Size());
+      ess_tdof_vals.SetSize(esslist.Size()*pcoeffgf.Size());
       for (int g = 0; g < pcoeffgf.Size(); g++)
       {
          /* vdofs */
@@ -452,6 +497,12 @@ void PDCoefficient::SetUpOperators()
          {
             pinitv[i+st0] = v0[piniti[i]];
          }
+         const int ste = g*esslist.Size();
+         for (int i = 0; i < esslist.Size(); i++)
+         {
+            ess_tdof_list[i+ste] = esslist[i]+ste;
+            ess_tdof_vals[i+ste] = v0[pactii[esslist[i]]];
+         }
       }
    }
 
@@ -460,6 +511,10 @@ void PDCoefficient::SetUpOperators()
 
    /* Update work vector */
    pwork.SetSize(pfes->GetTrueVSize());
+
+   /* Update BCHandler */
+   bchandler.Update(ess_tdof_list,ess_tdof_vals);
+
 }
 
 void PDCoefficient::SaveExcl(const char* filename)
@@ -822,6 +877,29 @@ void PDCoefficient::Update()
 PDCoefficient::~PDCoefficient()
 {
    Reset();
+}
+
+PDCoefficient::BCHandler::BCHandler() : PetscBCHandler()
+{
+   SetType(CONSTANT);
+
+}
+PDCoefficient::BCHandler::BCHandler(Array<int>& el, Array<double>& v) : BCHandler()
+{
+   Update(el,v);
+}
+
+void PDCoefficient::BCHandler::Update(Array<int>& el, Array<double>& v)
+{
+   SetTDofs(el);
+   vals.SetSize(v.Size());
+   for (int i = 0; i < v.Size(); i++) vals[i] = v[i];
+}
+
+void PDCoefficient::BCHandler::Eval(double t,Vector& g)
+{
+   Array<int>& td = GetTDofs();
+   for (int i = 0; i < td.Size(); i++) g[td[i]] = vals[i];
 }
 
 }
