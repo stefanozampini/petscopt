@@ -156,14 +156,16 @@ $(OBJDIR)/%.o : src/%.F90 | $$(@D)/.DIR $(MODDIR)/.DIR
 
 check :
 	-@echo $(ruler)
-	-@echo "Running test examples to verify correct installation"
+	-@echo "Compiling examples to verify correct installation"
 	-@echo "Using PETSCOPT_DIR=$(PETSCOPT_DIR)"
 	-@echo "Using PETSCOPT_ARCH=$(PETSCOPT_ARCH)"
 	-@echo "Using PETSC_DIR=$(PETSC_DIR)"
 	-@echo "Using PETSC_ARCH=$(PETSC_ARCH)"
 	-@echo $(ruler)
+	-@echo "Testing PETScOPT"
 	+@cd ${PETSCOPT_DIR}/src/ts/examples/tests >/dev/null && $(RM) -f ex1 && ${OMAKE} PETSCOPT_ARCH=${PETSCOPT_ARCH}  PETSCOPT_DIR=${PETSCOPT_DIR} ex1
 ifeq ($(with_mfem),1)
+	-@echo "Testing MFEMOPT"
 	+@cd ${PETSCOPT_DIR}/src/mfemopt/examples/tests >/dev/null && $(RM) -f ex1 && ${OMAKE} PETSCOPT_ARCH=${PETSCOPT_ARCH}  PETSCOPT_DIR=${PETSCOPT_DIR} ex1
 endif
 	-@echo $(ruler)
