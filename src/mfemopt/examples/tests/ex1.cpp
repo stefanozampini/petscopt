@@ -85,7 +85,6 @@ Image::Image(MPI_Comm comm, const char* filename, int ord, bool quad, bool test_
       pmesh = new ParMesh(comm,*mesh);
    }
    delete mesh;
-
    fec = new H1_FECollection(std::max(ord,1), 2);
    pfes = new ParFiniteElementSpace(pmesh, fec, 1, Ordering::byVDIM);
 
@@ -354,12 +353,13 @@ int main(int argc, char* argv[])
    /* process options */
    PetscErrorCode ierr;
    char imgfile[PETSC_MAX_PATH_LEN] = "../../../../share/petscopt/data/logo_noise.txt";
-   PetscBool save = PETSC_FALSE, viz = PETSC_TRUE, mon = PETSC_TRUE;
+   PetscBool save = PETSC_FALSE, viz = PETSC_TRUE, mon = PETSC_TRUE, visit = PETSC_FALSE;
    PetscBool primal_dual = PETSC_FALSE, symmetrize = PETSC_FALSE, project = PETSC_FALSE, quad = PETSC_FALSE;
    PetscReal noise = 0.0, tv_alpha = 0.0007, tv_beta = 0.1;
    PetscInt  ord = 1;
    PetscBool test = PETSC_FALSE, test_progress = PETSC_FALSE, test_part = PETSC_FALSE;
 
+   ierr = PetscOptionsGetBool(NULL,NULL,"-visit",&visit,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetBool(NULL,NULL,"-save",&save,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetBool(NULL,NULL,"-glvis",&viz,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetBool(NULL,NULL,"-monitor",&mon,NULL);CHKERRQ(ierr);
@@ -439,11 +439,12 @@ int main(int argc, char* argv[])
       /* solve via Newton */
       u = 0.;
       newton.Mult(dummy,u);
-      if (viz || save)
+      if (viz || save || visit)
       {
          imgpd->Distribute(u);
          if (save) imgpd->Save("reconstructed_image");
          if (viz) imgpd->Visualize("RJlc");
+         if (visit) imgpd->SaveVisIt("reconstructed_image_visit");
       }
 
       /* Test optimization solver */
@@ -452,11 +453,12 @@ int main(int argc, char* argv[])
       OptimizationMonitor myoptmonitor;
       if (mon) opt.SetMonitor(&myoptmonitor);
       opt.Solve(u);
-      if (viz || save)
+      if (viz || save || visit)
       {
          imgpd->Distribute(u);
          if (save) imgpd->Save("reconstructed_image_opt");
          if (viz) imgpd->Visualize("RJlc");
+         if (visit) imgpd->SaveVisIt("reconstructed_image_opt_visit");
       }
       delete imgpd;
    }
