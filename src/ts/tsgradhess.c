@@ -332,6 +332,7 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
 
   ierr = MatSetType(H,MATSHELL);CHKERRQ(ierr);
   ierr = MatShellSetOperation(H,MATOP_MULT,(void (*)())MatMult_TSHessian);CHKERRQ(ierr);
+  ierr = MatShellSetOperation(H,MATOP_MULT_TRANSPOSE,(void (*)())MatMult_TSHessian);CHKERRQ(ierr);
   ierr = PetscContainerGetPointer(c,(void**)&tshess);CHKERRQ(ierr);
 
   /* nonlinear model */
