@@ -717,11 +717,10 @@ PetscErrorCode MonitorError(Tao tao,void *ctx)
   PetscFunctionReturn(0);
 }
 
-
 /*TEST
 
     build:
-      requires: !complex
+      requires: petscgll_header !complex
 
     testset:
       args: -tao_max_it 5 -tao_gatol 1.e-4

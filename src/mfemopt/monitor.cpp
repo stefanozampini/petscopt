@@ -104,7 +104,7 @@ void OptimizationMonitor::MonitorSolver(PetscSolver *solver)
    ierr = VecNorm(pG,NORM_2,&normg); PCHKERRQ(tao,ierr);
 
    ierr = TaoComputeObjective(tao,X,&f); PCHKERRQ(tao,ierr);
-   ierr = PetscPrintf(PetscObjectComm((PetscObject)tao),"it=%D\tlit %D\tobj=%1.6e\t",it,lit,(double)f); PCHKERRQ(tao,ierr);
+   ierr = PetscPrintf(PetscObjectComm((PetscObject)tao),"it=%D\tlit=%D\tobj=%1.6e\t",it,lit,(double)f); PCHKERRQ(tao,ierr);
    ierr = PetscPrintf(PetscObjectComm((PetscObject)tao),"(g,du)=%1.6e\t||g||=%1.6e\tstep=%1.6e\n",-(double)PetscRealPart(inn),(double)normg,(double)lambda); PCHKERRQ(tao,ierr);
    ierr = VecCopy(G,pG); PCHKERRQ(tao,ierr);
 }

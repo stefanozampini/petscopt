@@ -4,9 +4,12 @@ Sources matrix
 Receivers matrix
 [row +0]
 +0.000000e+00
+=======================================
+NC 0 -> Number of dofs 5
 Initial objective 0.00767189 (LS 0.00134734, TV 0.00632456)
-it=0	lit=0	obj=7.671890e-03	(g,du)=-0.000000e+00	||g||=1.494645e-02	step=1.000000e+00
-it=1	lit=2	obj=7.653094e-03	(g,du)=-3.769999e-05	||g||=3.586680e-05	step=1.000000e+00
-it=2	lit=2	obj=7.653091e-03	(g,du)=-4.481089e-09	||g||=3.894145e-08	step=1.000000e+00
-Nonlinear newton_ solve converged due to CONVERGED_FNORM_ABS iterations 2
-Final objective 0.00765309 (LS 0.00132445, TV 0.00632864)
+it=0	lit=0	obj=7.671890e-03	(g,du)=-0.000000e+00	||g||=1.498014e-02	step=1.000000e+00
+it=1	lit=3	obj=7.622800e-03	(g,du)=-9.573862e-05	||g||=2.108598e-04	step=1.000000e+00
+it=2	lit=3	obj=7.622692e-03	(g,du)=-2.127626e-07	||g||=1.944781e-06	step=1.000000e+00
+it=3	lit=3	obj=7.622692e-03	(g,du)=-4.145629e-11	||g||=3.984584e-08	step=1.000000e+00
+Nonlinear newton_ solve converged due to CONVERGED_FNORM_ABS iterations 3
+Final objective (SNES) 0.00762269 (LS 0.00126729, TV 0.0063554)

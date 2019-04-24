@@ -1,6 +1,5 @@
 
 static char help[] ="Solves a simple data assimilation problem with one dimensional advection diffusion equation using TSAdjoint\n\n";
-
 /*
 
     Not yet tested in parallel
@@ -747,11 +746,10 @@ PetscErrorCode MonitorDestroy(void **ctx)
   PetscFunctionReturn(0);
 }
 
-
 /*TEST
 
    build:
-     requires: !complex
+     requires: petscgll_header !complex
 
    testset:
      requires: !single

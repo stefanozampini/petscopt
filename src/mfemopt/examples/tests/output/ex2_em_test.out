@@ -17,20 +17,22 @@ ObjectiveFunction::TestFDHessian state x state
 ||H||_inf = 1.48148e+06, ||H_fd||_inf = 1.48148e+06, ||H - H_fd||_inf = 0.00442225, ||H-H_fd||_inf/||H_fd||_inf = 2.98502e-09
 ---------------------------------------
 PDOperator::TestFDGradient wrt design
-||G|| = 0.584346, ||G^T|| = 1.08401, ||G - (G^T)^T||/||G|| = 4.74985e-17, ||G_fd|| = 0.584346, ||G_fd - G|| = 1.88701e-08
+||G|| = 0.825182, ||G^T|| = 1.26937, ||G - (G^T)^T||/||G|| = 1.34543e-16, ||G_fd|| = 0.825182, ||G_fd - G|| = 2.51469e-08
 ---------------------------------------
-Misfit objective 3.34674e-05
+Misfit objective 3.42603e-05
 ---------------------------------------
 TV tests
 ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing design gradient
-||g|| = 2.8079e-09, ||g_fd|| = 2.8079e-09, ||g - g_fd|| = 3.59631e-18, ||g-g_fd||/||g_fd|| = 1.28078e-09, cos() = 1.
+||g|| = 0., ||g_fd|| = 0., ||g - g_fd|| = 0., ||g-g_fd||/||g_fd|| = -nan., cos() = -nan.
 ObjectiveFunction::TestFDHessian design x design
-||H||_inf = 4.09582e-09, ||H_fd||_inf = 4.02016e-09, ||H - H_fd||_inf = 3.65554e-10, ||H-H_fd||_inf/||H_fd||_inf = 0.0909302
-Initial objective 3.34945e-05 (LS 3.34674e-05, TV 2.70433e-08)
-it=0	lit=0	obj=3.349448e-05	(g,du)=-0.000000e+00	||g||=2.941617e-04	step=1.000000e+00
-it=1	lit=4	obj=4.375525e-06	(g,du)=-7.536728e-05	||g||=1.215483e-04	step=1.000000e+00
-it=2	lit=4	obj=4.378950e-08	(g,du)=-8.341735e-06	||g||=7.281282e-06	step=1.000000e+00
-it=3	lit=4	obj=2.726381e-08	(g,du)=-3.346007e-08	||g||=9.145511e-07	step=1.000000e+00
+||H||_inf = 5.33333e-09, ||H_fd||_inf = 5.33333e-09, ||H - H_fd||_inf = 8.27181e-25, ||H-H_fd||_inf/||H_fd||_inf = 1.55096e-16
+=======================================
+NC 0 -> Number of dofs 20
+Initial objective 3.42873e-05 (LS 3.42603e-05, TV 2.7e-08)
+it=0	lit=0	obj=3.428730e-05	(g,du)=-0.000000e+00	||g||=2.971723e-04	step=1.000000e+00
+it=1	lit=12	obj=4.618082e-06	(g,du)=-7.734991e-05	||g||=1.250588e-04	step=1.000000e+00
+it=2	lit=13	obj=4.380601e-08	(g,du)=-8.796405e-06	||g||=7.274590e-06	step=1.000000e+00
+it=3	lit=13	obj=2.731572e-08	(g,du)=-3.355447e-08	||g||=9.211134e-07	step=1.000000e+00
 Nonlinear newton_ solve converged due to CONVERGED_FNORM_ABS iterations 3
-Final objective 2.72638e-08 (LS 2.63789e-10, TV 2.7e-08)
+Final objective (SNES) 2.73157e-08 (LS 2.79262e-10, TV 2.70365e-08)
