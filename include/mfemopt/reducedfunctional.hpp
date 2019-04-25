@@ -33,10 +33,11 @@ public:
 
    virtual void ComputeGuess(mfem::Vector&) const;
    virtual void GetBounds(mfem::Vector&,mfem::Vector&) const;
+
+   virtual void Init(const mfem::Vector&) {};
+   virtual void Update(int,const mfem::Vector&,const mfem::Vector&,const mfem::Vector&,const mfem::Vector&) {};
    virtual void PostCheck(const mfem::Vector&,mfem::Vector&,mfem::Vector&,bool &cy,bool &cw) const
    { cy = false; cw = false; }
-   virtual void Update(const mfem::Vector&) {};
-   virtual void Update(int,const mfem::Vector&,const mfem::Vector&,const mfem::Vector&,const mfem::Vector&) {};
 
    /* Default interface for mfem::Operator */
    virtual void Mult(const mfem::Vector& x, mfem::Vector& y) const
