@@ -1344,12 +1344,12 @@ int main(int argc, char* argv[])
   ierr = VecCopy(sol,tlmsol);CHKERRQ(ierr);
   ierr = VecSet(U,a*a);CHKERRQ(ierr); /* XXX IC */
   ierr = TSCreatePropagatorMat(ts,t0,dt,tf,U,M,NULL,&Phi);CHKERRQ(ierr);
-  ierr = MatComputeExplicitOperator(Phi,&PhiExpl);CHKERRQ(ierr);
+  ierr = MatComputeOperator(Phi,NULL,&PhiExpl);CHKERRQ(ierr);
   ierr = MatNorm(PhiExpl,NORM_INFINITY,&normPhi);CHKERRQ(ierr);
   ierr = PetscObjectSetName((PetscObject)PhiExpl,"Phi");CHKERRQ(ierr);
   ierr = MatViewFromOptions(PhiExpl,NULL,"-phi_view");CHKERRQ(ierr);
   ierr = MatCreateTranspose(Phi,&PhiT);CHKERRQ(ierr);
-  ierr = MatComputeExplicitOperator(PhiT,&PhiTExpl);CHKERRQ(ierr);
+  ierr = MatComputeOperator(PhiT,NULL,&PhiTExpl);CHKERRQ(ierr);
   ierr = PetscObjectSetName((PetscObject)PhiTExpl,"PhiT");CHKERRQ(ierr);
   ierr = MatViewFromOptions(PhiTExpl,NULL,"-phiT_view");CHKERRQ(ierr);
   ierr = MatTranspose(PhiTExpl,MAT_INITIAL_MATRIX,&checkTLM);CHKERRQ(ierr);
@@ -1373,7 +1373,7 @@ int main(int argc, char* argv[])
   if (flg) {
     Mat He;
 
-    ierr = MatComputeExplicitOperator(H,&He);CHKERRQ(ierr);
+    ierr = MatComputeOperator(H,NULL,&He);CHKERRQ(ierr);
     ierr = MatViewFromOptions(He,NULL,"-tshessian_view");CHKERRQ(ierr);
     ierr = MatDestroy(&He);CHKERRQ(ierr);
   }

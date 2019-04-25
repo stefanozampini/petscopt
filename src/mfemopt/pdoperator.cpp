@@ -3,6 +3,7 @@
 #include <mfemopt/private/utils.hpp>
 #include <mfem/linalg/petsc.hpp>
 #include <petsc/private/petscimpl.h>
+#include <petscopt/petscmat_cl.h>
 
 static PetscErrorCode PDOperatorGradientMFFD_Private(void*,Vec,Vec);
 
@@ -153,14 +154,14 @@ void PDOperator::TestFDGradient(MPI_Comm comm, const Vector& xpIn, const Vector&
    PetscParMatrix *pG = new PetscParMatrix(comm,G,Operator::PETSC_MATSHELL);
    G->Update(xdot,x,m);
 
-   ierr = MatComputeExplicitOperator(*pG,&GExpl);CCHKERRQ(comm,ierr);
+   ierr = MatComputeOperator(*pG,MATAIJ,&GExpl);CCHKERRQ(comm,ierr);
    ierr = MatConvert(GExpl,size > 1 ? MATMPIAIJ : MATSEQAIJ,MAT_INPLACE_MATRIX,&GExpl);CCHKERRQ(comm,ierr);
    ierr = MatNorm(GExpl,NORM_INFINITY,&normG);CCHKERRQ(comm,ierr);
    ierr = PetscObjectSetName((PetscObject)GExpl,"G");CCHKERRQ(comm,ierr);
    ierr = MatViewFromOptions(GExpl,NULL,"-test_pdoperatorgradient_G_view");CCHKERRQ(comm,ierr);
 
    ierr = MatCreateTranspose(*pG,&GT);CCHKERRQ(comm,ierr);
-   ierr = MatComputeExplicitOperator(GT,&GTExpl);CCHKERRQ(comm,ierr);
+   ierr = MatComputeOperator(GT,MATAIJ,&GTExpl);CCHKERRQ(comm,ierr);
    ierr = MatConvert(GTExpl,size > 1 ? MATMPIAIJ : MATSEQAIJ,MAT_INPLACE_MATRIX,&GTExpl);CCHKERRQ(comm,ierr);
    ierr = MatNorm(GTExpl,NORM_INFINITY,&normGT);CCHKERRQ(comm,ierr);
 

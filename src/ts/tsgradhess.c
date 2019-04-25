@@ -696,7 +696,7 @@ PetscErrorCode TSTaylorTest(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec
     if (expl) {
       Mat He;
 
-      ierr = MatComputeExplicitOperator(H,&He);CHKERRQ(ierr);
+      ierr = MatComputeOperator(H,NULL,&He);CHKERRQ(ierr);
       ierr = MatDestroy(&H);CHKERRQ(ierr);
       H    = He;
     }

@@ -284,7 +284,7 @@ int main(int argc, char* argv[])
     }
     ierr = VecDestroy(&W);CHKERRQ(ierr);
   }
-  ierr = MatComputeExplicitOperator(Phi,&PhiExpl);CHKERRQ(ierr);
+  ierr = MatComputeOperator(Phi,NULL,&PhiExpl);CHKERRQ(ierr);
   ierr = MatNorm(PhiExpl,NORM_INFINITY,&normPhi);CHKERRQ(ierr);
   if (P) {
     ierr = MatGetDiagonal(P,U0);CHKERRQ(ierr);
@@ -294,7 +294,7 @@ int main(int argc, char* argv[])
   ierr = PetscObjectSetName((PetscObject)PhiExpl,"Phi");CHKERRQ(ierr);
   ierr = MatViewFromOptions(PhiExpl,NULL,"-prop_view");CHKERRQ(ierr);
   ierr = MatCreateTranspose(Phi,&PhiT);CHKERRQ(ierr);
-  ierr = MatComputeExplicitOperator(PhiT,&PhiTExpl);CHKERRQ(ierr);
+  ierr = MatComputeOperator(PhiT,NULL,&PhiTExpl);CHKERRQ(ierr);
   if (P) {
     ierr = MatGetDiagonal(P,U0);CHKERRQ(ierr);
     ierr = VecReciprocal(U0);CHKERRQ(ierr);

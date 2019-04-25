@@ -15,6 +15,7 @@
 */
 
 #include <petscts.h>
+#include <petscopt/petscts_cl.h>
 
 PETSC_EXTERN_TYPEDEF typedef PetscErrorCode (*TSEvalGradientIC)(TS,PetscReal,Vec,Vec,Mat,Mat,void*);
 PETSC_EXTERN_TYPEDEF typedef PetscErrorCode (*TSEvalGradientDAE)(TS,PetscReal,Vec,Vec,Vec,Mat,void*);

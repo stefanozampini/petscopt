@@ -656,7 +656,7 @@ PetscErrorCode FormHessian_AO(Tao tao,Vec P,Mat H,Mat Hp,void *ctx)
 #if 0
   {
     Mat He;
-    ierr = MatComputeExplicitOperator(H,&He);CHKERRQ(ierr);
+    ierr = MatComputeOperator(H,NULL,&He);CHKERRQ(ierr);
     ierr = MatView(He,NULL);CHKERRQ(ierr);
     ierr = MatDestroy(&He);CHKERRQ(ierr);
   }
