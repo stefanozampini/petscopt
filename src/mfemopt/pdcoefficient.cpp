@@ -879,13 +879,14 @@ PDCoefficient::~PDCoefficient()
    Reset();
 }
 
-PDCoefficient::BCHandler::BCHandler() : PetscBCHandler()
+PDCoefficient::BCHandler::BCHandler()
 {
    SetType(CONSTANT);
-
 }
-PDCoefficient::BCHandler::BCHandler(Array<int>& el, Array<double>& v) : BCHandler()
+
+PDCoefficient::BCHandler::BCHandler(Array<int>& el, Array<double>& v)
 {
+   SetType(CONSTANT);
    Update(el,v);
 }
 
