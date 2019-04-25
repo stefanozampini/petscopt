@@ -2131,6 +2131,7 @@ int main(int argc, char *argv[])
        args: -glvis 0 -test_newton 0 -test_opt -opt_tao_converged_reason -opt_tao_max_it 10 -opt_tao_gttol 1.e-6 -opt_tao_gatol 1.e-6 -opt_tao_type nls -opt_tao_nls_ksp_type fgmres -opt_tao_nls_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1
 
    test:
+      filter: sed -e "s/-nan/nan/g"
       suffix: em_test
       timeoutfactor: 3
       nsize: 1

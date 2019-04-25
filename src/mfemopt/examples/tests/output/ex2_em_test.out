@@ -24,7 +24,7 @@ Misfit objective 3.42603e-05
 TV tests
 ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing design gradient
-||g|| = 0., ||g_fd|| = 0., ||g - g_fd|| = 0., ||g-g_fd||/||g_fd|| = -nan., cos() = -nan.
+||g|| = 0., ||g_fd|| = 0., ||g - g_fd|| = 0., ||g-g_fd||/||g_fd|| = nan., cos() = nan.
 ObjectiveFunction::TestFDHessian design x design
 ||H||_inf = 5.33333e-09, ||H_fd||_inf = 5.33333e-09, ||H - H_fd||_inf = 8.27181e-25, ||H-H_fd||_inf/||H_fd||_inf = 1.55096e-16
 =======================================
