@@ -259,7 +259,7 @@ public:
    virtual void ComputeObjective(const Vector&,double*) const;
    virtual void ComputeGradient(const Vector&,Vector&) const;
    virtual Operator& GetHessian(const Vector&) const;
-   virtual void Update(const Vector&);
+   virtual void Init(const Vector&);
    virtual void Update(int,const Vector&,const Vector&,const Vector&,const Vector&);
    //virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&) const;
 };
@@ -314,7 +314,7 @@ Operator& ImageFunctional::GetHessian(const Vector& u) const
 /* This method is called at the beginning of each nonlinear step
    We use it to update the dual variables for the TV regularizer */
 void ImageFunctional::Update(int it, const Vector& F, const Vector& X,
-                             const Vector& dX, const Vector &pX)
+                             const Vector& dX, const Vector& pX)
 {
    if (!it)
    {
@@ -327,7 +327,7 @@ void ImageFunctional::Update(int it, const Vector& F, const Vector& X,
    }
 }
 
-void ImageFunctional::Update(const Vector& X)
+void ImageFunctional::Init(const Vector& X)
 {
    tv->UpdateDual(X);
 }

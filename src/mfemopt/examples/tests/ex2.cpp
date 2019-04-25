@@ -291,7 +291,7 @@ public:
    virtual void ComputeGuess(Vector&) const;
 
    virtual void Update(int,const Vector&,const Vector&,const Vector&,const Vector&);
-   //virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&) const;
+   //virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&);
    virtual ~RegularizedMultiSourceMisfit() { delete H; delete Minv;}
 };
 
@@ -801,7 +801,7 @@ Operator& RegularizedMultiSourceMisfit::GetHessian(const Vector& m) const
 }
 
 void RegularizedMultiSourceMisfit::Update(int it, const Vector& F, const Vector& X,
-                                   const Vector& dX, const Vector &pX)
+                                   const Vector& dX, const Vector& pX)
 {
    if (!it)
    {
@@ -2124,11 +2124,11 @@ int main(int argc, char *argv[])
      test:
        suffix: newton_full
        filter: sed -e "s/lit=4/lit=3/g"
-       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 10 -newton_snes_rtol 1.e-6 -newton_snes_atol 1.e-6 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1
+       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 10 -newton_snes_rtol 1.e-4 -newton_snes_atol 1.e-5 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1
      test:
        suffix: taonewton_full
        filter: sed -e "s/lit=4/lit=3/g"
-       args: -glvis 0 -test_newton 0 -test_opt -opt_tao_converged_reason -opt_tao_max_it 10 -opt_tao_gttol 1.e-6 -opt_tao_gatol 1.e-6 -opt_tao_type nls -opt_tao_nls_ksp_type fgmres -opt_tao_nls_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1
+       args: -glvis 0 -test_newton 0 -test_opt -opt_tao_converged_reason -opt_tao_max_it 10 -opt_tao_gttol 1.e-4 -opt_tao_gatol 1.e-5 -opt_tao_type nls -opt_tao_nls_ksp_type fgmres -opt_tao_nls_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1
 
    test:
       filter: sed -e "s/-nan/nan/g"
