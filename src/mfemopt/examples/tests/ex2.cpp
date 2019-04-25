@@ -290,7 +290,7 @@ public:
    virtual Operator& GetHessian(const Vector&) const;
    virtual void ComputeGuess(Vector&) const;
 
-   virtual void Update(int,const Vector&,const Vector&,const Vector&,const Vector&) const;
+   virtual void Update(int,const Vector&,const Vector&,const Vector&,const Vector&);
    //virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&) const;
    virtual ~RegularizedMultiSourceMisfit() { delete H; delete Minv;}
 };
@@ -801,7 +801,7 @@ Operator& RegularizedMultiSourceMisfit::GetHessian(const Vector& m) const
 }
 
 void RegularizedMultiSourceMisfit::Update(int it, const Vector& F, const Vector& X,
-                                   const Vector& dX, const Vector &pX) const
+                                   const Vector& dX, const Vector &pX)
 {
    if (!it)
    {
