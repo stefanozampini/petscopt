@@ -4,6 +4,7 @@
 #include <petscoptconf.h>
 
 #if defined(PETSCOPT_HAVE_MFEMOPT)
+#include <mfemoptconf.h>
 #include <map>
 #include <string>
 #include <mfem/linalg/densemat.hpp>

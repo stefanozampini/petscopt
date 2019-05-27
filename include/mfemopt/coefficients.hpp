@@ -4,6 +4,7 @@
 #include <petscoptconf.h>
 
 #if defined(PETSCOPT_HAVE_MFEMOPT)
+#include <mfemoptconf.h>
 #include <mfem/fem/coefficient.hpp>
 #include <mfem/linalg/vector.hpp>
 #include <mfem/fem/eltrans.hpp>

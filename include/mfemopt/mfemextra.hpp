@@ -4,6 +4,7 @@
 #include <petscoptconf.h>
 
 #if defined(PETSCOPT_HAVE_MFEMOPT)
+#include <mfemoptconf.h>
 #include <mfemopt/reducedfunctional.hpp>
 #include <mfem/fem/pfespace.hpp>
 #include <mfem/mesh/pmesh.hpp>

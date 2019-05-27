@@ -4,6 +4,7 @@
 #include <petscoptconf.h>
 
 #if defined(PETSCOPT_HAVE_MFEMOPT)
+#include <mfemoptconf.h>
 #include <mfem/linalg/petsc.hpp>
 
 namespace mfemopt

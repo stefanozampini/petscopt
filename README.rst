@@ -42,9 +42,9 @@ MFEM support
 
 In order to enable the MFEM based FEM layer (MFEM version greater or equal 4.0 must be used), you have two options
 
-  **recommended**: Configure PETSc using --download-mfem --download-mfem-commit=6c129fc80d23bb8f1ad1a16f71336afbdfbe9131 --download-hypre --download-metis
+  **recommended**: Configure PETSc using --download-mfem --download-mfem-commit=v4.0 --download-hypre --download-metis
 
-  **harder**: After having built PETSc, follow the instructions to `build MFEM <https://mfem.org/building/>`_, and enable PETSc as a third-party package via ``MFEM_USE_PETSC=YES``. A version including commit 6c129fc80d23bb8f1ad1a16f71336afbdfbe9131 must be used. Then set the environment variable ``MFEM_DIR``::
+  **harder**: After having built PETSc, follow the instructions to `build MFEM <https://mfem.org/building/>`_, and enable PETSc as a third-party package via ``MFEM_USE_PETSC=YES``. Then set the environment variable ``MFEM_DIR``::
 
               $ export MFEM_DIR=_location_of_MFEM_
 

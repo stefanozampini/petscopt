@@ -4,6 +4,7 @@
 #include <petscoptconf.h>
 
 #if defined(PETSCOPT_HAVE_MFEMOPT)
+#include <mfemoptconf.h>
 #include <mfemopt/pdoperator.hpp>
 #include <mfemopt/pdbilininteg.hpp>
 #include <mfem/fem/pfespace.hpp>

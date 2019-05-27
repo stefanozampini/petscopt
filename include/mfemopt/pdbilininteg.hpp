@@ -4,6 +4,7 @@
 #include <petscoptconf.h>
 
 #if defined(PETSCOPT_HAVE_MFEMOPT)
+#include <mfemoptconf.h>
 #include <mfemopt/pdcoefficient.hpp>
 #include <mfem/fem/pgridfunc.hpp>
 #include <mfem/fem/bilininteg.hpp>

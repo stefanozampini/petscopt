@@ -4,6 +4,7 @@
 #include <petscoptconf.h>
 
 #if defined(PETSCOPT_HAVE_MFEMOPT)
+#include <mfemoptconf.h>
 #include <mfemopt/receiver.hpp>
 #include <mfemopt/pdcoefficient.hpp>
 #include <mfemopt/nonlininteg.hpp>
