@@ -84,6 +84,8 @@ addons:
 
 
 before_install:
+  - if [[ "$TRAVIS_COMPILER" == "gcc" ]]; then CC=gcc-5 && CXX=g++-5; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" && "$TRAVIS_COMPILER" == "clang" ]]; then CC=clang-3.6 && CXX=clang++-3.6; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export PATH=/usr/local/opt/ccache/libexec:$PATH; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export CCACHE_BINDIR=/usr/local/bin; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export CCACHE_BINLIB=/usr/local/bin; fi
