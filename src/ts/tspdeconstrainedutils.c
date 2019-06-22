@@ -303,6 +303,7 @@ PetscErrorCode TSLinearizedICApply_Private(TS ts, PetscReal t0, Vec x0, Vec desi
       ierr = KSPSetOptionsPrefix(ksp,prefix);CHKERRQ(ierr);
       ierr = KSPSetErrorIfNotConverged(ksp,PETSC_TRUE);CHKERRQ(ierr);
       ierr = KSPAppendOptionsPrefix(ksp,"jactsic_");CHKERRQ(ierr);
+      ierr = KSPSetOperators(ksp,G_x,G_x);CHKERRQ(ierr);
       ierr = KSPSetFromOptions(ksp);CHKERRQ(ierr);
       ierr = PetscObjectCompose((PetscObject)ts,"_ts_gradientIC_G",(PetscObject)ksp);CHKERRQ(ierr);
       ierr = PetscObjectDereference((PetscObject)ksp);CHKERRQ(ierr);

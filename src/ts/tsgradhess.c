@@ -349,12 +349,12 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
   if (!tshess->x0) {
     ierr = VecDuplicate(X,&tshess->x0);CHKERRQ(ierr);
   }
-  ierr = VecCopy(X,tshess->x0);CHKERRQ(ierr);
   if (!tshess->design) {
     ierr = VecDuplicate(design,&tshess->design);CHKERRQ(ierr);
   }
   ierr = VecCopy(design,tshess->design);CHKERRQ(ierr);
   ierr = TSSetUpFromDesign(ts,X,tshess->design);CHKERRQ(ierr);
+  ierr = VecCopy(X,tshess->x0);CHKERRQ(ierr);
   tshess->t0 = t0;
   tshess->dt = dt;
   tshess->tf = tf;
