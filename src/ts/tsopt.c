@@ -165,15 +165,19 @@ PetscErrorCode TSOptEvalHessianDAE(TSOpt tsopt, PetscInt w0, PetscInt w1, PetscR
 
   PetscFunctionBegin;
   ierr = PetscLogEventBegin(TSOPT_Opt_Eval_Hess_DAE,0,0,0,0);CHKERRQ(ierr);
-  W[0] = U;
-  W[1] = Udot;
-  ierr = TSGetTrajectory(tsopt->ts,&tj);CHKERRQ(ierr);
-  if (!U || !Udot) {
-    ierr = TSTrajectoryGetUpdatedHistoryVecs(tj,tsopt->ts,t,U ? NULL : &W[0],Udot ? NULL : &W[1]);CHKERRQ(ierr);
-  }
-  ierr = (*tsopt->HF[w0][w1])(tsopt->ts,t,W[0],W[1],M,L,X,Y,tsopt->HFctx);CHKERRQ(ierr);
-  if (!U || !Udot) {
-    ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,U ? NULL : &W[0],Udot ? NULL : &W[1]);CHKERRQ(ierr);
+  if (tsopt->HF[w0][w1]) {
+    W[0] = U;
+    W[1] = Udot;
+    ierr = TSGetTrajectory(tsopt->ts,&tj);CHKERRQ(ierr);
+    if (!U || !Udot) {
+      ierr = TSTrajectoryGetUpdatedHistoryVecs(tj,tsopt->ts,t,U ? NULL : &W[0],Udot ? NULL : &W[1]);CHKERRQ(ierr);
+    }
+    ierr = (*tsopt->HF[w0][w1])(tsopt->ts,t,W[0],W[1],M,L,X,Y,tsopt->HFctx);CHKERRQ(ierr);
+    if (!U || !Udot) {
+      ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,U ? NULL : &W[0],Udot ? NULL : &W[1]);CHKERRQ(ierr);
+    }
+  } else {
+    ierr = VecSet(Y,0.0);CHKERRQ(ierr);
   }
   ierr = PetscLogEventEnd(TSOPT_Opt_Eval_Hess_DAE,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -195,7 +199,11 @@ PetscErrorCode TSOptEvalHessianIC(TSOpt tsopt, PetscInt w0, PetscInt w1, PetscRe
 
   PetscFunctionBegin;
   ierr = PetscLogEventBegin(TSOPT_Opt_Eval_Hess_IC,0,0,0,0);CHKERRQ(ierr);
-  ierr = (*tsopt->HG[w0][w1])(tsopt->ts,t,U,M,L,X,Y,tsopt->HGctx);CHKERRQ(ierr);
+  if (tsopt->HG[w0][w1]) {
+    ierr = (*tsopt->HG[w0][w1])(tsopt->ts,t,U,M,L,X,Y,tsopt->HGctx);CHKERRQ(ierr);
+  } else {
+    ierr = VecSet(Y,0.0);CHKERRQ(ierr);
+  }
   ierr = PetscLogEventEnd(TSOPT_Opt_Eval_Hess_IC,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
