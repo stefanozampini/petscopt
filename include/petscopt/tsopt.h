@@ -33,7 +33,10 @@ PETSC_EXTERN PetscErrorCode TSSetUpFromDesign(TS,Vec,Vec);
 
 PETSC_EXTERN PetscErrorCode TSComputeObjectiveAndGradient(TS,PetscReal,PetscReal,PetscReal,Vec,Vec,Vec,PetscReal*);
 PETSC_EXTERN PetscErrorCode TSComputeHessian(TS,PetscReal,PetscReal,PetscReal,Vec,Vec,Mat);
-PETSC_EXTERN PetscErrorCode TSTaylorTest(TS,PetscReal,PetscReal,PetscReal,Vec,Vec,Vec);
 PETSC_EXTERN PetscErrorCode TSCreatePropagatorMat(TS,PetscReal,PetscReal,PetscReal,Vec,Vec,Mat,Mat*);
+
+PETSC_EXTERN PetscErrorCode TSTaylorTest(TS,PetscReal,PetscReal,PetscReal,Vec,Vec,Vec);
+PETSC_EXTERN PetscErrorCode TSCheckHessianIC(TS,PetscReal,Vec,Vec,Vec);
+PETSC_EXTERN PetscErrorCode TSCheckHessianDAE(TS,PetscReal,Vec,Vec,Vec,Vec);
 
 #endif

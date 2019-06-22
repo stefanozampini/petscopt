@@ -760,3 +760,186 @@ PetscErrorCode TSTaylorTest(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec
   ierr = MatDestroy(&H);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
+
+#include <petscopt/private/tssplitjacimpl.h>
+#include <petscdm.h>
+/* MFFD data struct to check Hessian terms */
+typedef struct {
+  Vec L;
+  Vec U;
+  Vec Udot;
+  Vec M;
+
+  PetscBool ic;
+  PetscInt  deriv;
+  PetscInt  sample;
+
+  TS ts;
+  PetscReal t;
+
+} MFFDCtx;
+
+static PetscErrorCode ResidualHessian_Private(void *ctx, Vec X, Vec Y)
+{
+  MFFDCtx*       mffd = (MFFDCtx*)(ctx);
+  TSOpt          tsopt;
+  Mat            G;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TSGetTSOpt(mffd->ts,&tsopt);CHKERRQ(ierr);
+  if (mffd->ic) {
+    ierr = TSOptEvalGradientIC(tsopt,mffd->t,(mffd->deriv == 0) ? X : mffd->U,
+                                             (mffd->deriv == 1) ? X : mffd->M,
+                                             mffd->sample ? NULL : &G,
+                                             mffd->sample ? &G : NULL);CHKERRQ(ierr);
+  } else {
+    if (mffd->sample < 2) {
+      Mat J_U,pJ_U,J_Udot,pJ_Udot;
+
+      if (mffd->deriv == 2) {
+        DM  dm;
+        Vec U0;
+
+        ierr = TSGetDM(mffd->ts,&dm);CHKERRQ(ierr);
+        ierr = DMGetGlobalVector(dm,&U0);CHKERRQ(ierr);
+        ierr = TSSetUpFromDesign(mffd->ts,U0,X);CHKERRQ(ierr);
+        ierr = DMRestoreGlobalVector(dm,&U0);CHKERRQ(ierr);
+      }
+      ierr = TSGetSplitJacobians(mffd->ts,&J_U,&pJ_U,&J_Udot,&pJ_Udot);CHKERRQ(ierr);
+      ierr = TSComputeSplitJacobians(mffd->ts,mffd->t,(mffd->deriv == 0) ? X : mffd->U,
+                                                      (mffd->deriv == 1) ? X : mffd->Udot,
+                                                      J_U,pJ_U,J_Udot,pJ_Udot);CHKERRQ(ierr);
+      G = mffd->sample ? J_Udot : J_U;
+    } else {
+      ierr = TSOptEvalGradientDAE(tsopt,mffd->t,(mffd->deriv == 0) ? X : mffd->U,
+                                                (mffd->deriv == 1) ? X : mffd->Udot,
+                                                (mffd->deriv == 2) ? X : mffd->M,&G,NULL);CHKERRQ(ierr);
+    }
+  }
+  if (G) {
+    ierr = MatMultTranspose(G,mffd->L,Y);CHKERRQ(ierr);
+  } else {
+    ierr = VecSet(Y,0.0);CHKERRQ(ierr);
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode HessianMult_Private(Mat H, Vec X, Vec Y)
+{
+  MFFDCtx*       mffd;
+  TSOpt          tsopt;
+  PetscInt       w0,w1;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = MatShellGetContext(H,(void**)&mffd);CHKERRQ(ierr);
+  w0   = mffd->sample;
+  w1   = mffd->deriv;
+  ierr = TSGetTSOpt(mffd->ts,&tsopt);CHKERRQ(ierr);
+  if (mffd->ic) {
+    ierr = TSOptEvalHessianIC(tsopt,w0,w1,mffd->t,mffd->U,mffd->M,mffd->L,X,Y);CHKERRQ(ierr);
+  } else {
+    ierr = TSOptEvalHessianDAE(tsopt,w0,w1,mffd->t,mffd->U,mffd->Udot,mffd->M,mffd->L,X,Y);CHKERRQ(ierr);
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode TSCheckHessian_Private(TS ts, PetscReal t, Vec U, Vec Udot, Vec design, Vec L, PetscBool ic)
+{
+  MFFDCtx        mffd;
+  Mat            H,He;
+  Vec            base;
+  PetscInt       samples,i,j,m,n,M,N;
+  MPI_Comm       comm;
+  char           dstr[8],sstr[8];
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  mffd.ts   = ts;
+  mffd.ic   = ic;
+  mffd.t    = t;
+  mffd.U    = U;
+  mffd.Udot = Udot;
+  mffd.M    = design;
+  mffd.L    = L;
+  samples   = ic ? 2 : 3;
+  for (i=0;i<samples;i++) {
+    mffd.sample = i;
+    for (j=0;j<samples;j++) {
+      mffd.deriv = j;
+
+      comm = PetscObjectComm((PetscObject)ts);
+      if (mffd.deriv == samples - 1) {
+        ierr = PetscStrcpy(dstr,"M");CHKERRQ(ierr);
+        ierr = VecGetSize(design,&N);CHKERRQ(ierr);
+        ierr = VecGetLocalSize(design,&n);CHKERRQ(ierr);
+        base = mffd.M;
+      } else {
+        if (mffd.deriv == 0) {
+          ierr = PetscStrcpy(dstr,"U");CHKERRQ(ierr);
+          base = mffd.U;
+        } else {
+          ierr = PetscStrcpy(dstr,"Udot");CHKERRQ(ierr);
+          base = mffd.Udot;
+        }
+        ierr = VecGetSize(U,&N);CHKERRQ(ierr);
+        ierr = VecGetLocalSize(U,&n);CHKERRQ(ierr);
+      }
+      if (mffd.sample == samples - 1) {
+        ierr = PetscStrcpy(sstr,"M");CHKERRQ(ierr);
+        ierr = VecGetSize(design,&M);CHKERRQ(ierr);
+        ierr = VecGetLocalSize(design,&m);CHKERRQ(ierr);
+      } else {
+        if (mffd.sample == 0) {
+          ierr = PetscStrcpy(sstr,"U");CHKERRQ(ierr);
+        } else {
+          ierr = PetscStrcpy(sstr,"Udot");CHKERRQ(ierr);
+        }
+        ierr = VecGetSize(U,&M);CHKERRQ(ierr);
+        ierr = VecGetLocalSize(U,&m);CHKERRQ(ierr);
+      }
+      ierr = MatCreate(comm,&H);CHKERRQ(ierr);
+      ierr = MatSetSizes(H,m,n,M,N);CHKERRQ(ierr);
+      ierr = MatSetType(H,MATMFFD);CHKERRQ(ierr);
+      ierr = MatSetUp(H);CHKERRQ(ierr);
+
+      ierr = MatMFFDSetBase(H,base,NULL);CHKERRQ(ierr);
+      ierr = MatMFFDSetFunction(H,(PetscErrorCode (*)(void*,Vec,Vec))ResidualHessian_Private,&mffd);CHKERRQ(ierr);
+      ierr = MatAssemblyBegin(H,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+      ierr = MatAssemblyEnd(H,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+      ierr = MatComputeOperator(H,NULL,&He);CHKERRQ(ierr);
+      ierr = PetscPrintf(comm,"Hessian %s MFFD_%s%s\n",ic ? "IC" : "DAE",sstr,dstr);CHKERRQ(ierr);
+      ierr = MatView(He,NULL);CHKERRQ(ierr);
+      ierr = MatDestroy(&He);CHKERRQ(ierr);
+      ierr = MatDestroy(&H);CHKERRQ(ierr);
+
+      ierr = MatCreateShell(comm,m,n,M,N,&mffd,&H);CHKERRQ(ierr);
+      ierr = MatShellSetOperation(H,MATOP_MULT,(void(*)(void))HessianMult_Private);CHKERRQ(ierr);
+      ierr = MatComputeOperator(H,NULL,&He);CHKERRQ(ierr);
+      ierr = PetscPrintf(comm,"Hessian %s SHELL_%s%s\n",ic ? "IC" : "DAE",sstr,dstr);CHKERRQ(ierr);
+      ierr = MatView(He,NULL);CHKERRQ(ierr);
+      ierr = MatDestroy(&He);CHKERRQ(ierr);
+      ierr = MatDestroy(&H);CHKERRQ(ierr);
+    }
+  }
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSCheckHessianIC(TS ts, PetscReal t0, Vec U0, Vec design, Vec L)
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TSCheckHessian_Private(ts,t0,U0,NULL,design,L,PETSC_TRUE);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSCheckHessianDAE(TS ts, PetscReal t, Vec U, Vec Udot, Vec design, Vec L)
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TSCheckHessian_Private(ts,t,U,Udot,design,L,PETSC_FALSE);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
