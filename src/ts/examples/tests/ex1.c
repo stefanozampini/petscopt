@@ -905,7 +905,7 @@ int main(int argc, char* argv[])
   Mat            J,pJ,G_M,F_M,G_X;
   Mat            checkTLM,Phi,PhiExpl,PhiT,PhiTExpl;
   Mat            H_MM,H_UU,H;
-  Vec            U,M,Mgrad,sol,tlmsol;
+  Vec            U,M,Mgrad,sol;
   UserObjective  userobj;
   UserDAE        userdae;
   TSProblemType  problemtype;
@@ -1340,9 +1340,7 @@ int main(int argc, char* argv[])
 
   /* Test tangent Linear Model */
   ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
-  ierr = VecDuplicate(sol,&tlmsol);CHKERRQ(ierr);
-  ierr = VecCopy(sol,tlmsol);CHKERRQ(ierr);
-  ierr = VecSet(U,a*a);CHKERRQ(ierr); /* XXX IC */
+  ierr = VecSet(U,a*a);CHKERRQ(ierr);
   ierr = TSCreatePropagatorMat(ts,t0,dt,tf,U,M,NULL,&Phi);CHKERRQ(ierr);
   ierr = MatComputeOperator(Phi,NULL,&PhiExpl);CHKERRQ(ierr);
   ierr = MatNorm(PhiExpl,NORM_INFINITY,&normPhi);CHKERRQ(ierr);
@@ -1365,6 +1363,10 @@ int main(int argc, char* argv[])
     ierr = MatView(checkTLM,NULL);CHKERRQ(ierr);
   }
   ierr = MatDestroy(&checkTLM);CHKERRQ(ierr);
+  ierr = MatDestroy(&PhiExpl);CHKERRQ(ierr);
+  ierr = MatDestroy(&Phi);CHKERRQ(ierr);
+  ierr = MatDestroy(&PhiTExpl);CHKERRQ(ierr);
+  ierr = MatDestroy(&PhiT);CHKERRQ(ierr);
 
   /* Test Hessian evaluation */
   ierr = MatCreate(PETSC_COMM_WORLD,&H);CHKERRQ(ierr);
@@ -1374,6 +1376,7 @@ int main(int argc, char* argv[])
     Mat He;
 
     ierr = MatComputeOperator(H,NULL,&He);CHKERRQ(ierr);
+    ierr = PetscObjectSetName((PetscObject)He,"H");CHKERRQ(ierr);
     ierr = MatViewFromOptions(He,NULL,"-tshessian_view");CHKERRQ(ierr);
     ierr = MatDestroy(&He);CHKERRQ(ierr);
   }
@@ -1397,7 +1400,6 @@ int main(int argc, char* argv[])
   ierr = MatDestroy(&userdae.F_UU);CHKERRQ(ierr);
   ierr = MatDestroy(&userdae.F_MM);CHKERRQ(ierr);
   ierr = MatDestroy(&userdae.F_UM);CHKERRQ(ierr);
-  ierr = VecDestroy(&tlmsol);CHKERRQ(ierr);
   /* XXX coverage */
   ierr = TSSetGradientIC(ts,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
   ierr = TSDestroy(&ts);CHKERRQ(ierr);
@@ -1405,10 +1407,6 @@ int main(int argc, char* argv[])
   ierr = VecDestroy(&U);CHKERRQ(ierr);
   ierr = VecDestroy(&M);CHKERRQ(ierr);
   ierr = VecDestroy(&Mgrad);CHKERRQ(ierr);
-  ierr = MatDestroy(&PhiExpl);CHKERRQ(ierr);
-  ierr = MatDestroy(&Phi);CHKERRQ(ierr);
-  ierr = MatDestroy(&PhiTExpl);CHKERRQ(ierr);
-  ierr = MatDestroy(&PhiT);CHKERRQ(ierr);
   ierr = MatDestroy(&pJ);CHKERRQ(ierr);
   ierr = MatDestroy(&J);CHKERRQ(ierr);
   ierr = MatDestroy(&H_UU);CHKERRQ(ierr);
