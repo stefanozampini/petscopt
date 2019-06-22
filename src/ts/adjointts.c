@@ -544,7 +544,9 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, PetscBoo
     DM         dm;
     Vec        soawork0,soawork1;
     Vec        FWDH,TLMH;
-    PetscBool  hast,HFhas[3][3];
+    PetscBool  hast,HFhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                                   {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                                   {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
 
     if (U) SETERRQ(PetscObjectComm((PetscObject)adjts),PETSC_ERR_SUP,"Not implemented");
     ierr = VecSet(F,0.0);CHKERRQ(ierr);
@@ -563,7 +565,9 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, PetscBoo
       has  = PETSC_TRUE;
     }
 
-    ierr = TSOptHasHessianDAE(tsopt,HFhas);CHKERRQ(ierr);
+    if (foats) { /* if present, not a Gauss-Newton Hessian */
+      ierr = TSOptHasHessianDAE(tsopt,HFhas);CHKERRQ(ierr);
+    }
     if (HFhas[0][0] || HFhas[0][1] || HFhas[0][2]) {
       Vec FWDHdot,FOAH;
 
@@ -734,7 +738,6 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
   ierr = PetscObjectQuery((PetscObject)adjts,"_ts_adjctx",(PetscObject*)&c);CHKERRQ(ierr);
   ierr = PetscContainerGetPointer(c,(void**)&adj_ctx);CHKERRQ(ierr);
   if (adj_ctx->direction && !adj_ctx->tlmts) SETERRQ(PetscObjectComm((PetscObject)adjts),PETSC_ERR_ORDER,"Missing TLMTS! You need to call AdjointTSSetTLMTSAndFOATS");
-  if (adj_ctx->direction && !adj_ctx->foats) SETERRQ(PetscObjectComm((PetscObject)adjts),PETSC_ERR_ORDER,"Missing FOATS! You need to call AdjointTSSetTLMTSAndFOATS");
   ierr = TSGetTSOpt(adj_ctx->fwdts,&tsopt);CHKERRQ(ierr);
   ierr = TSGetTime(adjts,&time);CHKERRQ(ierr);
   fwdt = adj_ctx->tf - time + adj_ctx->t0;
@@ -770,7 +773,9 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
     TS        foats = adj_ctx->foats;
     DM        dm;
     Vec       soawork0,soawork1,TLMH[2];
-    PetscBool hast,HFhas[3][3];
+    PetscBool hast,HFhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                                  {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                                  {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
 
     ierr = TSGetDM(adj_ctx->fwdts,&dm);CHKERRQ(ierr);
     ierr = DMGetGlobalVector(dm,&soawork0);CHKERRQ(ierr);
@@ -790,7 +795,9 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
       rsve = PETSC_FALSE;
     }
     /* these terms need to be evaluated only if we have point-form functionals */
-    ierr = TSOptHasHessianDAE(tsopt,HFhas);CHKERRQ(ierr);
+    if (foats) { /* Not present for Gauss-Newton Hessians */
+      ierr = TSOptHasHessianDAE(tsopt,HFhas);CHKERRQ(ierr);
+    }
     if (has_g && (HFhas[1][0] || HFhas[1][1] || HFhas[1][2])) {
       Vec FOAH,FWDH[2];
 
@@ -1260,7 +1267,7 @@ PetscErrorCode AdjointTSSetDirectionVec(TS adjts, Vec direction)
    Input Parameters:
 +  soats - the TS context obtained from TSCreateAdjointTS() (second order adjoint)
 .  tlmts - the TS context obtained from TSCreateTLMTS()
--  foats - the TS context obtained from TSCreateAdjointTS()
+-  foats - the TS context obtained from TSCreateAdjointTS() (can be NULL)
 
    Notes: You should call AdjointTSSetDirectionVec() first.
 
@@ -1280,14 +1287,18 @@ PetscErrorCode AdjointTSSetTLMTSAndFOATS(TS soats, TS tlmts, TS foats)
   PetscValidHeaderSpecific(tlmts,TS_CLASSID,2);
   PetscCheckSameComm(soats,1,tlmts,2);
   PetscCheckTLMTS(tlmts);
-  PetscValidHeaderSpecific(foats,TS_CLASSID,3);
-  PetscCheckSameComm(soats,1,foats,3);
-  PetscCheckAdjointTS(foats);
+  if (foats) {
+    PetscValidHeaderSpecific(foats,TS_CLASSID,3);
+    PetscCheckSameComm(soats,1,foats,3);
+    PetscCheckAdjointTS(foats);
+  }
   if (soats == foats) SETERRQ(PetscObjectComm((PetscObject)soats),PETSC_ERR_SUP,"The two AdjointTS should be different");
   ierr = PetscObjectQuery((PetscObject)soats,"_ts_adjctx",(PetscObject*)&c);CHKERRQ(ierr);
   ierr = PetscContainerGetPointer(c,(void**)&adj_ctx);CHKERRQ(ierr);
   ierr = PetscObjectReference((PetscObject)tlmts);CHKERRQ(ierr);
-  ierr = PetscObjectReference((PetscObject)foats);CHKERRQ(ierr);
+  if (foats) {
+    ierr = PetscObjectReference((PetscObject)foats);CHKERRQ(ierr);
+  }
   ierr = TSDestroy(&adj_ctx->tlmts);CHKERRQ(ierr);
   ierr = TSDestroy(&adj_ctx->foats);CHKERRQ(ierr);
   adj_ctx->tlmts = tlmts;
@@ -1451,62 +1462,73 @@ PetscErrorCode AdjointTSFinalizeQuadrature(TS adjts)
     } else { /* second-order adjoint in Hessian computations */
       TS        foats = adj_ctx->foats;
       TS        tlmts = adj_ctx->tlmts;
-      DM        dm;
-      Vec       soawork0,soawork1,FOAH,FWDH[2],TLMH,TLMHdot = NULL;
-      PetscBool HFhas[3][3],HGhas[2][2];
+      Vec       soawork0 = NULL,soawork1 = NULL,FOAH = NULL,FWDH[2],TLMH,TLMHdot = NULL;
+      PetscBool HGhas[2][2] = {{PETSC_FALSE,PETSC_FALSE},
+                               {PETSC_FALSE,PETSC_FALSE}};
+      PetscBool HFhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                               {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                               {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
 
-      ierr = TSOptHasHessianDAE(tsopt,HFhas);CHKERRQ(ierr);
-      ierr = TSOptHasHessianIC(tsopt,HGhas);CHKERRQ(ierr);
-      ierr = TSGetDM(adj_ctx->fwdts,&dm);CHKERRQ(ierr);
-      ierr = DMGetGlobalVector(dm,&soawork0);CHKERRQ(ierr);
-      ierr = DMGetGlobalVector(dm,&soawork1);CHKERRQ(ierr);
-
-      /* compute first order contribution */
-      ierr = TSTrajectoryGetUpdatedHistoryVecs(foats->trajectory,foats,adj_ctx->tf,&FOAH,NULL);CHKERRQ(ierr);
-      ierr = TSTrajectoryGetUpdatedHistoryVecs(tlmts->trajectory,tlmts,adj_ctx->t0,&TLMH,HFhas[1][1] ? &TLMHdot : NULL);CHKERRQ(ierr);
-      ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,adj_ctx->t0,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
-      if (!J_Udot) {
-        ierr = VecCopy(FOAH,soawork1);CHKERRQ(ierr);
+      if (foats) { /* Full (not Gauss-Newton) Hessian IC contributions */
+        ierr = DMGetGlobalVector(adm,&soawork0);CHKERRQ(ierr);
+        ierr = DMGetGlobalVector(adm,&soawork1);CHKERRQ(ierr);
+        ierr = TSOptHasHessianIC(tsopt,HGhas);CHKERRQ(ierr);
+        ierr = TSOptHasHessianDAE(tsopt,HFhas);CHKERRQ(ierr);
+        ierr = TSTrajectoryGetUpdatedHistoryVecs(foats->trajectory,foats,adj_ctx->tf,&FOAH,NULL);CHKERRQ(ierr);
+        ierr = TSTrajectoryGetUpdatedHistoryVecs(tlmts->trajectory,tlmts,adj_ctx->t0,&TLMH,HFhas[1][1] ? &TLMHdot : NULL);CHKERRQ(ierr);
+        ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,adj_ctx->t0,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
+        if (!J_Udot) {
+          ierr = VecCopy(FOAH,soawork1);CHKERRQ(ierr);
+        } else {
+          ierr = MatMultTranspose(J_Udot,FOAH,soawork1);CHKERRQ(ierr);
+        }
+        /* XXX Hack to just solve for G_x (if any) -> compute mu */
+        ierr = TSLinearizedICApply_Private(fwdts,adj_ctx->t0,FWDH[0],adj_ctx->design,soawork1,soawork0,PETSC_TRUE,PETSC_FALSE);CHKERRQ(ierr);
+        if (HGhas[0][0]) { /* (\mu^T \otimes I_N) G_XX \eta, \eta the TLM solution */
+          ierr = TSOptEvalHessianIC(tsopt,0,0,adj_ctx->t0,FWDH[0],adj_ctx->design,soawork0,TLMH,soawork1);CHKERRQ(ierr);
+          ierr = VecAXPY(work,-1.0,soawork1);CHKERRQ(ierr);
+        }
+        if (HGhas[0][1]) { /* (\mu^T \otimes I_N) G_XM direction */
+          ierr = TSOptEvalHessianIC(tsopt,0,1,adj_ctx->t0,FWDH[0],adj_ctx->design,soawork0,adj_ctx->direction,soawork1);CHKERRQ(ierr);
+          ierr = VecAXPY(work,-1.0,soawork1);CHKERRQ(ierr);
+        }
+        if (HFhas[1][0]) { /* (L^T \otimes I_N) H_XdotX \eta, \eta the TLM solution */
+          ierr = TSOptEvalHessianDAE(tsopt,1,0,adj_ctx->t0,FWDH[0],FWDH[1],adj_ctx->design,FOAH,TLMH,soawork1);CHKERRQ(ierr);
+          ierr = VecAXPY(work,1.0,soawork1);CHKERRQ(ierr);
+        }
+        if (HFhas[1][1]) { /* (L^T \otimes I_N) H_XdotXdot \etadot, \eta the TLM solution */
+          ierr = TSOptEvalHessianDAE(tsopt,1,1,adj_ctx->t0,FWDH[0],FWDH[1],adj_ctx->design,FOAH,TLMHdot,soawork1);CHKERRQ(ierr);
+          ierr = VecAXPY(work,1.0,soawork1);CHKERRQ(ierr);
+        }
+        if (HFhas[1][2]) { /* (L^T \otimes I_N) H_XdotM direction */
+          ierr = TSOptEvalHessianDAE(tsopt,1,2,adj_ctx->t0,FWDH[0],FWDH[1],adj_ctx->design,FOAH,adj_ctx->direction,soawork1);CHKERRQ(ierr);
+          ierr = VecAXPY(work,1.0,soawork1);CHKERRQ(ierr);
+        }
       } else {
-        ierr = MatMultTranspose(J_Udot,FOAH,soawork1);CHKERRQ(ierr);
+        ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,adj_ctx->t0,&FWDH[0],NULL);CHKERRQ(ierr);
       }
-      /* XXX Hack to just solve for G_x (if any) */
-      ierr = TSLinearizedICApply_Private(fwdts,adj_ctx->t0,FWDH[0],adj_ctx->design,soawork1,soawork0,PETSC_TRUE,PETSC_FALSE);CHKERRQ(ierr);
-      if (HGhas[0][0]) { /* (\mu^T \otimes I_N) G_XX \eta, \eta the TLM solution */
-        ierr = TSOptEvalHessianIC(tsopt,0,0,adj_ctx->t0,FWDH[0],adj_ctx->design,soawork0,TLMH,soawork1);CHKERRQ(ierr);
-        ierr = VecAXPY(work,-1.0,soawork1);CHKERRQ(ierr);
-      }
-      if (HGhas[0][1]) { /* (\mu^T \otimes I_N) G_XM direction */
-        ierr = TSOptEvalHessianIC(tsopt,0,1,adj_ctx->t0,FWDH[0],adj_ctx->design,soawork0,adj_ctx->direction,soawork1);CHKERRQ(ierr);
-        ierr = VecAXPY(work,-1.0,soawork1);CHKERRQ(ierr);
-      }
-      if (HFhas[1][0]) { /* (L^T \otimes I_N) H_XdotX \eta, \eta the TLM solution */
-        ierr = TSOptEvalHessianDAE(tsopt,1,0,adj_ctx->t0,FWDH[0],FWDH[1],adj_ctx->design,FOAH,TLMH,soawork1);CHKERRQ(ierr);
-        ierr = VecAXPY(work,1.0,soawork1);CHKERRQ(ierr);
-      }
-      if (HFhas[1][1]) { /* (L^T \otimes I_N) H_XdotXdot \etadot, \eta the TLM solution */
-        ierr = TSOptEvalHessianDAE(tsopt,1,1,adj_ctx->t0,FWDH[0],FWDH[1],adj_ctx->design,FOAH,TLMHdot,soawork1);CHKERRQ(ierr);
-        ierr = VecAXPY(work,1.0,soawork1);CHKERRQ(ierr);
-      }
-      if (HFhas[1][2]) { /* (L^T \otimes I_N) H_XdotM direction */
-        ierr = TSOptEvalHessianDAE(tsopt,1,2,adj_ctx->t0,FWDH[0],FWDH[1],adj_ctx->design,FOAH,adj_ctx->direction,soawork1);CHKERRQ(ierr);
-        ierr = VecAXPY(work,1.0,soawork1);CHKERRQ(ierr);
-      }
+      /* With Gauss-Newton Hessians, all terms are zero except for this */
       ierr = TSLinearizedICApply_Private(fwdts,adj_ctx->t0,FWDH[0],adj_ctx->design,work,adj_ctx->wquad,PETSC_TRUE,PETSC_TRUE);CHKERRQ(ierr);
       ierr = VecAXPY(adj_ctx->quadvec,1.0,adj_ctx->wquad);CHKERRQ(ierr);
-      if (HGhas[1][1]) { /* (\mu^T \otimes I_M) G_MM direction */
-        ierr = TSOptEvalHessianIC(tsopt,1,1,adj_ctx->t0,FWDH[0],adj_ctx->design,soawork0,adj_ctx->direction,adj_ctx->wquad);CHKERRQ(ierr);
-        ierr = VecAXPY(adj_ctx->quadvec,1.0,adj_ctx->wquad);CHKERRQ(ierr);
+      if (foats) { /* full Hessian */
+        if (HGhas[1][1]) { /* (\mu^T \otimes I_M) G_MM direction */
+          ierr = TSOptEvalHessianIC(tsopt,1,1,adj_ctx->t0,FWDH[0],adj_ctx->design,soawork0,adj_ctx->direction,adj_ctx->wquad);CHKERRQ(ierr);
+          ierr = VecAXPY(adj_ctx->quadvec,1.0,adj_ctx->wquad);CHKERRQ(ierr);
+        }
+        if (HGhas[1][0]) { /* (\mu^T \otimes I_M) G_MX  \eta, \eta the TLM solution */
+          ierr = TSOptEvalHessianIC(tsopt,1,0,adj_ctx->t0,FWDH[0],adj_ctx->design,soawork0,TLMH,adj_ctx->wquad);CHKERRQ(ierr);
+          ierr = VecAXPY(adj_ctx->quadvec,1.0,adj_ctx->wquad);CHKERRQ(ierr);
+        }
+        if (foats) {
+          ierr = TSTrajectoryRestoreUpdatedHistoryVecs(foats->trajectory,&FOAH,NULL);CHKERRQ(ierr);
+        }
+        ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
+        ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tlmts->trajectory,&TLMH,TLMHdot ? &TLMHdot : NULL);CHKERRQ(ierr);
+        ierr = DMRestoreGlobalVector(adm,&soawork0);CHKERRQ(ierr);
+        ierr = DMRestoreGlobalVector(adm,&soawork1);CHKERRQ(ierr);
+      } else {
+        ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,&FWDH[0],NULL);CHKERRQ(ierr);
       }
-      if (HGhas[1][0]) { /* (\mu^T \otimes I_M) G_MX  \eta, \eta the TLM solution */
-        ierr = TSOptEvalHessianIC(tsopt,1,0,adj_ctx->t0,FWDH[0],adj_ctx->design,soawork0,TLMH,adj_ctx->wquad);CHKERRQ(ierr);
-        ierr = VecAXPY(adj_ctx->quadvec,1.0,adj_ctx->wquad);CHKERRQ(ierr);
-      }
-      ierr = TSTrajectoryRestoreUpdatedHistoryVecs(foats->trajectory,&FOAH,NULL);CHKERRQ(ierr);
-      ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
-      ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tlmts->trajectory,&TLMH,TLMHdot ? &TLMHdot : NULL);CHKERRQ(ierr);
-      ierr = DMRestoreGlobalVector(dm,&soawork0);CHKERRQ(ierr);
-      ierr = DMRestoreGlobalVector(dm,&soawork1);CHKERRQ(ierr);
     }
     ierr = DMRestoreGlobalVector(adm,&work);CHKERRQ(ierr);
   }

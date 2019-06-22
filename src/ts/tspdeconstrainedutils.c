@@ -98,16 +98,21 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
   TS             fwdts = q->fwdts;
   TS             adjts = q->adjts;
   TS             tlmts = q->tlmts;
-  TSTrajectory   tj,atj,ltj;
+  TSTrajectory   tj,atj = NULL,ltj;
   TSOpt          tsopt;
-  Vec            FWDH[2],FOAH;
+  Vec            FWDH[2],FOAH = NULL;
   PetscReal      adjt  = q->tf - t + q->t0;
-  PetscBool      AXPY, rest = PETSC_FALSE, Hhas[3][3];
+  PetscBool      AXPY, rest = PETSC_FALSE;
+  PetscBool      Hhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                               {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                               {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
   ierr = TSGetTrajectory(fwdts,&tj);CHKERRQ(ierr);
-  ierr = TSGetTrajectory(adjts,&atj);CHKERRQ(ierr);
+  if (adjts) { /* If not present, Gauss-Newton Hessian */
+    ierr = TSGetTrajectory(adjts,&atj);CHKERRQ(ierr);
+  }
   ierr = TSGetTrajectory(tlmts,&ltj);CHKERRQ(ierr);
   ierr = TSTrajectoryGetUpdatedHistoryVecs(tj,fwdts,t,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
   ierr = TSObjEval_MU(q->obj,FWDH[0],q->design,t,U,q->work1,&AXPY,F);CHKERRQ(ierr);
@@ -122,8 +127,10 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
     }
   }
   ierr = TSGetTSOpt(fwdts,&tsopt);CHKERRQ(ierr);
-  ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
-  if (Hhas[2][0] || (Hhas[2][1] && q->init) || Hhas[2][2]) {
+  if (adjts) {
+    ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
+  }
+  if (Hhas[2][0] || (Hhas[2][1] && q->init) || Hhas[2][2]) { /* Not for GN */
     rest = PETSC_TRUE;
     ierr = TSTrajectoryGetUpdatedHistoryVecs(atj,adjts,adjt,&FOAH,NULL);CHKERRQ(ierr);
   }
@@ -495,8 +502,8 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
       qfwd.work = qeval_ctx->wquad[2];
       qeval_ctx->veval_ctx = &qfwd;
     } else {
-      ierr = PetscObjectQuery((PetscObject)model,"_ts_hessian_foats",(PetscObject*)&qtlm.adjts);CHKERRQ(ierr); /* XXX */
-      if (!qtlm.adjts) SETERRQ(PetscObjectComm((PetscObject)model),PETSC_ERR_PLIB,"Missing first-order adjoint");
+      /* qtlm.adjts may be NULL for Gauss-Newton approximations */
+      ierr = PetscObjectQuery((PetscObject)model,"_ts_hessian_foats",(PetscObject*)&qtlm.adjts);CHKERRQ(ierr);
       qtlm.fwdts     = model;
       qtlm.tlmts     = ts;
       qtlm.t0        = t0;

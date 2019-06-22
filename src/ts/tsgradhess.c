@@ -20,6 +20,7 @@ typedef struct {
   PetscReal    t0,dt,tf;
   Vec          design;
   TSTrajectory modeltj;  /* nonlinear model trajectory */
+  PetscBool    GN;
 } TSHessian;
 
 static PetscErrorCode TSHessianReset_Private(void *ptr)
@@ -103,7 +104,7 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   }
 
   /* XXX should we add the AdjointTS to the TS private data? */
-  ierr = PetscObjectCompose((PetscObject)tshess->model,"_ts_hessian_foats",(PetscObject)tshess->foats);CHKERRQ(ierr);
+  ierr = PetscObjectCompose((PetscObject)tshess->model,"_ts_hessian_foats",tshess->GN ? NULL : (PetscObject)tshess->foats);CHKERRQ(ierr);
   ierr = TSSolveWithQuadrature_Private(tshess->tlmts,NULL,tshess->design,x,y,NULL);CHKERRQ(ierr);
   ierr = PetscObjectCompose((PetscObject)tshess->model,"_ts_hessian_foats",NULL);CHKERRQ(ierr);
   ierr = TLMTSSetPerturbationVec(tshess->tlmts,NULL);CHKERRQ(ierr);
@@ -111,7 +112,7 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   /* second-order adjoint solve */
   ierr = AdjointTSSetTimeLimits(tshess->soats,tshess->t0,tshess->tf);CHKERRQ(ierr);
   ierr = AdjointTSSetDirectionVec(tshess->soats,x);CHKERRQ(ierr);
-  ierr = AdjointTSSetTLMTSAndFOATS(tshess->soats,tshess->tlmts,tshess->foats);CHKERRQ(ierr);
+  ierr = AdjointTSSetTLMTSAndFOATS(tshess->soats,tshess->tlmts,tshess->GN ? NULL : tshess->foats);CHKERRQ(ierr);
   ierr = AdjointTSSetQuadratureVec(tshess->soats,y);CHKERRQ(ierr);
   ierr = AdjointTSComputeInitialConditions(tshess->soats,NULL,PETSC_TRUE,PETSC_TRUE);CHKERRQ(ierr);
   ierr = TSSetStepNumber(tshess->soats,0);CHKERRQ(ierr);
@@ -335,6 +336,9 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
   ierr = MatShellSetOperation(H,MATOP_MULT_TRANSPOSE,(void (*)())MatMult_TSHessian);CHKERRQ(ierr);
   ierr = PetscContainerGetPointer(c,(void**)&tshess);CHKERRQ(ierr);
 
+  /* Gauss-Newton approximation */
+  ierr = PetscOptionsGetBool(((PetscObject)ts)->options,((PetscObject)ts)->prefix,"-tshessian_gn",&tshess->GN,NULL);CHKERRQ(ierr);
+
   /* nonlinear model */
   if (ts != tshess->model) {
     ierr = TSHessianReset_Private(tshess);CHKERRQ(ierr);
@@ -456,19 +460,20 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
   ierr = TSHistoryGetTimeStep(tshess->modeltj->tsh,PETSC_TRUE,0,&dt);CHKERRQ(ierr);
   ierr = TSSetTimeStep(tshess->foats,dt);CHKERRQ(ierr);
   ierr = AdjointTSSetTimeLimits(tshess->foats,tshess->t0,tshess->tf);CHKERRQ(ierr);
-  ierr = AdjointTSComputeInitialConditions(tshess->foats,NULL,PETSC_TRUE,PETSC_FALSE);CHKERRQ(ierr);
-  ierr = TSGetAdapt(tshess->foats,&adapt);CHKERRQ(ierr);
-  ierr = PetscObjectTypeCompare((PetscObject)adapt,TSADAPTHISTORY,&istr);CHKERRQ(ierr);
-  if (istr) {
-    PetscInt nsteps;
+  if (!tshess->GN) { /* not needed for Gauss-Newton approximation */
+    ierr = AdjointTSComputeInitialConditions(tshess->foats,NULL,PETSC_TRUE,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = TSGetAdapt(tshess->foats,&adapt);CHKERRQ(ierr);
+    ierr = PetscObjectTypeCompare((PetscObject)adapt,TSADAPTHISTORY,&istr);CHKERRQ(ierr);
+    if (istr) {
+      PetscInt nsteps;
 
-    ierr = TSAdaptHistorySetTSHistory(adapt,tshess->modeltj->tsh,PETSC_TRUE);CHKERRQ(ierr);
-    ierr = TSTrajectoryGetNumSteps(tshess->modeltj,&nsteps);CHKERRQ(ierr);
-    ierr = TSSetMaxSteps(tshess->foats,nsteps-1);CHKERRQ(ierr);
-    ierr = TSSetExactFinalTime(tshess->foats,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
+      ierr = TSAdaptHistorySetTSHistory(adapt,tshess->modeltj->tsh,PETSC_TRUE);CHKERRQ(ierr);
+      ierr = TSTrajectoryGetNumSteps(tshess->modeltj,&nsteps);CHKERRQ(ierr);
+      ierr = TSSetMaxSteps(tshess->foats,nsteps-1);CHKERRQ(ierr);
+      ierr = TSSetExactFinalTime(tshess->foats,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
+    }
+    ierr = TSSolve(tshess->foats,NULL);CHKERRQ(ierr);
   }
-  ierr = TSSolve(tshess->foats,NULL);CHKERRQ(ierr);
-
   /* restore old TSTrajectory (if any) */
   ts->trajectory = otrj;
   ierr = MatSetUp(H);CHKERRQ(ierr);
