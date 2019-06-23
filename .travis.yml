@@ -82,6 +82,7 @@ addons:
     packages:
       - ccache
       - mpich
+    update: true
 
 
 before_install:
@@ -91,7 +92,7 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export CCACHE_BINDIR=/usr/local/bin; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export CCACHE_BINLIB=/usr/local/bin; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export TMPDIR=/tmp; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
+#  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
 #  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install mpich ccache; fi
 #  - sudo update-ccache-symlinks -> does not work with clang
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then export PATH=/usr/lib/ccache:$PATH; fi
