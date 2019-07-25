@@ -205,7 +205,7 @@ alletags :
 deleteetags :
 	-@$(RM) CTAGS TAGS
 allctags :
-	-@ctags -o $(PETSC_DIR)/.vimctags -R --exclude=$(PETSC_DIR)/include/petsc/finclude $(PETSC_DIR)/src/ $(PETSC_DIR)/include/
+	-@ctags -o $(PETSC_DIR)/.vimctags -R --exclude=$(PETSC_DIR)/include/petsc/finclude --langmap=c++:+.cu $(PETSC_DIR)/src/ $(PETSC_DIR)/include/
 	-@ctags -o .vimctags -R src/ include/
 deletectags :
 	-@$(RM) $(PETSC_DIR)/.vimctags
