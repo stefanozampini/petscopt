@@ -10,6 +10,18 @@
 namespace mfemopt
 {
 
+class UniformNoise
+{
+private:
+   double A,B;
+
+public:
+   UniformNoise(double = 0.0, double = 1.0);
+   double random() const;
+   void random(mfem::Vector&,int = -1) const;
+   ~UniformNoise() {}
+};
+
 class GaussianNoise
 {
 private:

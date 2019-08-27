@@ -42,4 +42,21 @@ void GaussianNoise::random(Vector& v, int n) const
    for (int i = 0; i < v.Size(); i++) v[i] = (*this).random();
 }
 
+UniformNoise::UniformNoise(double _A, double _B)
+{
+   A = _A;
+   B = _B;
+}
+
+double UniformNoise::random() const
+{
+   return A + (B-A)*std::rand()*(1.0/RAND_MAX);
+}
+
+void UniformNoise::random(Vector& v, int n) const
+{
+   if (n >= 0) v.SetSize(n);
+   for (int i = 0; i < v.Size(); i++) v[i] = (*this).random();
+}
+
 }
