@@ -1,0 +1,60 @@
+
+Initial state
+Vec Object: 1 MPI processes
+  type: seq
+0.5
+0.5
+
+Final state
+Vec Object: 1 MPI processes
+  type: seq
+0.899589
+0.36043
+  0 TAO,  Function value: 0.209566,  Residual: 1.67113 
+  1 TAO,  Function value: 0.0811036,  Residual: 0.390565 
+  2 TAO,  Function value: 0.0476931,  Residual: 0.299952 
+  3 TAO,  Function value: 0.0204895,  Residual: 0.0700549 
+  4 TAO,  Function value: 0.0169144,  Residual: 0.0840586 
+  5 TAO,  Function value: 0.00844382,  Residual: 0.120574 
+  6 TAO,  Function value: 0.00184382,  Residual: 0.0676114 
+  7 TAO,  Function value: 0.000167295,  Residual: 0.00958927 
+  8 TAO,  Function value: 7.32804e-06,  Residual: 0.000956865 
+  9 TAO,  Function value: 7.70909e-08,  Residual: 0.00065908 
+ 10 TAO,  Function value: 7.41529e-09,  Residual: 4.14073e-05 
+ 11 TAO,  Function value: 1.5461e-12,  Residual: 5.83156e-07 
+ 12 TAO,  Function value: 3.33351e-19,  Residual: 4.24953e-10 
+
+Tao solution
+Vec Object: 1 MPI processes
+  type: seq
+-0.346574
+0.346574
+-0.693147
+
+Initial state solution
+Vec Object: 1 MPI processes
+  type: seq
+0.5
+0.5
+  ---------- Testing Hessian -------------
+  Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
+    O(1.e-8), the hand-coded Hessian is probably correct.
+  ||H - Hfd||_F/||H||_F = 5.64935e-05, ||H - Hfd||_F = 0.00019408
+  Hand-coded Hessian ----------
+Mat Object: 1 MPI processes
+  type: seqaij
+row 0: (0, 0.687536)  (1, -0.687536)  (2, -1.16325) 
+row 1: (0, -0.687536)  (1, 0.687536)  (2, 1.16325) 
+row 2: (0, -1.16326)  (1, 1.16326)  (2, 2.12104) 
+  Finite difference Hessian ----------
+Mat Object: 1 MPI processes
+  type: seqaij
+row 0: (0, 0.687488)  (1, -0.687585)  (2, -1.1633) 
+row 1: (0, -0.687488)  (1, 0.687585)  (2, 1.1633) 
+row 2: (0, -1.16317)  (1, 1.16335)  (2, 2.12113) 
+  Finite-difference minus hand-coded Hessian with tolerance 1e-05 ----------
+Mat Object: 1 MPI processes
+  type: seqaij
+row 0: (0, 4.8839e-05)  (1, 4.88493e-05)  (2, 4.88994e-05) 
+row 1: (0, -4.8839e-05)  (1, -4.88493e-05)  (2, -4.88994e-05) 
+row 2: (0, -8.81605e-05)  (1, -8.81957e-05)  (2, -8.82667e-05) 

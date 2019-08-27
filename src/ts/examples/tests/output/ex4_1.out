@@ -1,0 +1,105 @@
+
+Initial state
+Vec Object: 1 MPI processes
+  type: seq
+0.5
+0.5
+
+Final state
+Vec Object: 1 MPI processes
+  type: seq
+0.904465
+0.360131
+  0 TAO,  Function value: 0.209279,  Residual: 1.66829 
+  1 TAO,  Function value: 0.0811653,  Residual: 0.392995 
+  2 TAO,  Function value: 0.0475558,  Residual: 0.300126 
+  3 TAO,  Function value: 0.0206123,  Residual: 0.0702237 
+  4 TAO,  Function value: 0.0170566,  Residual: 0.0835016 
+  5 TAO,  Function value: 0.00806024,  Residual: 0.121807 
+  6 TAO,  Function value: 0.0017596,  Residual: 0.0656355 
+  7 TAO,  Function value: 0.000155062,  Residual: 0.00932491 
+  8 TAO,  Function value: 6.42442e-06,  Residual: 0.000901673 
+  9 TAO,  Function value: 7.52667e-08,  Residual: 0.000672828 
+ 10 TAO,  Function value: 4.79843e-09,  Residual: 3.20059e-05 
+ 11 TAO,  Function value: 9.04039e-13,  Residual: 4.37813e-07 
+ 12 TAO,  Function value: 1.27829e-19,  Residual: 2.5344e-10 
+
+Tao solution
+Vec Object: 1 MPI processes
+  type: seq
+-0.346574
+0.346574
+-0.693147
+
+Initial state solution
+Vec Object: 1 MPI processes
+  type: seq
+0.5
+0.5
+  ---------- Testing Hessian -------------
+  Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
+    O(1.e-8), the hand-coded Hessian is probably correct.
+  ||H - Hfd||_F/||H||_F = 0.000111593, ||H - Hfd||_F = 0.000385241
+  Hand-coded Hessian ----------
+Mat Object: 1 MPI processes
+  type: seqaij
+row 0: (0, 0.692617)  (1, -0.692617)  (2, -1.16949) 
+row 1: (0, -0.692617)  (1, 0.692617)  (2, 1.16949) 
+row 2: (0, -1.16949)  (1, 1.16949)  (2, 2.12789) 
+  Finite difference Hessian ----------
+Mat Object: 1 MPI processes
+  type: seqaij
+row 0: (0, 0.692531)  (1, -0.692714)  (2, -1.1696) 
+row 1: (0, -0.692531)  (1, 0.692714)  (2, 1.1696) 
+row 2: (0, -1.16933)  (1, 1.16967)  (2, 2.12808) 
+  Finite-difference minus hand-coded Hessian with tolerance 1e-05 ----------
+Mat Object: 1 MPI processes
+  type: seqaij
+row 0: (0, 8.56528e-05)  (1, 9.76549e-05)  (2, 0.000106707) 
+row 1: (0, -8.56528e-05)  (1, -9.76549e-05)  (2, -0.000106707) 
+row 2: (0, -0.000160207)  (1, -0.000175935)  (2, -0.00018781) 
+
+Gradient via adjoint
+Vec Object: 1 MPI processes
+  type: seq
+0.0354827
+-0.0354827
+0.199853
+
+Gradient of objective function
+Vec Object: 1 MPI processes
+  type: seq
+-0.264763
+0.291262
+
+Gradient via adjoint (TLM)
+Vec Object: 1 MPI processes
+  type: seq
+0.0354827
+-0.0354827
+0.199853
+
+TLM matrix
+Mat Object: 1 MPI processes
+  type: seqdense
+-5.1151913240493518e-01 5.1151913240493518e-01 5.3939402561100758e-01 
+-3.4315692964142247e-01 3.4315692964142247e-01 1.1764839691656794e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+-5.1151899795183664e-01 -3.4315693188653168e-01 
+5.1151899795183664e-01 3.4315693188653168e-01 
+5.3939395424883940e-01 1.1764839322362881e+00 
+
+Gradient via TLM (explicit)
+Vec Object: 1 MPI processes
+  type: seq
+0.0354827
+-0.0354827
+0.199853
+-------------------------- Taylor test results ---------------------------
+		Gradient				Hessian
+--------------------------------------------------------------------------
+0.00132977	0.00000 	0	9.38083e-05	0.00000 	0
+0.000344148	1.95007 	2	1.17458e-05	2.99757 	3
+8.75804e-05	1.97435 	2	1.39315e-06	3.07572 	3
+2.21120e-05	1.98578 	2	1.31435e-07	3.40593 	3
