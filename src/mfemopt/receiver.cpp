@@ -65,6 +65,11 @@ void Receiver::FinalizeIData()
 
 void Receiver::GetIData(double time, Vector& vals)
 {
+   if (!vals.Size() || !idata.size())
+   {
+      vals = 0.0;
+      return;
+   }
    signal_data data;
    data.t = time;
    InterpolateLinear(data);
