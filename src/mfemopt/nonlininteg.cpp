@@ -104,11 +104,12 @@ void TVIntegrator::AssembleElementGrad(const FiniteElement& el,
       double s = 1.0/(norm < 0.0 ? std::sqrt(InnerProduct(gradm,gradm) + beta) : norm);
       if (WQ) /* primal-dual approach */
       {
-         double nw;
          WQ->Eval(wk, T, ip);
-         nw = std::sqrt(InnerProduct(wk,wk));
+         //double nw;
+         //nw = std::sqrt(InnerProduct(wk,wk));
          if (project)
          {
+            double nw = std::sqrt(InnerProduct(wk,wk));
             wk /= std::max(1.0,nw);
          }
          //if (nw > 1.0 && nw > nwmax) { nwmax = nw; std::cout << "WARNING NWMAX " << nwmax << std::endl; }
