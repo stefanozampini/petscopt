@@ -1489,4 +1489,10 @@ int main(int argc, char* argv[])
     suffix: 13
     args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type bdf -test_general_final -test_general -ts_rtol 1.e-4 -ts_atol 1.e-4 -ts_trajectory_type memory -use_taylor -test_ifunc -m 1.1 -test_general_double {{0 1}separate output} -test_general_final_double {{0 1}separate output} -test_remove_multadd {{0 1}separate output}
 
+  test:
+    requires: !complex !single
+    timeoutfactor: 2
+    suffix: 14
+    args: -t0 1.1 -tf 1.9 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-5 -ts_rtol 1.e-5 -test_event_final -p 1.3 -ts_trajectory_type memory -tshessian_view -tshessian_gn {{0 1}separate output} -test_objective_norm -test_ifunc -m 1.1
+
 TEST*/
