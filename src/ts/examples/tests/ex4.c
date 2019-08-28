@@ -659,6 +659,7 @@ int main(int argc, char* argv[])
       ierr = MatCreate(PETSC_COMM_SELF,&H);CHKERRQ(ierr);
       ierr = TSComputeHessian(ts,t0,dt,tf,NULL,M,H);CHKERRQ(ierr);
       ierr = MatComputeOperator(H,MATAIJ,&He);CHKERRQ(ierr);
+      ierr = MatConvert(He,MATAIJ,MAT_INPLACE_MATRIX,&He);CHKERRQ(ierr);
       ierr = PetscObjectSetName((PetscObject)He,"H");CHKERRQ(ierr);
       ierr = MatViewFromOptions(He,NULL,"-tshessian_view");CHKERRQ(ierr);
       ierr = MatDestroy(&He);CHKERRQ(ierr);
@@ -680,16 +681,16 @@ int main(int argc, char* argv[])
 test:
     requires: !complex !single
     suffix: 1
-    args: -ts_rk_type 3bs -ts_adapt_type dsp -ts_atol 1.e-8 -ts_rtol 1.e-8  -ts_trajectory_type memory -tao_monitor -test_tao  -tao_test_hessian -tao_test_hessian_view -tf 1 -test_tlm -tsgradient_adjoint_ts_adapt_type history -test_taylor -taylor_ts_hessian
+    args: -ts_rk_type 3bs -ts_adapt_type dsp -ts_atol 1.e-8 -ts_rtol 1.e-8  -ts_trajectory_type memory -tao_monitor -test_tao  -tao_test_hessian -tf 1 -test_tlm -tsgradient_adjoint_ts_adapt_type history -test_taylor -taylor_ts_hessian
 
 test:
     requires: !complex !single
     suffix: 2
-    args: -ts_type cn -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao  -tao_test_hessian -tao_test_hessian_view -test_tlm -tf 1 -tshessian_view -tshessian_mffd {{0 1}separate output} -test_taylor -taylor_ts_hessian
+    args: -ts_type cn -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao  -tao_test_hessian -test_tlm -tf 1 -tshessian_view -tshessian_mffd {{0 1}separate output} -test_taylor -taylor_ts_hessian
 test:
 
     requires: !complex !single
     suffix: 3
-    args: -ts_type cn -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao  -tao_test_hessian -tao_test_hessian_view -tf 1 -tshessian_gn {{0 1}}
+    args: -ts_type cn -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao  -tao_test_hessian -tf 1 -tshessian_gn {{0 1}}
 
 TEST*/

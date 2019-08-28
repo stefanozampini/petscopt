@@ -37,27 +37,11 @@ Vec Object: 1 MPI processes
 0.5
 0.5
   ---------- Testing Hessian -------------
+  Run with -tao_test_hessian_view and optionally -tao_test_hessian <threshold> to show difference
+    of hand-coded and finite difference Hessian entries greater than <threshold>.
   Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Hessian is probably correct.
   ||H - Hfd||_F/||H||_F = 0., ||H - Hfd||_F = 0.
-  Hand-coded Hessian ----------
-Mat Object: 1 MPI processes
-  type: seqaij
-row 0: (0, 0.687488)  (1, -0.687585)  (2, -1.1633) 
-row 1: (0, -0.687488)  (1, 0.687585)  (2, 1.1633) 
-row 2: (0, -1.16317)  (1, 1.16335)  (2, 2.12113) 
-  Finite difference Hessian ----------
-Mat Object: 1 MPI processes
-  type: seqaij
-row 0: (0, 0.687488)  (1, -0.687585)  (2, -1.1633) 
-row 1: (0, -0.687488)  (1, 0.687585)  (2, 1.1633) 
-row 2: (0, -1.16317)  (1, 1.16335)  (2, 2.12113) 
-  Finite-difference minus hand-coded Hessian with tolerance 1e-05 ----------
-Mat Object: 1 MPI processes
-  type: seqaij
-row 0:
-row 1:
-row 2:
 
 Gradient via adjoint
 Vec Object: 1 MPI processes
