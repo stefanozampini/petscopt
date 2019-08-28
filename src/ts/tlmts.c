@@ -100,7 +100,7 @@ static PetscErrorCode TLMTSRHSFunctionLinear(TS lts, PetscReal time, Vec U, Vec 
   PetscFunctionBegin;
   ierr = TSGetApplicationContext(lts,(void*)&tlm_ctx);CHKERRQ(ierr);
   /* force recomputation of RHS Jacobian */
-  tlm_ctx->model->rhsjacobian.time = PETSC_MIN_REAL;
+  lts->rhsjacobian.time = PETSC_MIN_REAL;
   ierr = TSComputeRHSJacobian(lts,time,U,lts->Arhs,lts->Brhs);CHKERRQ(ierr);
   ierr = MatMult(lts->Arhs,U,F);CHKERRQ(ierr);
   ierr = TSGetTSOpt(tlm_ctx->model,&tsopt);CHKERRQ(ierr);

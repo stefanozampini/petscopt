@@ -69,6 +69,8 @@ static PetscErrorCode AdjointTSRHSJacobian(TS adjts, PetscReal time, Vec U, Mat 
   ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
   ierr = TSGetProblemType(adj_ctx->fwdts,&type);CHKERRQ(ierr);
   ft   = adj_ctx->tf - time + adj_ctx->t0;
+  /* force recomputation of RHS Jacobian XXX CHECK WITH RK FOR CACHING */
+  if (adjts->rhsjacobian.time == PETSC_MIN_REAL) adj_ctx->fwdts->rhsjacobian.time = PETSC_MIN_REAL;
   if (type > TS_LINEAR) {
     ierr = TSTrajectoryGetUpdatedHistoryVecs(adj_ctx->fwdts->trajectory,adj_ctx->fwdts,ft,&U,NULL);CHKERRQ(ierr);
   }
@@ -90,7 +92,6 @@ static PetscErrorCode AdjointTSRHSJacobian(TS adjts, PetscReal time, Vec U, Mat 
 */
 static PetscErrorCode AdjointTSRHSFunctionLinear(TS adjts, PetscReal time, Vec U, Vec F, void *ctx)
 {
-  AdjointCtx     *adj_ctx;
   PetscBool      has;
   PetscErrorCode ierr;
 
@@ -98,8 +99,7 @@ static PetscErrorCode AdjointTSRHSFunctionLinear(TS adjts, PetscReal time, Vec U
   PetscCheckAdjointTS(adjts);
   ierr = AdjointTSComputeForcing(adjts,time,NULL,&has,F);CHKERRQ(ierr);
   /* force recomputation of RHS Jacobian XXX CHECK WITH RK FOR CACHING */
-  ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
-  adj_ctx->fwdts->rhsjacobian.time = PETSC_MIN_REAL;
+  adjts->rhsjacobian.time = PETSC_MIN_REAL;
   ierr = TSComputeRHSJacobian(adjts,time,U,adjts->Arhs,adjts->Brhs);CHKERRQ(ierr);
   if (has) {
     ierr = VecScale(F,-1.0);CHKERRQ(ierr);
