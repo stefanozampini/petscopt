@@ -280,53 +280,106 @@ void ObjectiveFunction::TestFDHessian(MPI_Comm comm, const Vector& xIn, const Ve
 }
 
 // TikhonovRegularizer
-TikhonovRegularizer::TikhonovRegularizer(PDCoefficient *_u) : ObjectiveFunction(false,true)
+TikhonovRegularizer::TikhonovRegularizer(PDCoefficient *_m_pd) : ObjectiveFunction(false,true), m_pd(_m_pd), m0(NULL)
 {
-   Array<ParGridFunction*> &pgf = _u->GetCoeffs();
+   Init();
+}
+
+void TikhonovRegularizer::Init()
+{
+   delete m0;
+   delete H_MM;
+   if (!m_pd) return;
+
+   Array<ParGridFunction*> &pgf = m_pd->GetCoeffs();
    if (!pgf.Size()) return;
-   MFEM_VERIFY(pgf.Size() == 1,"Not yet coded");
 
-   /* TODO: make it customizable */
-   BilinearForm *m = new BilinearForm(pgf[0]->ParFESpace());
-   m->AddDomainIntegrator(new MassIntegrator());
-   m->Assemble(0);
-   m->Finalize(0);
+   /* Missing constructor from local sizes only */
+   Vector t(m_pd->GetLocalSize());
+   m0 = new PetscParVector(pgf[0]->ParFESpace()->GetParMesh()->GetComm(),t,false);
+   m_pd->GetInitialVector(*m0);
+}
 
-   PetscParMatrix *tM = new PetscParMatrix(pgf[0]->ParFESpace()->GetParMesh()->GetComm(),
-                                           pgf[0]->ParFESpace()->GlobalVSize(),
-                                           (PetscInt*)pgf[0]->ParFESpace()->GetDofOffsets(),
-                                           &(m->SpMat()),
-                                           Operator::PETSC_MATAIJ);
-   delete m;
+void TikhonovRegularizer::SetUpHessian_MM(const Vector& u,const Vector& m,double t)
+{
+   if (H_MM) return;
+   if (!m_pd) return;
 
-   PetscParMatrix *P = _u->GetP();
+   Array<ParGridFunction*> &pgf = m_pd->GetCoeffs();
+   int ngf = pgf.Size();
+   if (!ngf) return;
 
-   H_MM = RAP(tM,P);
-   delete tM;
+   Array<int> boff(ngf+1);
+   boff[0] = 0;
+   Array<Operator*> H_MMb(ngf);
+   for (int i = 0; i < ngf; i++)
+   {
+      BilinearForm *m = new BilinearForm(pgf[i]->ParFESpace());
+      /* TODO: make it customizable */
+      m->AddDomainIntegrator(new MassIntegrator());
+      m->Assemble(0);
+      m->Finalize(0);
 
-   u0 = new PetscParVector(*P);
-   _u->GetInitialVector(*u0);
+      SparseMatrix& msp = m->SpMat();
+      msp *= scale;
+
+      PetscParMatrix *tM = new PetscParMatrix(pgf[i]->ParFESpace()->GetParMesh()->GetComm(),
+                                              pgf[i]->ParFESpace()->GlobalVSize(),
+                                              (PetscInt*)pgf[i]->ParFESpace()->GetDofOffsets(),
+                                              &msp,
+                                              Operator::PETSC_MATAIJ);
+      delete m;
+      boff[i+1] = pgf[i]->ParFESpace()->TrueVSize();
+      H_MMb[i] = RAP(tM,m_pd->GetP());
+      delete tM;
+   }
+   boff.PartialSum();
+
+   if (ngf == 1)
+   {
+      H_MM = H_MMb[0];
+   }
+   else
+   {
+      // MFEM's block operator does not copy the offsets!
+      BlockOperator bOp(boff);
+      for (int i = 0; i < ngf; i++) bOp.SetBlock(i,i,H_MMb[i]);
+      bOp.owns_blocks = 1;
+      H_MM = new PetscParMatrix(pgf[0]->ParFESpace()->GetParMesh()->GetComm(),&bOp,Operator::ANY_TYPE);
+   }
 }
 
 void TikhonovRegularizer::Eval(const mfem::Vector& u,const mfem::Vector& m,double t,double* f)
 {
-   Vector x(m),Mx; /* XXX work array */
-   x -= *u0;
+   MFEM_VERIFY(m0,"Init() not called");
+   SetUpHessian_MM(u,m,t);
+   x.SetSize(H_MM->Width());
    Mx.SetSize(H_MM->Height());
+   x = m;
+   x -= *m0;
    H_MM->Mult(x,Mx);
-   *f = 0.5*InnerProduct(u0->GetComm(),x,Mx);
+   *f = 0.5*InnerProduct(m0->GetComm(),x,Mx);
 }
 
 void TikhonovRegularizer::EvalGradient_M(const mfem::Vector& u,const mfem::Vector& m,double t,mfem::Vector &g)
 {
-   Vector x(m);
-   x -= *u0;
+   MFEM_VERIFY(m0,"Init() not called");
+   SetUpHessian_MM(u,m,t);
+   x.SetSize(H_MM->Width());
+   x = m;
+   x -= *m0;
    H_MM->Mult(x,g);
+}
+
+void TikhonovRegularizer::SetScale(double s)
+{
+   scale = s;
+   delete H_MM;
 }
 
 TikhonovRegularizer::~TikhonovRegularizer()
 {
-   delete u0;
+   delete m0;
 }
 
 // least squares sampling : 1/2 || E - D ||^2

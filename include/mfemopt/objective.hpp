@@ -34,7 +34,7 @@ protected:
 public:
    ObjectiveFunction(bool _has_x = true, bool _has_m = true, double _teval = std::numeric_limits<double>::min()) : teval(_teval), has_x(_has_x), has_m(_has_m), scale(1.0), H_XX(NULL), H_MM(NULL) {}
 
-   void SetScale(double s) { scale = s; }
+   virtual void SetScale(double s) { scale = s; }
    double GetEvalTime() { return teval; }
 
    virtual void Eval(const mfem::Vector&,const mfem::Vector&,double,double*)
@@ -77,17 +77,23 @@ public:
    ObjectiveHessianOperatorFD(MPI_Comm,ObjectiveFunction*,const mfem::Vector&,const mfem::Vector&,double,int,int);
 };
 
-// Simple Tikhonov misfit : 1/2 \int_\Omega ||u - u_0||^2 dx
+// Simple Tikhonov misfit : 1/2 \int_\Omega ||m - m_0||^2 dx
 class TikhonovRegularizer : public ObjectiveFunction
 {
 private:
-   mfem::PetscParVector* u0;
+   PDCoefficient* m_pd;
+   mfem::PetscParVector* m0;
+   mfem::Vector x,Mx;
+
+   void Init();
 
 public:
-   TikhonovRegularizer() : ObjectiveFunction(false,true), u0(NULL) {}
+   TikhonovRegularizer() : ObjectiveFunction(false,true), m_pd(NULL), m0(NULL) {}
    TikhonovRegularizer(PDCoefficient*);
    virtual void Eval(const mfem::Vector&,const mfem::Vector&,double,double*);
    virtual void EvalGradient_M(const mfem::Vector&,const mfem::Vector&,double,mfem::Vector&);
+   virtual void SetUpHessian_MM(const mfem::Vector&,const mfem::Vector&,double);
+   virtual void SetScale(double);
    ~TikhonovRegularizer();
 };
 
