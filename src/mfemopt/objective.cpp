@@ -594,9 +594,8 @@ void TDLeastSquaresHessian::Mult(const Vector& x, Vector& y) const
    ls->rhsform_x->ParallelAssemble(y);
 }
 
-TVRegularizer::TVRegularizer(PDCoefficient* _m_pd, double _alpha, double _beta, bool _primal_dual, bool _uncoupled) : ObjectiveFunction(false,true), m_pd(_m_pd), vtvInteg(_beta,_uncoupled)
+TVRegularizer::TVRegularizer(PDCoefficient* _m_pd, double _beta, bool _primal_dual, bool _uncoupled) : ObjectiveFunction(false,true), m_pd(_m_pd), vtvInteg(_beta,_uncoupled)
 {
-   SetScale(_alpha);
    if (!m_pd) return;
 
    Array<ParGridFunction*> &pgf = m_pd->GetDerivCoeffs();

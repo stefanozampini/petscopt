@@ -1739,7 +1739,8 @@ int main(int argc, char *argv[])
    //M = new PetscParMatrix(PETSC_COMM_WORLD,tk->GetHessianOperator_MM(),Operator::PETSC_MATAIJ);
 
    /* Total variation regularizer */
-   TVRegularizer *tv = new TVRegularizer(mu_inv_pd,tva,tvb,tvpd);
+   TVRegularizer *tv = new TVRegularizer(mu_inv_pd,tvb,tvpd);
+   tv->SetScale(tva);
    tv->Symmetrize(tvsy);
    tv->Project(tvpr);
 
@@ -1984,7 +1985,8 @@ int main(int argc, char *argv[])
             /* tva already scaled */
             tvb /= 5.0;
 
-            tv = new TVRegularizer(mu_inv_pd,tva,tvb,tvpd);
+            tv = new TVRegularizer(mu_inv_pd,tvb,tvpd);
+            tv->SetScale(tva);
             tv->Symmetrize(tvsy);
             tv->Project(tvpr);
 

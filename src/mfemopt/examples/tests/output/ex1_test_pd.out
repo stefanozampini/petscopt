@@ -2,23 +2,23 @@
 TV tests
 ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing design gradient
-||g|| = 3.46132e-17, ||g_fd|| = 0., ||g - g_fd|| = 3.46132e-17, ||g-g_fd||/||g_fd|| = inf., cos() = nan.
+||g|| = 0.00153839, ||g_fd|| = 0.00153839, ||g - g_fd|| = 2.71562e-12, ||g-g_fd||/||g_fd|| = 1.76523e-09, cos() = 1.
 ObjectiveFunction::TestFDHessian design x design
-||H||_inf = 0.0501748, ||H_fd||_inf = 0.0501748, ||H - H_fd||_inf = 1.50886e-10, ||H-H_fd||_inf/||H_fd||_inf = 3.00721e-09
+||H||_inf = 0.0038891, ||H_fd||_inf = 0.0038891, ||H - H_fd||_inf = 2.85683e-09, ||H-H_fd||_inf/||H_fd||_inf = 7.34574e-07
 ---------------------------------------
 Tikhonov tests
 ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing design gradient
-||g|| = 0.010989, ||g_fd|| = 0.010989, ||g - g_fd|| = 3.20219e-12, ||g-g_fd||/||g_fd|| = 2.91398e-10, cos() = 1.
+||g|| = 0.0232572, ||g_fd|| = 0.0232572, ||g - g_fd|| = 5.76207e-11, ||g-g_fd||/||g_fd|| = 2.47755e-09, cos() = 1.
 ObjectiveFunction::TestFDHessian design x design
-||H||_inf = 0.00590278, ||H_fd||_inf = 0.00590278, ||H - H_fd||_inf = 6.30971e-11, ||H-H_fd||_inf/||H_fd||_inf = 1.06894e-08
+||H||_inf = 0.00590278, ||H_fd||_inf = 0.00590278, ||H - H_fd||_inf = 5.39619e-11, ||H-H_fd||_inf/||H_fd||_inf = 9.14177e-09
 ---------------------------------------
 Image tests
 ReducedFunctional::TestFDGradient, delta: 1e-06
 -> hang tight while computing state gradient
-||g|| = 0.010989, ||g_fd|| = 0.010989, ||g - g_fd|| = 3.20219e-12, ||g-g_fd||/||g_fd|| = 2.91398e-10, cos() = 1.
+||g|| = 0.0235012, ||g_fd|| = 0.0235012, ||g - g_fd|| = 7.54753e-11, ||g-g_fd||/||g_fd|| = 3.21155e-09, cos() = 1.
 ReducedFunctional::TestFDHessian
-||H||_inf = 0.0532998, ||H_fd||_inf = 0.0532998, ||H - H_fd||_inf = 2.12562e-10, ||H-H_fd||_inf/||H_fd||_inf = 3.98804e-09
+||H||_inf = 0.00815471, ||H_fd||_inf = 0.00815471, ||H - H_fd||_inf = 2.83749e-09, ||H-H_fd||_inf/||H_fd||_inf = 3.47957e-07
 ---------------------------------------
 Nonlinear  solve converged due to CONVERGED_FNORM_RELATIVE iterations 9
-TAO solve converged due to CONVERGED_GATOL iterations 10
+TAO solve converged due to CONVERGED_GATOL iterations 9

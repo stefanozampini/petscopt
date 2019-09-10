@@ -163,7 +163,7 @@ private:
    mfem::Array2D<mfem::DenseMatrix*> eljacs;
 
 public:
-   TVRegularizer(PDCoefficient*,double,double,bool=false,bool=true);
+   TVRegularizer(PDCoefficient*,double,bool=false,bool=true);
 
    void Symmetrize(bool _sym = true) { vtvInteg.Symmetrize(_sym); }
    void Project(bool _prj = true) { vtvInteg.Project(_prj); }
