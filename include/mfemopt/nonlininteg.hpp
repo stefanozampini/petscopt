@@ -10,51 +10,56 @@
 namespace mfemopt
 {
 
-class TVIntegrator : public mfem::NonlinearFormIntegrator
+class VTVIntegrator : public mfem::BlockNonlinearFormIntegrator
 {
 private:
-   double beta;
+   double beta; // TODO hyper-parameter
 
-   double norm;
+   const mfem::IntegrationRule *IntRule;
 
-   mfem::VectorGridFunctionCoefficient *WQ;
+   mfem::Vector gradm,norms;
+   mfem::Vector wk,wj;
+   mfem::DenseMatrix A,tmat;
 
-   mfem::DenseMatrix dshape;
-   mfem::Vector gradm,graddm,dualshape;
+   mfem::Array<mfem::DenseMatrix*> dshapes;
+   mfem::Array<mfem::Vector*> work,dwork;
 
-   mfem::Vector wk;
-   mfem::DenseMatrix A;
-   mfem::DenseMatrix tmat;
+   mfem::Array<mfem::VectorGridFunctionCoefficient*> WQs;
 
    const mfem::IntegrationRule* GetIntRule(const mfem::FiniteElement&);
 
 protected:
+   bool indep; // TODO coupling mask?
    bool symmetrize;
    bool project;
    friend class TVRegularizer;
 
 public:
-   TVIntegrator(double _beta) : mfem::NonlinearFormIntegrator(), beta(_beta), norm(-1.0), WQ(NULL), symmetrize(false), project(false) {}
+   VTVIntegrator(double,bool=true);
+   void SetDualCoefficients(const mfem::Array<mfem::VectorGridFunctionCoefficient*>&);
+   void SetDualCoefficients();
    void SetBeta(double _beta) { beta = _beta; }
-   void SetNorm(double _norm) { norm = _norm; }
    void Symmetrize(bool _sym = true) { symmetrize = _sym; }
-   void Project(bool _nrm = true) { project = _nrm; }
-   void SetDualCoefficient(mfem::VectorGridFunctionCoefficient* _WQ) { WQ = _WQ; }
-   virtual double GetElementEnergy(const mfem::FiniteElement&,
+   void Project(bool _prj = true) { project = _prj; }
+   virtual double GetElementEnergy(const mfem::Array<const mfem::FiniteElement*>&,
                                    mfem::ElementTransformation&,
-                                   const mfem::Vector&);
-   virtual void AssembleElementVector(const mfem::FiniteElement&,
+                                   const mfem::Array<const mfem::Vector*>&);
+   virtual void AssembleElementVector(const mfem::Array<const mfem::FiniteElement*>&,
                                       mfem::ElementTransformation&,
-                                      const mfem::Vector&,mfem::Vector&);
-   virtual void AssembleElementGrad(const mfem::FiniteElement&,
+                                      const mfem::Array<const mfem::Vector*>&,
+                                      const mfem::Array<mfem::Vector*>&);
+   virtual void AssembleElementGrad(const mfem::Array<const mfem::FiniteElement*>&,
                                     mfem::ElementTransformation&,
-                                    const mfem::Vector&,mfem::DenseMatrix&);
-   virtual void AssembleElementDualUpdate(const mfem::FiniteElement&,
-                                          const mfem::FiniteElement&,
-                                          mfem::ElementTransformation&,
-                                          const mfem::Vector&,const mfem::Vector&,
-                                          mfem::Vector&,double*);
-   virtual ~TVIntegrator() {}
+                                    const mfem::Array<const mfem::Vector*>&,
+                                    const mfem::Array2D<mfem::DenseMatrix*>&);
+   void AssembleElementDualUpdate(const mfem::Array<const mfem::FiniteElement*>&,
+                                  const mfem::Array<const mfem::FiniteElement*>&,
+                                  mfem::ElementTransformation&,
+                                  const mfem::Array<mfem::Vector*>&,
+                                  const mfem::Array<mfem::Vector*>&,
+                                  mfem::Array<mfem::Vector*>&,
+                                  double*);
+   virtual ~VTVIntegrator();
 };
 
 }

@@ -594,48 +594,68 @@ void TDLeastSquaresHessian::Mult(const Vector& x, Vector& y) const
    ls->rhsform_x->ParallelAssemble(y);
 }
 
-TVRegularizer::TVRegularizer(PDCoefficient* _m_pd, double _alpha, double _beta, bool _primal_dual) : ObjectiveFunction(false,true), beta(_beta), tvInteg(beta), wkgf(), P2D(NULL), ljacs(), primal_dual(_primal_dual), m_pd(_m_pd)
+TVRegularizer::TVRegularizer(PDCoefficient* _m_pd, double _alpha, double _beta, bool _primal_dual, bool _uncoupled) : ObjectiveFunction(false,true), m_pd(_m_pd), vtvInteg(_beta,_uncoupled)
 {
    SetScale(_alpha);
    if (!m_pd) return;
+
    Array<ParGridFunction*> &pgf = m_pd->GetDerivCoeffs();
    if (!pgf.Size()) return;
-   const FiniteElement *el = pgf[0]->ParFESpace()->GetFE(0);
-   const int dim = el ? el->GetDim() : 0;
-   const int ord = el ? el->GetOrder() : 1;
-   L2_FECollection *l2 = new L2_FECollection(ord, dim); /* XXX the correct space should have the same order I think */
-   ParFiniteElementSpace *gfes = new ParFiniteElementSpace(pgf[0]->ParFESpace()->GetParMesh(), l2, dim);
-   for (int i = 0; i < pgf.Size(); i++)
+
    {
-      ParGridFunction *gf = new ParGridFunction(gfes);
-      *gf = 0.0;
-      if (!i) gf->MakeOwner(l2);
-      wkgf.Append(gf);
-      WQ.Append(new VectorGridFunctionCoefficient(gf));
-      wkgf2.Append(new ParGridFunction(gfes));
+      ParFiniteElementSpace *fes = pgf[0]->ParFESpace();
+      ParMesh *mesh = fes->GetParMesh();
+      for (int i = 0; i < pgf.Size(); i++)
+      {
+         ParFiniteElementSpace *pfes = pgf[i]->ParFESpace();
+         MFEM_VERIFY(mesh == pfes->GetParMesh(),"Different meshes not supported");
+      }
    }
 
-   //ParFiniteElementSpace *mfes = pgf[0]->ParFESpace();
-   //ParMesh *mesh = mfes->GetParMesh();
-   //Vector m(m_pd->GetLocalSize());
-   //m = 1.0;
-   //m_pd->SetUseDerivCoefficients(true);
-   //m_pd->UpdateCoefficient(m);
-   //integ_exclude.SetSize(mesh->GetNE());
-   //for (int i = 0; i < mesh->GetNE(); i++)
-   //{
-   //   Array<int> dofs;
-   //   mfes->GetElementVDofs(i,dofs);
-   //   Vector vals;
-   //   pgf[0]->GetSubVector(dofs,vals);
-   //   bool lex = false;
-   //   for (int v = 0; v < vals.Size(); v++) if (vals[v] == 0.0) lex = true;
-   //   integ_exclude[i] = lex;
-   //}
-   //Array<bool>& cexcl = m_pd->GetActiveElements();
-   //integ_exclude.SetSize(mesh->GetNE());
-   //integ_exclude.Assign(cexcl);
-   ParDiscreteLinearOperator* intOp = new ParDiscreteLinearOperator(pgf[0]->ParFESpace(),gfes);
+   int nb = pgf.Size();
+   els.SetSize(nb);
+   mks.SetSize(nb);
+   elgrads.SetSize(nb);
+   for (int i = 0; i < nb; i++)
+   {
+      mks[i] = new Vector();
+      elgrads[i] = new Vector();
+   }
+
+   ljacs.SetSize(nb,nb);
+   eljacs.SetSize(nb,nb);
+   for (int i = 0; i < nb; i++)
+   {
+      int r = pgf[i]->ParFESpace()->GetVSize();
+      for (int j = 0; j < nb; j++)
+      {
+         int c = pgf[j]->ParFESpace()->GetVSize();
+         ljacs(i,j) = new SparseMatrix(r,c);
+         eljacs(i,j) = new DenseMatrix();
+      }
+   }
+
+   if (_primal_dual)
+   {
+      Array<FiniteElementCollection*> l2s(nb);
+      for (int i = 0; i < nb; i++)
+      {
+         const FiniteElement *el = pgf[i]->ParFESpace()->GetFE(0);
+         const int dim = el ? el->GetDim() : 0;
+         const int ord = el ? el->GetOrder() : 1;
+         l2s[i] = new L2_FECollection(ord, dim); /* XXX the correct space should have the same order I think */
+         ParFiniteElementSpace *gfes = new ParFiniteElementSpace(pgf[i]->ParFESpace()->GetParMesh(), l2s[i], dim);
+         ParGridFunction *gf = new ParGridFunction(gfes);
+         *gf = 0.0;
+         gf->MakeOwner(l2s[i]);
+         wkgf.Append(gf);
+         WQ.Append(new VectorGridFunctionCoefficient(gf));
+         wkgf2.Append(new ParGridFunction(gfes));
+      }
+   }
+   /* XXX */
+#if 0
+   ParDiscreteLinearOperator* intOp = new ParDiscreteLinearOperator(pgf[0]->ParFESpace(),wkgf[0]->ParFESpace());
    intOp->AddDomainInterpolator(new GradientInterpolator);
    intOp->Assemble();
    intOp->Finalize();
@@ -653,127 +673,167 @@ TVRegularizer::TVRegularizer(PDCoefficient* _m_pd, double _alpha, double _beta, 
    }
    P2D = new PetscParMatrix(*pH,rows,m_pd->GetGlobalCols());
    delete pH;
+#endif
 }
 
 void TVRegularizer::UpdateDual(const Vector& m)
 {
-   if (!m_pd) return;
-   if (!wkgf.Size()) return;
-   int n = P2D->Width();
-   double *data = m.GetData();
    for (int i=0; i<wkgf.Size(); i++)
    {
-      Vector pmi(data,n);
-      P2D->Mult(pmi,*wkgf[i]);
-      data += n;
-      pmi.SetData(NULL); /* XXX clang static analysis */
+     *wkgf[i] = 0.0;
    }
+   Vector dm(m.Size());
+   dm = 0.0;
+   UpdateDual(m,dm,1.0,-1.0);
 }
 
-void TVRegularizer::UpdateDual(const Vector& m, const Vector& dm, double lambda)
+void TVRegularizer::UpdateDual(const Vector& m, const Vector& dm, double lambda, double safety)
 {
-   Vector mk,dmk,wk,dwk;
+   Array<Vector*> mks,dmks,dwks;
    DenseMatrix dM;
    LUFactors dMinv;
-
+   Array<const FiniteElement*> els,dels;
    Array<int> vdofs,dvdofs,ipiv;
 
-   if (!primal_dual || !m_pd) return;
+   if (!WQ.Size() || !m_pd) return;
    Array<ParGridFunction*> &pgf  = m_pd->GetDerivCoeffs();
    Array<ParGridFunction*> &pgf2 = m_pd->GetGradCoeffs();
    if (!pgf.Size()) return;
-   ParFiniteElementSpace *fes = pgf[0]->ParFESpace();
-   ParMesh *mesh = fes->GetParMesh();
-   for (int i = 0; i < pgf.Size(); i++)
+
+   vtvInteg.SetDualCoefficients(WQ);
+
+   const int nb = pgf.Size();
+   mks.SetSize(nb);
+   dmks.SetSize(nb);
+   dwks.SetSize(nb);
+   els.SetSize(nb);
+   dels.SetSize(nb);
+   for (int i = 0; i < nb; i++)
    {
-      ParFiniteElementSpace *pfes = pgf[i]->ParFESpace();
-      MFEM_VERIFY(mesh == pfes->GetParMesh(),"Different meshes not supported");
-      ParFiniteElementSpace *pfes2 = pgf2[i]->ParFESpace();
-      MFEM_VERIFY(mesh == pfes2->GetParMesh(),"Different meshes not supported");
+      mks[i] = new Vector();
+      dmks[i] = new Vector();
+      dwks[i] = new Vector();
    }
+
    m_pd->Distribute(m,pgf);
    m_pd->Distribute(dm,pgf2);
 
    Array<bool>& integ_exclude = m_pd->GetExcludedElements();
-   double llopt = std::numeric_limits<double>::max(), lopt;
+   double llopt = std::numeric_limits<double>::max(), lopt = 0.0;
+   ParMesh *mesh = pgf[0]->ParFESpace()->GetParMesh();
    VectorMassIntegrator dminteg;
    for (int e = 0; e < mesh->GetNE(); e++)
    {
+      ElementTransformation *T = NULL;
       if (integ_exclude[e]) continue;
-      /* For multiple: SetDenominator */
-      for (int pg = 0; pg < pgf.Size(); pg++)
+      /* compute rhs for dual update */
+      for (int pg = 0; pg < nb; pg++)
+      {
+         GridFunction *dgf = WQ[pg]->GetGridFunction();
+         FiniteElementSpace *dfes = dgf->FESpace();
+         ParFiniteElementSpace *fes = pgf[pg]->ParFESpace();
+         dels[pg] = dfes->GetFE(e);
+         els[pg] = fes->GetFE(e);
+
+         fes->GetElementVDofs(e, vdofs);
+         pgf[pg]->GetSubVector(vdofs, *(mks[pg]));
+         pgf2[pg]->GetSubVector(vdofs, *(dmks[pg]));
+         *(dmks[pg]) *= -1.0; /* XXX PETSc gets back -du */
+         if (!pg) T = fes->GetElementTransformation(e);
+      }
+
+      vtvInteg.AssembleElementDualUpdate(els,dels,*T,
+                                         mks,dmks,dwks,
+                                         safety < 0.0 ? NULL : &lopt);
+      llopt = std::min(lopt,llopt);
+
+      for (int pg = 0; pg < nb; pg++)
       {
          /* Compute element mass matrix for dual dofs */
          GridFunction *dgf = WQ[pg]->GetGridFunction();
          FiniteElementSpace *dfes = dgf->FESpace();
-         const FiniteElement *del = dfes->GetFE(e);
          ElementTransformation *dT = dfes->GetElementTransformation(e);
-         dminteg.AssembleElementMatrix(*del,*dT,dM);
+         dminteg.AssembleElementMatrix(*dels[pg],*dT,dM);
 
          /* factor element mass matrix */
-         int ddof = dM.Width();
+         const int ddof = dM.Width();
          ipiv.SetSize(ddof);
          dMinv.data = dM.GetData();
          dMinv.ipiv = ipiv.GetData();
          dMinv.Factor(ddof);
 
-         /* compute rhs for dual update */
-         ParFiniteElementSpace *fes = pgf[pg]->ParFESpace();
-         fes->GetElementVDofs(e, vdofs);
-         pgf[pg]->GetSubVector(vdofs, mk);
-         pgf2[pg]->GetSubVector(vdofs, dmk);
-         dmk *= -1.0; /* XXX PETSc gets back -du */
-         const FiniteElement *el = fes->GetFE(e);
-         ElementTransformation *T = fes->GetElementTransformation(e);
-
-         tvInteg.SetDualCoefficient(WQ[pg]);
-         tvInteg.AssembleElementDualUpdate(*el,*del,*T,
-                                           mk,dmk,dwk,&lopt);
-         llopt = std::min(lopt,llopt);
-
          /* solve for the update */
-         dMinv.Solve(ddof,1,dwk.GetData());
+         dMinv.Solve(ddof,1,dwks[pg]->GetData());
 
          /* store update */
          GridFunction *dwgf = wkgf2[pg];
          dfes->GetElementVDofs(e, dvdofs);
-         dwgf->SetSubVector(dvdofs, dwk);
+         dwgf->SetSubVector(dvdofs, *(dwks[pg]));
       }
    }
    MPI_Allreduce(&llopt,&lopt,1,MPI_DOUBLE_PRECISION,MPI_MIN,mesh->GetComm());
 
    /* XXX TODO add customization for these? */
-   bool uselambda = (tvInteg.symmetrize && tvInteg.project);
-   //uselambda = true;
-   //std::cout << "LOPT " << lopt << std::endl;
-   lopt = uselambda ? lambda : 0.99*lopt;
+   if (safety < 0.0) { safety = 1.0; lopt = lambda; }
+   bool uselambda = (vtvInteg.symmetrize && vtvInteg.project);
+   lopt = uselambda ? lambda : safety*lopt;
+
    /* update dual dofs */
-   for (int pg = 0; pg < pgf.Size(); pg++)
+   for (int pg = 0; pg < nb; pg++)
    {
       GridFunction *dgf = WQ[pg]->GetGridFunction();
       GridFunction *dwgf = wkgf2[pg];
       dgf->Add(lopt,*dwgf);
    }
+
+   for (int i = 0; i < nb; i++)
+   {
+      delete mks[i];
+      delete dmks[i];
+      delete dwks[i];
+   }
 }
 
 TVRegularizer::~TVRegularizer()
 {
+   for (int i = 0; i < mks.Size(); i++)
+   {
+      delete mks[i];
+   }
+   for (int i = 0; i < elgrads.Size(); i++)
+   {
+      delete elgrads[i];
+   }
    for (int i = 0; i < wkgf.Size(); i++)
    {
       delete wkgf[i];
+   }
+   for (int i = 0; i < wkgf2.Size(); i++)
+   {
       delete wkgf2[i];
+   }
+   for (int i = 0; i < WQ.Size(); i++)
+   {
       delete WQ[i];
    }
-   for (int i = 0; i < ljacs.Size(); i++)
+   for (int i = 0; i < ljacs.NumRows(); i++)
    {
-      delete ljacs[i];
+      for (int j = 0; j < ljacs.NumCols(); j++)
+      {
+         delete ljacs(i,j);
+      }
    }
-   delete P2D;
+   for (int i = 0; i < eljacs.NumRows(); i++)
+   {
+      for (int j = 0; j < eljacs.NumCols(); j++)
+      {
+         delete eljacs(i,j);
+      }
+   }
 }
 
 void TVRegularizer::Eval(const Vector& state, const Vector& m, double time, double *f)
 {
-   Vector     mk;
    Array<int> vdofs;
 
    *f = 0.0;
@@ -782,38 +842,31 @@ void TVRegularizer::Eval(const Vector& state, const Vector& m, double time, doub
    pgf = m_pd->GetDerivCoeffs();
    if (!pgf.Size()) return;
 
-   ParFiniteElementSpace *fes = pgf[0]->ParFESpace();
-   ParMesh *mesh = fes->GetParMesh();
-   for (int i = 0; i < pgf.Size(); i++)
-   {
-      ParFiniteElementSpace *pfes = pgf[i]->ParFESpace();
-      MFEM_VERIFY(mesh == pfes->GetParMesh(),"Different meshes not supported");
-   }
-
    m_pd->Distribute(m,pgf);
 
    double lf = 0.0;
+
    Array<bool>& integ_exclude = m_pd->GetExcludedElements();
+   ParMesh *mesh = pgf[0]->ParFESpace()->GetParMesh();
    for (int e = 0; e < mesh->GetNE(); e++)
    {
+      ElementTransformation *T = NULL;
       if (integ_exclude[e]) continue;
-      /* For multiple: SetDenominator */
       for (int pg = 0; pg < pgf.Size(); pg++)
       {
          ParFiniteElementSpace *fes = pgf[pg]->ParFESpace();
          fes->GetElementVDofs(e, vdofs);
-         pgf[pg]->GetSubVector(vdofs, mk);
-         const FiniteElement *el = fes->GetFE(e);
-         ElementTransformation *T = fes->GetElementTransformation(e);
-         lf += scale * tvInteg.GetElementEnergy(*el,*T,mk);
+         pgf[pg]->GetSubVector(vdofs, *(mks[pg]));
+         els[pg] = fes->GetFE(e);
+         if (!pg) T = fes->GetElementTransformation(e);
       }
+      lf += scale * vtvInteg.GetElementEnergy(els,*T,mks);
    }
    MPI_Allreduce(&lf,f,1,MPI_DOUBLE_PRECISION,MPI_SUM,mesh->GetComm());
 }
 
 void TVRegularizer::EvalGradient_M(const Vector& state, const Vector& m, double time, mfem::Vector& g)
 {
-   Vector     mk,elgrad;
    Array<int> vdofs;
 
    g = 0.0;
@@ -821,34 +874,33 @@ void TVRegularizer::EvalGradient_M(const Vector& state, const Vector& m, double 
    Array<ParGridFunction*> &pgf = m_pd->GetDerivCoeffs();
    if (!pgf.Size()) return;
 
-   ParFiniteElementSpace *fes = pgf[0]->ParFESpace();
-   ParMesh *mesh = fes->GetParMesh();
-   for (int i = 0; i < pgf.Size(); i++)
-   {
-      ParFiniteElementSpace *pfes = pgf[i]->ParFESpace();
-      MFEM_VERIFY(mesh == pfes->GetParMesh(),"Different meshes not supported");
-   }
-
    m_pd->Distribute(m,pgf);
 
    Array<ParGridFunction*> &pgradgf = m_pd->GetGradCoeffs();
    for (int pg = 0; pg < pgf.Size(); pg++) *pgradgf[pg] = 0.0;
 
    Array<bool>& integ_exclude = m_pd->GetExcludedElements();
+   ParMesh *mesh = pgf[0]->ParFESpace()->GetParMesh();
    for (int e = 0; e < mesh->GetNE(); e++)
    {
+      ElementTransformation *T = NULL;
+
       if (integ_exclude[e]) continue;
-      /* For multiple: SetDenominator */
       for (int pg = 0; pg < pgf.Size(); pg++)
       {
          ParFiniteElementSpace *fes = pgf[pg]->ParFESpace();
          fes->GetElementVDofs(e, vdofs);
-         pgf[pg]->GetSubVector(vdofs, mk);
-         const FiniteElement *el = fes->GetFE(e);
-         ElementTransformation *T = fes->GetElementTransformation(e);
-         tvInteg.AssembleElementVector(*el,*T,mk,elgrad);
-         elgrad *= scale;
-         pgradgf[pg]->AddElementVector(vdofs,elgrad);
+         pgf[pg]->GetSubVector(vdofs, *(mks[pg]));
+         els[pg] = fes->GetFE(e);
+         if (!pg) T = fes->GetElementTransformation(e);
+      }
+      vtvInteg.AssembleElementVector(els,*T,mks,elgrads);
+      for (int pg = 0; pg < pgf.Size(); pg++)
+      {
+         *(elgrads[pg]) *= scale;
+         ParFiniteElementSpace *fes = pgf[pg]->ParFESpace();
+         fes->GetElementVDofs(e, vdofs);
+         pgradgf[pg]->AddElementVector(vdofs,*(elgrads[pg]));
       }
    }
    m_pd->Assemble(g);
@@ -856,69 +908,102 @@ void TVRegularizer::EvalGradient_M(const Vector& state, const Vector& m, double 
 
 void TVRegularizer::SetUpHessian_MM(const Vector& x,const Vector& m,double t)
 {
+   Array<int> vdofs,rvdofs,cvdofs;
+
    if (!m_pd) return;
    Array<ParGridFunction*> &pgf = m_pd->GetDerivCoeffs();
    if (!pgf.Size()) return;
 
-   ParFiniteElementSpace *fes = pgf[0]->ParFESpace();
-   ParMesh *mesh = fes->GetParMesh();
-   for (int i = 0; i < pgf.Size(); i++)
-   {
-      ParFiniteElementSpace *pfes = pgf[i]->ParFESpace();
-      MFEM_VERIFY(mesh == pfes->GetParMesh(),"Different meshes not supported");
-   }
-
    m_pd->Distribute(m,pgf);
+   int nb = pgf.Size();
 
-   if (!ljacs.Size())
+   for (int i = 0; i < nb; i++)
    {
-      for (int i = 0; i < pgf.Size(); i++)
+      for (int j = 0; j < nb; j++)
       {
-         ljacs.Append(new SparseMatrix(pgf[i]->ParFESpace()->GetVSize()));
+         *ljacs(i,j) = 0.0;
       }
    }
-   else
-   {
-      for (int i = 0; i < pgf.Size(); i++)
-      {
-         *ljacs[i] = 0.0;
-      }
-   }
+
+   vtvInteg.SetDualCoefficients(WQ);
 
    int skz = 0;
    Array<bool>& integ_exclude = m_pd->GetExcludedElements();
+   ParMesh *mesh = pgf[0]->ParFESpace()->GetParMesh();
    for (int e = 0; e < mesh->GetNE(); e++)
    {
-      if (integ_exclude[e]) continue;
-      /* For multiple: SetDenominator */
-      for (int pg = 0; pg < pgf.Size(); pg++)
-      {
-         DenseMatrix elmat;
-         Vector      mk;
-         Array<int>  vdofs;
+      ElementTransformation *T = NULL;
 
+      if (integ_exclude[e]) continue;
+      for (int pg = 0; pg < nb; pg++)
+      {
          ParFiniteElementSpace *fes = pgf[pg]->ParFESpace();
          fes->GetElementVDofs(e, vdofs);
-         pgf[pg]->GetSubVector(vdofs, mk);
-         const FiniteElement *el = fes->GetFE(e);
-         ElementTransformation *T = fes->GetElementTransformation(e);
-         if (primal_dual) tvInteg.SetDualCoefficient(WQ[pg]);
-         else tvInteg.SetDualCoefficient(NULL);
-         tvInteg.AssembleElementGrad(*el,*T,mk,elmat);
-         elmat *= scale;
-         ljacs[pg]->AddSubMatrix(vdofs,vdofs,elmat,skz);
+         pgf[pg]->GetSubVector(vdofs, *(mks[pg]));
+         els[pg] = fes->GetFE(e);
+         if (!pg) T = fes->GetElementTransformation(e);
+      }
+      vtvInteg.AssembleElementGrad(els,*T,mks,eljacs);
+      for (int i = 0; i < nb; i++)
+      {
+         pgf[i]->ParFESpace()->GetElementVDofs(e, rvdofs);
+         for (int j = 0; j < nb; j++)
+         {
+            if (vtvInteg.indep && i != j) continue; /* independent TV, skip */
+            *eljacs(i,j) *= scale;
+            pgf[j]->ParFESpace()->GetElementVDofs(e, cvdofs);
+            ljacs(i,j)->AddSubMatrix(rvdofs,cvdofs,*(eljacs(i,j)),skz);
+         }
+     }
+   }
+   for (int i = 0; i < nb; i++)
+   {
+      for (int j = 0; j < nb; j++)
+      {
+         ljacs(i,j)->Finalize(skz);
       }
    }
-   for (int i = 0; i < pgf.Size(); i++)
+
+   PetscParMatrix *H = NULL;
+   if (nb == 1)
    {
-      ljacs[i]->Finalize(skz);
+      PetscParMatrix *uH = new PetscParMatrix(mesh->GetComm(),pgf[0]->ParFESpace()->GlobalVSize(),
+                                              (PetscInt*)pgf[0]->ParFESpace()->GetDofOffsets(),
+                                              ljacs(0,0),
+                                              Operator::PETSC_MATAIJ);
+      H = RAP(uH,m_pd->GetP());
+      delete uH;
+   }
+   else
+   {
+      Array<int> boff(nb+1);
+      boff[0] = 0;
+      for (int i = 0; i < nb; i++)
+         boff[i+1] = pgf[i]->ParFESpace()->TrueVSize();
+      boff.PartialSum();
+
+      BlockOperator bOp(boff);
+      bOp.owns_blocks = 1;
+      for (int i = 0; i < nb; i++)
+      {
+         for (int j = 0; j < nb; j++)
+         {
+            if (vtvInteg.indep && i != j) continue; /* independent TV, skip */
+            PetscParMatrix *uH = new PetscParMatrix(mesh->GetComm(),
+                                                    pgf[i]->ParFESpace()->GlobalVSize(),
+                                                    pgf[j]->ParFESpace()->GlobalVSize(),
+                                                    (PetscInt*)pgf[i]->ParFESpace()->GetDofOffsets(),
+                                                    (PetscInt*)pgf[j]->ParFESpace()->GetDofOffsets(),
+                                                    ljacs(i,j),
+                                                    Operator::PETSC_MATAIJ);
+            bOp.SetBlock(i,j,RAP(uH,m_pd->GetP()));
+            delete uH;
+         }
+      }
+      // MFEM's block operator does not copy the offsets!
+      H = new PetscParMatrix(mesh->GetComm(),&bOp,Operator::ANY_TYPE);
    }
 
-   PetscParMatrix *uH = new PetscParMatrix(mesh->GetComm(),fes->GlobalVSize(),
-                                           (PetscInt*)fes->GetDofOffsets(),ljacs[0], /* XXX */
-                                           Operator::PETSC_MATAIJ);
-
-   PetscParMatrix *H = RAP(uH,m_pd->GetP());
    if (!H_MM) H_MM = H;
    else
    {
@@ -932,7 +1017,6 @@ void TVRegularizer::SetUpHessian_MM(const Vector& x,const Vector& m,double t)
       ierr = MatHeaderReplace(*pH_MM,&B); CCHKERRQ(mesh->GetComm(),ierr);
       delete H;
    }
-   delete uH;
 }
 
 PetscErrorCode mfemopt_eval_tdobj(Vec U,Vec M,PetscReal t,PetscReal* f,void* ctx)

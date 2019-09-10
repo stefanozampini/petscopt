@@ -148,26 +148,31 @@ public:
 class TVRegularizer : public ObjectiveFunction
 {
 private:
-   double beta;
-   TVIntegrator tvInteg;
+   PDCoefficient* m_pd;
+
+   VTVIntegrator vtvInteg;
+
    mfem::Array<mfem::ParGridFunction*> wkgf;
    mfem::Array<mfem::ParGridFunction*> wkgf2;
    mfem::Array<mfem::VectorGridFunctionCoefficient*> WQ;
-   mfem::PetscParMatrix *P2D;
-   mfem::Array<mfem::SparseMatrix*> ljacs;
-   bool primal_dual;
-   PDCoefficient* m_pd;
+
+   mfem::Array<const mfem::FiniteElement*> els;
+   mfem::Array<mfem::Vector*> mks;
+   mfem::Array<mfem::Vector*> elgrads;
+   mfem::Array2D<mfem::SparseMatrix*> ljacs;
+   mfem::Array2D<mfem::DenseMatrix*> eljacs;
 
 public:
-   TVRegularizer(PDCoefficient*,double,double,bool=false);
-   void Symmetrize(bool _sym = true) { tvInteg.Symmetrize(_sym); }
-   void Project(bool _nrm = true) { tvInteg.Project(_nrm); }
+   TVRegularizer(PDCoefficient*,double,double,bool=false,bool=true);
+
+   void Symmetrize(bool _sym = true) { vtvInteg.Symmetrize(_sym); }
+   void Project(bool _prj = true) { vtvInteg.Project(_prj); }
+   void UpdateDual(const mfem::Vector&);
+   void UpdateDual(const mfem::Vector&,const mfem::Vector&,double,double=0.99);
+
    virtual void Eval(const mfem::Vector&,const mfem::Vector&,double,double*);
    virtual void EvalGradient_M(const mfem::Vector&,const mfem::Vector&,double,mfem::Vector&);
    virtual void SetUpHessian_MM(const mfem::Vector&,const mfem::Vector&,double);
-
-   void UpdateDual(const mfem::Vector&);
-   void UpdateDual(const mfem::Vector&,const mfem::Vector&,double);
 
    virtual ~TVRegularizer();
 };

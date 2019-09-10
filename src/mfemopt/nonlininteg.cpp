@@ -7,7 +7,34 @@ namespace mfemopt
 
 using namespace mfem;
 
-const IntegrationRule* TVIntegrator::GetIntRule(const FiniteElement& el)
+VTVIntegrator::VTVIntegrator(double _beta, bool _ind)
+{
+   beta = _beta;
+   indep = _ind;
+   IntRule = NULL;
+   symmetrize = false;
+   project = false;
+}
+
+void VTVIntegrator::SetDualCoefficients(const mfem::Array<mfem::VectorGridFunctionCoefficient*>& _WQs)
+{
+   WQs.SetSize(_WQs.Size());
+   WQs.Assign(_WQs);
+}
+
+void VTVIntegrator::SetDualCoefficients()
+{
+   WQs.SetSize(0);
+}
+
+VTVIntegrator::~VTVIntegrator()
+{
+   for (int j = 0; j < work.Size(); j++) delete work[j];
+   for (int j = 0; j < dwork.Size(); j++) delete dwork[j];
+   for (int j = 0; j < dshapes.Size(); j++) delete dshapes[j];
+}
+
+const IntegrationRule* VTVIntegrator::GetIntRule(const FiniteElement& el)
 {
    if (IntRule) return IntRule;
    const int dim = el.GetDim();
@@ -32,124 +59,305 @@ const IntegrationRule* TVIntegrator::GetIntRule(const FiniteElement& el)
    return IntRule;
 }
 
-double TVIntegrator::GetElementEnergy(const FiniteElement& el,
-                                      ElementTransformation& T,
-                                      const Vector& mk)
+double VTVIntegrator::GetElementEnergy(const Array<const FiniteElement*>& els,
+                                       ElementTransformation& T,
+                                       const Array<const Vector*>& mks)
 {
-   const int dim = el.GetDim();
-   const int dof = el.GetDof();
-
-   gradm.SetSize(dim);
-   dshape.SetSize(dof, dim);
-   const IntegrationRule *ir = GetIntRule(el);
    double en = 0.0;
+   if (!els.Size()) return en;
+
+   const int dim = els[0]->GetDim();
+   const int nb = els.Size();
+   norms.SetSize(nb);
+   gradm.SetSize(dim);
+
+   if (dshapes.Size() < nb)
+   {
+      for (int i = dshapes.Size(); i < nb; i++)
+      {
+         dshapes.Append(new DenseMatrix());
+      }
+   }
+
+   for (int j = 0; j < nb; j++)
+   {
+      const int dof = els[j]->GetDof();
+      dshapes[j]->SetSize(dof, dim);
+   }
+
+   const IntegrationRule *ir = GetIntRule(*(els[0]));
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
       const IntegrationPoint &ip = ir->IntPoint(i);
       T.SetIntPoint(&ip);
-      el.CalcPhysDShape(T,dshape);
-      dshape.MultTranspose(mk,gradm);
-      en += T.Weight()* ip.weight *(norm < 0.0 ? std::sqrt(InnerProduct(gradm,gradm) + beta) : norm);
+      const double w = T.Weight() * ip.weight;
+
+      for (int j = 0; j < nb; j++)
+      {
+         els[j]->CalcPhysDShape(T,*(dshapes[j]));
+         dshapes[j]->MultTranspose(*(mks[j]),gradm);
+         norms[j] = InnerProduct(gradm,gradm);
+      }
+      if (indep)
+      {
+         for (int j = 0; j < nb; j++)
+         {
+            en += w * std::sqrt(norms[j] + beta);
+         }
+      }
+      else
+      {
+         double c = 0.0;
+         for (int j = 0; j < nb; j++)
+         {
+            c += norms[j];
+         }
+         en += w * std::sqrt(c + beta);
+      }
    }
    return en;
 }
 
-void TVIntegrator::AssembleElementVector(const FiniteElement& el,
-                                         ElementTransformation& T,
-                                         const Vector& mk,Vector& elvect)
+void VTVIntegrator::AssembleElementVector(const Array<const FiniteElement*>& els,
+                                          ElementTransformation& T,
+                                          const Array<const Vector*>& mks,
+                                          const Array<Vector*>& elvects)
 {
-   const int dim = el.GetDim();
-   const int dof = el.GetDof();
+   if (!els.Size()) return;
 
+   const int dim = els[0]->GetDim();
+   const int nb = els.Size();
+   norms.SetSize(nb);
    gradm.SetSize(dim);
-   dshape.SetSize(dof, dim);
-   elvect.SetSize(dof);
-   elvect = 0.0;
 
-   const IntegrationRule *ir = GetIntRule(el);
+   if (work.Size() < nb)
+   {
+      for (int i = work.Size(); i < nb; i++)
+      {
+         work.Append(new Vector());
+      }
+   }
+   if (dshapes.Size() < nb)
+   {
+      for (int i = dshapes.Size(); i < nb; i++)
+      {
+         dshapes.Append(new DenseMatrix());
+      }
+   }
+   for (int j = 0; j < nb; j++)
+   {
+      const int dof = els[j]->GetDof();
+      elvects[j]->SetSize(dof);
+      *elvects[j] = 0.0;
+      work[j]->SetSize(dof);
+      dshapes[j]->SetSize(dof, dim);
+   }
+
+   const IntegrationRule *ir = GetIntRule(*(els[0]));
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
+      double c = 0.0;
+
       const IntegrationPoint &ip = ir->IntPoint(i);
       T.SetIntPoint(&ip);
-      el.CalcPhysDShape(T,dshape);
-      dshape.MultTranspose(mk,gradm);
-      double s = T.Weight()*ip.weight/(norm < 0.0 ? std::sqrt(InnerProduct(gradm,gradm) + beta) : norm);
-      dshape.AddMult_a(s,gradm,elvect);
+      const double w = T.Weight() * ip.weight;
+
+      for (int j = 0; j < nb; j++)
+      {
+         els[j]->CalcPhysDShape(T,*(dshapes[j]));
+         dshapes[j]->MultTranspose(*(mks[j]),gradm);
+         norms[j] = InnerProduct(gradm,gradm);
+         if (indep)
+         {
+            const double s = w/std::sqrt(norms[j] + beta);
+            dshapes[j]->AddMult_a(s,gradm,*(elvects[j]));
+         }
+         else
+         {
+            const double s = w;
+            dshapes[j]->Mult(gradm,*(work[j]));
+            *(work[j]) *= s;
+            c += norms[j];
+         }
+      }
+      if (!indep)
+      {
+         for (int j = 0; j < nb; j++)
+         {
+            *(work[j]) /= std::sqrt(c + beta);
+            *(elvects[j]) += *(work[j]);
+         }
+      }
    }
 }
 
-//static double nwmax = -1;
-
-void TVIntegrator::AssembleElementGrad(const FiniteElement& el,
-                                       ElementTransformation& T,
-                                       const Vector& mk,DenseMatrix& elmat)
+void VTVIntegrator::AssembleElementGrad(const Array<const FiniteElement*>& els,
+                                        ElementTransformation& T,
+                                        const Array<const Vector*>& mks,
+                                        const Array2D<DenseMatrix*>& elmats)
 {
-   const int dim = el.GetDim();
-   const int dof = el.GetDof();
+   if (!els.Size()) return;
 
-   tmat.SetSize(dim, dof);
-   gradm.SetSize(dim);
-   dshape.SetSize(dof, dim);
-   elmat.SetSize(dof, dof);
-   elmat = 0.0;
+   const int dim = els[0]->GetDim();
+   wk.SetSize(dim);
 
-   const IntegrationRule *ir = GetIntRule(el);
+   const int nb = els.Size();
+   norms.SetSize(nb);
+
+   if (dshapes.Size() < nb)
+   {
+      for (int i = dshapes.Size(); i < nb; i++)
+      {
+         dshapes.Append(new DenseMatrix());
+      }
+   }
+   if (work.Size() < nb)
+   {
+      for (int i = work.Size(); i < nb; i++)
+      {
+         work.Append(new Vector());
+      }
+   }
+   for (int j = 0; j < nb; j++)
+   {
+      const int jdof = els[j]->GetDof();
+      for (int k = 0; k < nb; k++)
+      {
+         const int kdof = els[k]->GetDof();
+         elmats(j,k)->SetSize(jdof, kdof);
+         *(elmats(j,k)) = 0.0;
+      }
+      dshapes[j]->SetSize(jdof, dim);
+      work[j]->SetSize(dim);
+   }
+
+   const bool pd = WQs.Size() ? true : false;
+   const IntegrationRule *ir = GetIntRule(*(els[0]));
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
+      double c = 0.0;
+
       const IntegrationPoint &ip = ir->IntPoint(i);
       T.SetIntPoint(&ip);
-      el.CalcPhysDShape(T,dshape);
-      dshape.MultTranspose(mk,gradm);
+      const double w = ip.weight * T.Weight();
 
-      double s = 1.0/(norm < 0.0 ? std::sqrt(InnerProduct(gradm,gradm) + beta) : norm);
-      if (WQ) /* primal-dual approach */
+      for (int j = 0; j < nb; j++)
       {
-         WQ->Eval(wk, T, ip);
-         //double nw;
-         //nw = std::sqrt(InnerProduct(wk,wk));
-         if (project)
+         els[j]->CalcPhysDShape(T,*(dshapes[j]));
+         dshapes[j]->MultTranspose(*(mks[j]),*(work[j]));
+         norms[j] = InnerProduct(*(work[j]),*(work[j]));
+         c += norms[j];
+      }
+
+      if (indep)
+      {
+         for (int j = 0; j < nb; j++)
          {
-            double nw = std::sqrt(InnerProduct(wk,wk));
-            wk /= std::max(1.0,nw);
-         }
-         //if (nw > 1.0 && nw > nwmax) { nwmax = nw; std::cout << "WARNING NWMAX " << nwmax << std::endl; }
-         //wk *= s; /* XXX REMOVE (used to check correctness of the code)*/
-      }
-      else
-      {
-         wk = gradm;
-         wk *= s;
-      }
+            const double s = 1.0/std::sqrt(norms[j] + beta);
+            const int dof = els[j]->GetDof();
 
-
-      A.Diag(s,dim);
-      if (symmetrize)
-      {
-         AddMult_a_VWt(-s*s/2.0,wk,gradm,A);
-         AddMult_a_VWt(-s*s/2.0,gradm,wk,A);
-      }
-      else
-      {
-         AddMult_a_VWt(-s*s,wk,gradm,A);
-      }
-
+            if (pd) /* primal-dual approach */
+            {
+               WQs[j]->Eval(wj, T, ip);
+               if (project)
+               {
+                  double nw = std::sqrt(InnerProduct(wj,wj));
+                  wj /= std::max(1.0,nw);
+               }
 #if 0
-      if (symmetrize) {
-        double ll[3] = {0., 0., 0.},vv[9];
-
-        A.CalcEigenvalues(ll,vv);
-        if (ll[0] < 0. || ll[1] < 0. || ll[2] < 0.)
-        {
-           std::cout << "EIGS: " << ll[0] << "," << ll[1] << ", " << ll[2] << std::endl;
-           wk.Print();
-        }
-      }
+               /* (used to check correctness of the code, if duals updated via P2D(m) )*/
+               wj *= s;
 #endif
-      double w = ip.weight*T.Weight();
-      A *= w;
+            }
+            else
+            {
+               wj = *(work[j]);
+               wj *= s;
+            }
 
-      MultABt(A,dshape,tmat);
-      AddMult(dshape,tmat,elmat);
+            A.Diag(s,dim);
+            if (symmetrize)
+            {
+               AddMult_a_VWt(-s*s/2.0,wj,*(work[j]),A);
+               AddMult_a_VWt(-s*s/2.0,*(work[j]),wj,A);
+            }
+            else
+            {
+               AddMult_a_VWt(-s*s,wj,*(work[j]),A);
+            }
+
+            A *= w;
+
+            tmat.SetSize(dim,dof);
+            MultABt(A,*(dshapes[j]),tmat);
+            AddMult(*(dshapes[j]),tmat,*(elmats(j,j)));
+         }
+      }
+      else
+      {
+         const double s = 1.0/std::sqrt(c + beta);
+
+         for (int j = 0; j < nb; j++)
+         {
+            if (pd)
+            {
+               WQs[j]->Eval(wj, T, ip);
+               if (project)
+               {
+                  double nw = std::sqrt(InnerProduct(wj,wj));
+                  wj /= std::max(1.0,nw);
+               }
+#if 0
+               /* (used to check correctness of the code, if duals updated via P2D(m) )*/
+               wj *= s;
+#endif
+            }
+            else
+            {
+               wj = *(work[j]);
+               wj *= s;
+            }
+
+            for (int k = 0; k < nb; k++)
+            {
+               const int dof = els[k]->GetDof();
+               A.Diag(j == k ? s : 0.0,dim);
+               if (symmetrize)
+               {
+                  if (pd)
+                  {
+                     WQs[k]->Eval(wk, T, ip);
+                     if (project)
+                     {
+                        double nw = std::sqrt(InnerProduct(wk,wk));
+                        wk /= std::max(1.0,nw);
+                     }
+#if 0
+                     /* (used to check correctness of the code, if duals updated via P2D(m) )*/
+                     wk *= s;
+#endif
+                  }
+                  else
+                  {
+                     wk = *(work[k]);
+                     wk *= s;
+                  }
+                  AddMult_a_VWt(-s*s/2.0,wj,*(work[k]),A);
+                  AddMult_a_VWt(-s*s/2.0,*(work[j]),wk,A);
+               }
+               else
+               {
+                  AddMult_a_VWt(-s*s,wj,*(work[k]),A);
+               }
+
+               A *= w;
+
+               tmat.SetSize(dim,dof);
+               MultABt(A,*(dshapes[k]),tmat);
+               AddMult(*(dshapes[j]),tmat,*(elmats(j,k)));
+            }
+         }
+      }
    }
 }
 
@@ -173,78 +381,203 @@ static inline double larger_quadratic_roots(double a, double b, double c)
    return x1 < x2 ? x2 : x1;
 }
 
-void TVIntegrator::AssembleElementDualUpdate(const FiniteElement& el,
-                                             const FiniteElement& del,
-                                             ElementTransformation& T,
-                                             const Vector& mk,const Vector& dmk,
-                                             Vector& dwk, double *lopt)
+void VTVIntegrator::AssembleElementDualUpdate(const Array<const FiniteElement*>& els,
+                                              const Array<const FiniteElement*>& dels,
+                                              ElementTransformation& T,
+                                              const Array<Vector*>& mks,
+                                              const Array<Vector*>& dmks,
+                                              Array<Vector*>& dwks,
+                                              double *lopt)
 {
-   MFEM_VERIFY(WQ,"missing coefficient for dual variables");
+   MFEM_VERIFY(WQs.Size(),"missing coefficient for dual variables");
 
-   const int dim = el.GetDim();
-   const int dof = el.GetDof();
-   const int ddof = del.GetDof();
+   if (!els.Size()) return;
+
+   const int dim = els[0]->GetDim();
+   wk.SetSize(dim);
+   wj.SetSize(dim);
+
+   const int nb = els.Size();
+   norms.SetSize(nb);
+   gradm.SetSize(dim);
 
    /* local optimal dual steplength */
    Vector lalpha(dim),lbeta(dim);
    double llopt;
 
-   gradm.SetSize(dim);
-   graddm.SetSize(dim);
-   dshape.SetSize(dof, dim);
-   dualshape.SetSize(ddof);
-   dwk.SetSize(ddof*dim);
-   dwk = 0.0;
+   Vector dwkd,dualshape;
 
-   *lopt = std::numeric_limits<double>::max();
-   const IntegrationRule *ir = GetIntRule(el);
+   if (dshapes.Size() < nb)
+   {
+      for (int i = dshapes.Size(); i < nb; i++)
+      {
+         dshapes.Append(new DenseMatrix());
+      }
+   }
+   if (work.Size() < nb)
+   {
+      for (int i = work.Size(); i < nb; i++)
+      {
+         work.Append(new Vector());
+      }
+   }
+   if (dwork.Size() < nb)
+   {
+      for (int i = dwork.Size(); i < nb; i++)
+      {
+         dwork.Append(new Vector());
+      }
+   }
+   for (int i = 0; i < nb; i++)
+   {
+      const int dof = els[i]->GetDof();
+      const int ddof = dels[i]->GetDof();
+      work[i]->SetSize(dim);
+      dwork[i]->SetSize(dim);
+      dshapes[i]->SetSize(dof,dim);
+      dwks[i]->SetSize(ddof*dim);
+      *(dwks[i]) = 0.0;
+   }
+
+   if (lopt) *lopt = std::numeric_limits<double>::max();
+
+   const IntegrationRule *ir = GetIntRule(*els[0]);
    for (int i = 0; i < ir->GetNPoints(); i++)
    {
+      double c = 0.0;
+
       const IntegrationPoint &ip = ir->IntPoint(i);
       T.SetIntPoint(&ip);
-      el.CalcPhysDShape(T,dshape);
-      del.CalcPhysShape(T,dualshape);
 
-      dshape.MultTranspose(mk,gradm);
-      dshape.MultTranspose(dmk,graddm);
-      double s = 1./(norm < 0.0 ? std::sqrt(InnerProduct(gradm,gradm) + beta) : norm);
+      const double w = ip.weight * T.Weight();
 
-      WQ->Eval(wk, T, ip);
-      double nw = 1.0;
-      if (project) /* XXX Here to check againts Georg's */
+      for (int j = 0; j < nb; j++)
       {
-         nw = std::max(1.0,std::sqrt(InnerProduct(wk,wk)));
-         wk /= nw;
+         els[j]->CalcPhysDShape(T,*(dshapes[j]));
+         dshapes[j]->MultTranspose(*(mks[j]),*(work[j]));
+         dshapes[j]->MultTranspose(*(dmks[j]),*(dwork[j]));
+         norms[j] = InnerProduct(*(work[j]),*(work[j]));
+         c += norms[j];
       }
 
-      A.Diag(s,dim);
-      if (symmetrize && project)  /* XXX Here to check againts Georg's */
+      if (indep)
       {
-         AddMult_a_VWt(-s*s/2.0,wk,gradm,A);
-         AddMult_a_VWt(-s*s/2.0,gradm,wk,A);
+         for (int j = 0; j < nb; j++)
+         {
+            const double s = 1.0/std::sqrt(norms[j] + beta);
+            const int ddof = dels[j]->GetDof();
+            double nw = 1.0;
+
+            gradm = *(work[j]);
+
+            WQs[j]->Eval(wj, T, ip);
+            if (project)
+            {
+               nw = std::max(1.0,std::sqrt(InnerProduct(wj,wj)));
+               wj /= nw;
+            }
+            A.Diag(s,dim);
+
+            if (symmetrize)
+            {
+               AddMult_a_VWt(-s*s/2.0,wj,gradm,A);
+               AddMult_a_VWt(-s*s/2.0,gradm,wj,A);
+            }
+            else
+            {
+               AddMult_a_VWt(-s*s,wj,gradm,A);
+            }
+            gradm *= s;
+
+            A.AddMult(*(dwork[j]),gradm);
+
+            /* assemble element contribution to rhs update */
+            dualshape.SetSize(ddof);
+            dels[j]->CalcPhysShape(T,dualshape);
+            for (int d = 0; d < dim; d++)
+            {
+               dwkd.SetDataAndSize(dwks[j]->GetData() + d*ddof,ddof);
+               dwkd.Add(w*(gradm(d) - wj(d)*nw),dualshape);
+               lalpha(d) = gradm(d) - wj(d)*nw;
+               lbeta(d) = wj(d);
+            }
+
+            /* determine optimal step length for dual variables */
+            if (lopt)
+            {
+               const double eA = InnerProduct(lalpha,lalpha);
+               const double eB = 2.*InnerProduct(lalpha,lbeta);
+               const double eC = InnerProduct(lbeta,lbeta)-1.0;
+
+               llopt = larger_quadratic_roots(eA,eB,eC);
+               *lopt = std::min(llopt,*lopt);
+            }
+         }
       }
       else
       {
-         AddMult_a_VWt(-s*s,wk,gradm,A);
-      }
-      gradm *= s;
-      A.AddMult(graddm,gradm);
-      double w = ip.weight*T.Weight();
-      for (int d = 0; d < dim; d++)
-      {
-         Vector dwkd(dwk.GetData() + d*ddof,ddof);
-         dwkd.Add(w*(gradm(d) - wk(d)*nw),dualshape);
-         lalpha(d) = gradm(d) - wk(d)*nw;
-         lbeta(d) = wk(d);
-      }
+         const double s = 1.0/std::sqrt(c + beta);
 
-      /* determine optimal step length for dual variables */
-      double eA = InnerProduct(lalpha,lalpha);
-      double eB = 2.*InnerProduct(lalpha,lbeta);
-      double eC = InnerProduct(lbeta,lbeta)-1.0;
+         for (int j = 0; j < nb; j++)
+         {
+            const int ddof = dels[j]->GetDof();
+            double nw = 1.0;
 
-      llopt = larger_quadratic_roots(eA,eB,eC);
-      *lopt = std::min(llopt,*lopt);
+            WQs[j]->Eval(wj, T, ip);
+            if (project)
+            {
+               nw = std::max(1.0,std::sqrt(InnerProduct(wj,wj)));
+               wj /= nw;
+            }
+
+            gradm = *(work[j]);
+            gradm *= s;
+
+            for (int k = 0; k < nb; k++)
+            {
+               A.Diag(j == k ? s : 0.0,dim);
+               if (symmetrize)
+               {
+                  WQs[k]->Eval(wk, T, ip);
+                  if (project)
+                  {
+                     double nw2 = std::sqrt(InnerProduct(wk,wk));
+                     wk /= std::max(1.0,nw2);
+                  }
+                  AddMult_a_VWt(-s*s/2.0,wj,*(work[k]),A);
+                  AddMult_a_VWt(-s*s/2.0,*(work[j]),wk,A);
+               }
+               else
+               {
+                  AddMult_a_VWt(-s*s,wj,*(work[k]),A);
+               }
+
+               A.AddMult(*(dwork[k]),gradm);
+            }
+
+            /* assemble element contribution to rhs update */
+            dualshape.SetSize(ddof);
+            dels[j]->CalcPhysShape(T,dualshape);
+            for (int d = 0; d < dim; d++)
+            {
+               dwkd.SetDataAndSize(dwks[j]->GetData() + d*ddof,ddof);
+               dwkd.Add(w*(gradm(d) - wj(d)*nw),dualshape);
+               lalpha(d) = gradm(d) - wj(d)*nw;
+               lbeta(d) = wj(d);
+            }
+
+            /* determine optimal step length for dual variables */
+            if (lopt)
+            {
+               const double eA = InnerProduct(lalpha,lalpha);
+               const double eB = 2.*InnerProduct(lalpha,lbeta);
+               const double eC = InnerProduct(lbeta,lbeta)-1.0;
+
+               llopt = larger_quadratic_roots(eA,eB,eC);
+               *lopt = std::min(llopt,*lopt);
+            }
+         }
+      }
    }
 }
 
