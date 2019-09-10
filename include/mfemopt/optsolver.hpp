@@ -42,6 +42,7 @@ public:
 
    virtual void Init(ReducedFunctional&);
    virtual void Solve(mfem::Vector&);
+   void SetHessianType(mfem::Operator::Type);
    void SetMonitor(mfem::PetscSolverMonitor*);
    virtual ~PetscOptimizationSolver();
 };

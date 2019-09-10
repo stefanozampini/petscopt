@@ -17,6 +17,7 @@ static PetscErrorCode __mfem_tao_update(Tao,PetscInt,void*);
 typedef struct
 {
    mfemopt::ReducedFunctional *objective;
+   mfem::Operator::Type       hessType; // OperatorType for the Hessian (automatic conversion if needed)
 } __mfem_tao_ctx;
 
 
@@ -58,6 +59,7 @@ void PetscOptimizationSolver::CreatePrivateContext()
 
    __mfem_tao_ctx *tao_ctx;
    ierr = PetscNew(&tao_ctx); CCHKERRQ(PETSC_COMM_SELF,ierr);
+   tao_ctx->hessType = Operator::ANY_TYPE;
    private_ctx = tao_ctx;
 }
 
@@ -69,6 +71,7 @@ void PetscOptimizationSolver::Init(ReducedFunctional& f)
    // private context
    __mfem_tao_ctx *tao_ctx = (__mfem_tao_ctx*)private_ctx;
    tao_ctx->objective = objective;
+   tao_ctx->hessType = Operator::ANY_TYPE;
 
    ierr = TaoSetObjectiveRoutine(tao,__mfem_tao_obj,tao_ctx); PCHKERRQ(tao,ierr);
    ierr = TaoSetGradientRoutine(tao,__mfem_tao_grad,tao_ctx); PCHKERRQ(tao,ierr);
@@ -89,6 +92,12 @@ void PetscOptimizationSolver::Init(ReducedFunctional& f)
    PetscParVector pH(PetscObjectComm((PetscObject)tao),h,true);
    ierr = TaoSetVariableBounds(tao,pL,pH); PCHKERRQ(tao,ierr);
 
+}
+
+void PetscOptimizationSolver::SetHessianType(Operator::Type hessType)
+{
+   __mfem_tao_ctx *tao_ctx = (__mfem_tao_ctx*)private_ctx;
+   tao_ctx->hessType = hessType;
 }
 
 // duplicated from PetscSolver::SetMonitor
@@ -170,9 +179,11 @@ static PetscErrorCode __mfem_tao_hessian(Tao tao, Vec x, Mat H, Mat Hpre, void* 
    mfem::PetscParMatrix *pHH = const_cast<mfem::PetscParMatrix *>
                                (dynamic_cast<const mfem::PetscParMatrix *>(&HH));
    bool delete_mat = false;
-   if (!pHH)
+   if (!pHH || (tao_ctx->hessType != mfem::Operator::ANY_TYPE &&
+               pHH->GetType() != tao_ctx->hessType))
    {
-      pHH = new mfem::PetscParMatrix(PetscObjectComm((PetscObject)tao),&HH);
+      pHH = new mfem::PetscParMatrix(PetscObjectComm((PetscObject)tao),&HH,
+                                     tao_ctx->hessType);
       delete_mat = true;
    }
 
