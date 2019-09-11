@@ -8,6 +8,12 @@ namespace mfemopt
 {
 using namespace mfem;
 
+void Noise::Randomize(Vector& v, int n) const
+{
+   if (n >= 0) v.SetSize(n);
+   for (int i = 0; i < v.Size(); i++) v[i] = (*this).Random();
+}
+
 double GaussianNoise::epsilon = std::numeric_limits<double>::min();
 double GaussianNoise::two_pi = 2.0*3.14159265358979323846;
 
@@ -18,7 +24,7 @@ GaussianNoise::GaussianNoise(double _mu, double _sigma)
    reuse = true;
 }
 
-double GaussianNoise::random() const
+double GaussianNoise::Random() const
 {
    reuse = !reuse;
    if (reuse) return y0*sigma + mu;
@@ -36,27 +42,16 @@ double GaussianNoise::random() const
    return y1 * sigma + mu;
 }
 
-void GaussianNoise::random(Vector& v, int n) const
-{
-   if (n >= 0) v.SetSize(n);
-   for (int i = 0; i < v.Size(); i++) v[i] = (*this).random();
-}
-
 UniformNoise::UniformNoise(double _A, double _B)
 {
    A = _A;
    B = _B;
 }
 
-double UniformNoise::random() const
+double UniformNoise::Random() const
 {
-   return A + (B-A)*std::rand()*(1.0/RAND_MAX);
-}
-
-void UniformNoise::random(Vector& v, int n) const
-{
-   if (n >= 0) v.SetSize(n);
-   for (int i = 0; i < v.Size(); i++) v[i] = (*this).random();
+   const double r = std::rand()*(1.0/RAND_MAX);
+   return A*(1-r) + B*r;
 }
 
 }

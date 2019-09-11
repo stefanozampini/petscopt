@@ -157,7 +157,7 @@ void Image::AddNoise(double s)
 {
    GaussianNoise noise;
    Vector vnoise;
-   noise.random(vnoise,vdim*nex*ney);
+   noise.Randomize(vnoise,vdim*nex*ney);
    vnoise *= s;
    for (int i = 0; i < vdim*ney*nex; i++) data[i] += vnoise[i];
 }
@@ -674,12 +674,12 @@ int main(int argc, char* argv[])
   test:
     nsize: {{1 2}}
     suffix: vtv_test
-    args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor 0 -quad -order 2 -opt_tao_max_it 0 -snes_max_it 0 -vector 1 -primaldual 0 -symmetrize {{0 1}} -coupled {{0 1}}
+    args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor -quad -order 2 -opt_tao_max_it 0 -snes_max_it 0 -vector 1 -primaldual 0 -symmetrize {{0 1}} -coupled {{0 1}}
 
   test:
     nsize: {{1 2}}
     suffix: vtv_pd_test
-    args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor 0 -quad -order 2 -opt_tao_max_it 0 -snes_max_it 0 -vector 1 -primaldual 1 -symmetrize {{0 1}} -project {{0 1}} -coupled {{0 1}}
+    args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor -quad -order 2 -opt_tao_max_it 0 -snes_max_it 0 -vector 1 -primaldual 1 -symmetrize {{0 1}} -project {{0 1}} -coupled {{0 1}}
 
   testset:
     nsize: 1

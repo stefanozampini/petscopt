@@ -686,7 +686,7 @@ test:
 test:
     requires: !complex !single
     suffix: 2
-    args: -ts_type cn -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao  -tao_test_hessian -test_tlm -tf 1 -tshessian_view -tshessian_mffd {{0 1}separate output} -test_taylor -taylor_ts_hessian
+    args: -test_mffd_ic -ts_type cn -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao  -tao_test_hessian -test_tlm -tf 1 -tshessian_view -tshessian_mffd {{0 1}separate output} -test_taylor -taylor_ts_hessian
 test:
 
     requires: !complex !single

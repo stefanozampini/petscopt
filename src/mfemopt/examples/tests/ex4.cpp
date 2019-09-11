@@ -59,6 +59,8 @@ int main(int argc, char *argv[])
       ierr = PetscOptionsEnd();CHKERRQ(ierr);
    }
 
+   UniformNoise noise(PETSC_MIN_REAL,PETSC_MAX_REAL);
+
    Mesh *mesh = new Mesh(meshfile, 1, 0);
    for (int lev = 0; lev < srl; lev++)
    {
@@ -128,8 +130,8 @@ int main(int argc, char *argv[])
    PetscParVector *px = new PetscParVector(ppfes);
    PetscParVector *py = new PetscParVector(cpfes);
 
-   *y = PETSC_MAX_REAL;
-   *py = PETSC_MAX_REAL;
+   noise.Randomize(*y);
+   noise.Randomize(*py);
 
    /* Broadcast/Reduce GridFunction */
    *x = 0.0;
@@ -152,8 +154,8 @@ int main(int argc, char *argv[])
    /* Use replicator class */
    DataReplicator *drep = new DataReplicator(PETSC_COMM_WORLD,nrep,contig);
 
-   *y = PETSC_MAX_REAL;
-   *py = PETSC_MAX_REAL;
+   noise.Randomize(*y);
+   noise.Randomize(*py);
 
    double f_ex = 1.6792302;
    double f1, f2 = PETSC_MAX_REAL;

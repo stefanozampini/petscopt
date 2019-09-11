@@ -1813,7 +1813,7 @@ int main(int argc, char *argv[])
 
       GaussianNoise nnoise;
       Vector vnoise;
-      nnoise.random(vnoise,u.Size());
+      nnoise.Randomize(vnoise,u.Size());
       pmap.Map(vnoise,vnoise);
       vnoise *= test_newton_noise;
       u += vnoise;
@@ -1875,7 +1875,8 @@ int main(int argc, char *argv[])
 
          if (test_opt)
          {
-            PetscOptimizationSolver opt(PETSC_COMM_WORLD,*robj,"opt_");
+            PetscOptimizationSolver opt(PETSC_COMM_WORLD,"opt_");
+            opt.Init(*robj);
             opt.iterative_mode = true; /* we always use an initial guess, it can be zero */
             /* XXX Fix: BCHandler in TAO ? */
 
