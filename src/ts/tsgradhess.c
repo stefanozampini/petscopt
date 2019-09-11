@@ -644,10 +644,9 @@ PetscErrorCode TSComputeHessian(TS ts, PetscReal t0, PetscReal dt, PetscReal tf,
 @*/
 PetscErrorCode TSTaylorTest(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec X, Vec design, Vec ddesign)
 {
-  Mat            H;
-  Vec            G,M,dM,M2;
-  PetscReal      h;
-  PetscReal      *tG,*tH,obj;
+  Vec            G,M,dM;
+  PetscScalar    v;
+  PetscReal      h,*tG,*tH,obj,res1,res2 = 0.0;
   PetscInt       i,n;
   PetscBool      hess;
   PetscViewer    viewer;
@@ -692,7 +691,11 @@ PetscErrorCode TSTaylorTest(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec
 
   /* Sample gradient and Hessian at design point */
   ierr = TSComputeObjectiveAndGradient(ts,t0,dt,tf,X,design,G,&obj);CHKERRQ(ierr);
+  ierr = VecDot(G,dM,&v);CHKERRQ(ierr);
+  res1 = PetscRealPart(v);
   if (hess) {
+    Mat       H;
+    Vec       M2;
     PetscBool expl;
 
     ierr = PetscOptionsGetBool(((PetscObject)ts)->options,((PetscObject)ts)->prefix,"-taylor_ts_hessian_explicit",(expl=PETSC_FALSE,&expl),NULL);CHKERRQ(ierr);
@@ -706,35 +709,33 @@ PetscErrorCode TSTaylorTest(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec
       H    = He;
     }
     ierr = VecDuplicate(M,&M2);CHKERRQ(ierr);
-  } else {
-    H  = NULL;
-    M2 = NULL;
+    ierr = MatMult(H,dM,M2);CHKERRQ(ierr);
+    ierr = VecDot(M2,dM,&v);CHKERRQ(ierr);
+    ierr = VecDestroy(&M2);CHKERRQ(ierr);
+    ierr = MatDestroy(&H);CHKERRQ(ierr);
+    res2 = PetscRealPart(v);
   }
 
   /*
     Taylor test:
-     - obj(M+dM) - obj(M) - h * (G^T * dM) should be O(h^2)
-     - obj(M+dM) - obj(M) - h * (G^T * dM) - 0.5 * h^2 * (dM^T * H * dM) should be O(h^3)
+     - obj(M + h*dM) - obj(M) - h * (G^T * dM) should be O(h^2)
+     - obj(M + h*dM) - obj(M) - h * (G^T * dM) - 1/2 * h^2 * (dM^T * H * dM) should be O(h^3)
   */
-  for (i = 0; i < n; i++, h /= 2.0) {
-    PetscScalar v,v2;
+  for (i = 0; i < n; i++, h /= 2.) {
     PetscReal   objtest;
 
     ierr  = VecWAXPY(M,h,dM,design);CHKERRQ(ierr);
     ierr  = TSComputeObjectiveAndGradient(ts,t0,dt,tf,X,M,NULL,&objtest);CHKERRQ(ierr);
-    ierr  = VecDot(G,dM,&v);CHKERRQ(ierr);
-    tG[i] = PetscAbsReal(objtest-obj-h*PetscRealPart(v)); /* XXX */
-    if (H) {
-      ierr  = MatMult(H,dM,M2);CHKERRQ(ierr);
-      ierr  = VecDot(M2,dM,&v2);CHKERRQ(ierr);
-      tH[i] = PetscAbsReal(objtest-obj-h*PetscRealPart(v)-0.5*h*h*PetscRealPart(v2)); /* XXX */
+    tG[i] = PetscAbsReal(objtest-obj-h*res1);
+    if (hess) {
+      tH[i] = PetscAbsReal(objtest-obj-h*res1-h*h*res2/2.);
     }
   }
 
   ierr = PetscViewerASCIIGetStdout(PetscObjectComm((PetscObject)ts),&viewer);CHKERRQ(ierr);
   ierr = PetscViewerASCIIPrintf(viewer,"-------------------------- Taylor test results ---------------------------\n");CHKERRQ(ierr);
   ierr = PetscViewerASCIIPrintf(viewer,"\t\tGradient");CHKERRQ(ierr);
-  if (H) {
+  if (hess) {
     ierr = PetscViewerASCIIPrintf(viewer,"\t\t\t\tHessian");CHKERRQ(ierr);
   } else {
     ierr = PetscViewerASCIIPrintf(viewer,"\t\t\tHessian not tested");CHKERRQ(ierr);
@@ -744,20 +745,18 @@ PetscErrorCode TSTaylorTest(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec
     PetscReal rate;
 
     rate = (i > 0 && tG[i] != tG[i-1]) ? -PetscLogReal(tG[i]/tG[i-1])/PetscLogReal(2.0) : 0.0;
-    ierr = PetscViewerASCIIPrintf(viewer,"%-#8g\t%-#8g\t%D",(double)tG[i],(double)rate,(PetscInt)PetscRoundReal(rate));CHKERRQ(ierr);
+    ierr = PetscViewerASCIIPrintf(viewer,"%-#8g\t%-#8g\t%D",(double)tG[i],(double)rate,(PetscInt)PetscMin(PetscRoundReal(rate),2));CHKERRQ(ierr);
     rate = (i > 0 && tH[i] != tH[i-1]) ? -PetscLogReal(tH[i]/tH[i-1])/PetscLogReal(2.0) : 0.0;
-    ierr = PetscViewerASCIIPrintf(viewer,"\t%-#8g\t%-#8g\t%D",(double)tH[i],(double)rate,(PetscInt)PetscRoundReal(rate));CHKERRQ(ierr);
+    ierr = PetscViewerASCIIPrintf(viewer,"\t%-#8g\t%-#8g\t%D",(double)tH[i],(double)rate,(PetscInt)PetscMin(PetscRoundReal(rate),3));CHKERRQ(ierr);
     ierr = PetscViewerASCIIPrintf(viewer,"\n");CHKERRQ(ierr);
   }
 
   ierr = PetscFree2(tG,tH);CHKERRQ(ierr);
-  ierr = VecDestroy(&M2);CHKERRQ(ierr);
   ierr = VecDestroy(&M);CHKERRQ(ierr);
   ierr = VecDestroy(&G);CHKERRQ(ierr);
   if (!ddesign) {
     ierr = VecDestroy(&dM);CHKERRQ(ierr);
   }
-  ierr = MatDestroy(&H);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
