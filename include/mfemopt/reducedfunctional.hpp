@@ -49,6 +49,8 @@ public:
    /* Testing */
    void TestFDGradient(MPI_Comm,const mfem::Vector&,double,bool=true);
    void TestFDHessian(MPI_Comm,const mfem::Vector&);
+   void TestTaylor(MPI_Comm,const mfem::Vector&,bool=false);
+   void TestTaylor(MPI_Comm,const mfem::Vector&,const mfem::Vector&,bool=false);
 
    virtual ~ReducedFunctional() {};
 };

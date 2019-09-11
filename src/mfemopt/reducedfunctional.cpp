@@ -147,6 +147,85 @@ void ReducedFunctional::TestFDHessian(MPI_Comm comm, const Vector& mIn)
    delete pfdH;
 }
 
+void ReducedFunctional::TestTaylor(MPI_Comm comm, const Vector& mIn, bool testhess)
+{
+   /* Try to make tests reproducible on a given machine */
+   PetscErrorCode ierr;
+   PetscInt s = 22011982;
+   ierr = PetscOptionsGetInt(NULL,NULL,"-taylor_seed",&s,NULL); CCHKERRQ(comm,ierr);
+
+   Vector dmIn(mIn.Size());
+   dmIn.Randomize(s);
+
+   (*this).TestTaylor(comm,mIn,dmIn,testhess);
+}
+
+void ReducedFunctional::TestTaylor(MPI_Comm comm, const Vector& mIn, const Vector& dmIn, bool testhess)
+{
+   PetscErrorCode ierr;
+
+   PetscReal h;
+   PetscInt n;
+   ierr = PetscOptionsGetReal(NULL,NULL,"-taylor_h",(h=1./8.,&h),NULL); CCHKERRQ(comm,ierr);
+   ierr = PetscOptionsGetInt(NULL,NULL,"-taylor_steps",(n=4,&n),NULL); CCHKERRQ(comm,ierr);
+
+   double *tG = new double[n];
+   double *tH = new double[n];
+
+   double obj;
+   Vector g(mIn.Size());
+   (*this).ComputeObjectiveAndGradient(mIn,&obj,g);
+
+   double v1,v2 = 0.0;
+   v1 = InnerProduct(comm,g,dmIn);
+
+   if (testhess)
+   {
+      Vector m2(mIn.Size());
+      Operator &H = GetHessian(mIn);
+      H.Mult(dmIn,m2);
+      v2 = InnerProduct(comm,m2,dmIn);
+   }
+
+   Vector m(mIn.Size());
+   for (PetscInt i = 0; i < n; i++, h /= 2.)
+   {
+      m = dmIn;
+      m *= h;
+      m += mIn;
+
+      double hobj;
+      (*this).ComputeObjective(m,&hobj);
+
+      tG[i] = std::abs(hobj-obj-h*v1);
+
+      if (testhess)
+      {
+         tH[i] = std::abs(hobj-obj-h*v1-h*h*v2/2.);
+      }
+   }
+
+   ierr = PetscPrintf(comm,"-------------------------- ReducedFunctional::TestTaylor ---------------------------\n"); CCHKERRQ(comm,ierr);
+   ierr = PetscPrintf(comm,"\t\tGradient"); CCHKERRQ(comm,ierr);
+   if (testhess) {
+     ierr = PetscPrintf(comm,"\t\t\t\tHessian"); CCHKERRQ(comm,ierr);
+   } else {
+     ierr = PetscPrintf(comm,"\t\t\tHessian not tested"); CCHKERRQ(comm,ierr);
+   }
+   ierr = PetscPrintf(comm,"\n--------------------------------------------------------------------------\n"); CCHKERRQ(comm,ierr);
+   for (PetscInt i = 0; i < n; i++) {
+     PetscReal rate;
+
+     rate = (i > 0 && tG[i] != tG[i-1]) ? -PetscLogReal(tG[i]/tG[i-1])/PetscLogReal(2.0) : 0.0;
+     ierr = PetscPrintf(comm,"%-#8g\t%-#8g\t%D",tG[i],rate,(PetscInt)PetscMin(PetscRoundReal(rate),2)); CCHKERRQ(comm,ierr);
+     rate = (i > 0 && tH[i] != tH[i-1]) ? -PetscLogReal(tH[i]/tH[i-1])/PetscLogReal(2.0) : 0.0;
+     ierr = PetscPrintf(comm,"\t%-#8g\t%-#8g\t%D",tH[i],rate,(PetscInt)PetscMin(PetscRoundReal(rate),3)); CCHKERRQ(comm,ierr);
+     ierr = PetscPrintf(comm,"\n"); CCHKERRQ(comm,ierr);
+   }
+   delete [] tG;
+   delete [] tH;
+}
+
 ReducedFunctionalHessianOperatorFD::ReducedFunctionalHessianOperatorFD(MPI_Comm _comm, ReducedFunctional *_obj, const Vector& _mIn) : PetscParMatrix()
 {
    obj = _obj;
