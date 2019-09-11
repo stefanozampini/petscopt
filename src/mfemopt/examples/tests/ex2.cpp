@@ -809,7 +809,15 @@ void RegularizedMultiSourceMisfit::Update(int it, const Vector& F, const Vector&
    }
    else
    {
-      double lambda = pX.Size() ? (pX[0] - X[0])/dX[0] : 0.0;
+      double lambda = 0.0;
+      for (int i = 0; i < pX.Size(); i++)
+      {
+         if (dX[i] != 0.0)
+         {
+            lambda = (pX[i] - X[i])/dX[i];
+            break;
+         }
+      }
       reg->UpdateDual(pX,dX,lambda);
    }
 }
