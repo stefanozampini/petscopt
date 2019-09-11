@@ -635,7 +635,14 @@ void PDCoefficient::Visualize(const char* keys)
       if (first)
       {
          sock << "window_size 800 800\n";
-         sock << "window_title 'Target'\n";
+         if (pcoeffgf.Size() > 1)
+         {
+            sock << "window_title 'Target-" << i << "'\n";
+         }
+         else
+         {
+            sock << "window_title 'Target'\n";
+         }
          sock << "keys " << fkeys << "\n";
       }
       sock << "pause\n";
