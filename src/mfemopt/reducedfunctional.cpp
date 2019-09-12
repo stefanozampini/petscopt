@@ -1,7 +1,7 @@
 #include <mfemopt/reducedfunctional.hpp>
 #include <mfemopt/private/mfemoptpetscmacros.h>
 #include <mfem/linalg/petsc.hpp>
-#include <petscmat.h>
+#include <petscopt/petscmat_cl.h>
 #include <limits>
 
 static PetscErrorCode ComputeHessianMFFD_Private(void*,Vec,Vec);

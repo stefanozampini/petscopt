@@ -8,4 +8,6 @@
 #define MatComputeOperatorTranspose(A,B,C) MatComputeExplicitOperatorTranspose(A,C)
 #endif
 
+#include <petscopt/petscsys_cl.h>
+
 #endif
