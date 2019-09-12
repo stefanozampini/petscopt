@@ -28,7 +28,8 @@ env:
     - CXXFLAGS='-std=c++11'
     - CPPFLAGS='-Wno-unused-command-line-argument'
     - PETSC_COMMIT=
-    - MFEM_COMMIT=v4.0
+    #- MFEM_COMMIT=v4.0
+    - MFEM_COMMIT=b25280d
 
   matrix:
 
