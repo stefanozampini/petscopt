@@ -110,7 +110,7 @@ install:
   - export MPICH_CXX=$CXX
   - mpicc -show
   - echo $PETSC_DIR && ls -A $PETSC_DIR
-  - rm -rf $PETSC_DIR
+  #- rm -rf $PETSC_DIR
   - if [[ ! "$(ls -A $PETSC_DIR)" ]]; then git clone https://gitlab.com/petsc/petsc.git $PETSC_DIR; fi
   - cd $PETSC_DIR
   - git fetch
