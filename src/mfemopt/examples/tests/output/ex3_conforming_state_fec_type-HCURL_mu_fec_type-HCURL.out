@@ -1,3 +1,5 @@
 Using param fec type HCURL, order 2
 Using state fec type HCURL, order 2
-Error at line 355: 0.000347222
+[VP_VS] ||   op_M_pd - op_M||: 0.000347222
+[VP_VS] ||    op_M_m - op_M||: 1.86483e-17
+[VP_VS] || op_M_pd_m - op_M||: 0.000347222

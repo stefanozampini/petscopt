@@ -1,4 +1,8 @@
 Using param fec type L2, order 2
 Using state fec type HDIV, order 2
-Error at line 292: 4.84452e-17
-Error at line 317: 7.77305e-17
+[SP_VS] ||   op_M_pd - op_M||: 2.1938e-16
+[SP_VS] ||    op_M_m - op_M||: 1.25923e-16
+[SP_VS] || op_M_pd_m - op_M||: 2.36755e-16
+[SP_VS_VI] ||   op_M_pd - op_M||: 7.77305e-17
+[SP_VS_VI] ||    op_M_m - op_M||: 1.14451e-17
+[SP_VS_VI] || op_M_pd_m - op_M||: 7.77305e-17

@@ -47,7 +47,7 @@ static bool excl_fn(const Vector &x)
 static double mu_fn(const Vector &x)
 {
    double v = 1.0;
-   for (int i = 0; i < x.Size(); i++) v *= x(i)*x(i);
+   for (int i = 0; i < x.Size(); i++) v += x(i)*x(i);
    return v;
 }
 
@@ -76,16 +76,20 @@ class TestOperator
 {
 private:
    ParBilinearForm pbform;
+   ParMixedBilinearForm pbformmix;
    OperatorHandle  Mh;
+   OperatorHandle  Mhmix;
 public:
    TestOperator(ParFiniteElementSpace*,BilinearFormIntegrator*,Operator::Type = Operator::PETSC_MATAIJ);
    Operator* GetOperator();
+   Operator* GetOperatorMixed();
    ~TestOperator();
 };
 
-TestOperator::TestOperator(ParFiniteElementSpace *s_fes, BilinearFormIntegrator *pd_bilin, Operator::Type oid) : pbform(s_fes), Mh(oid)
+TestOperator::TestOperator(ParFiniteElementSpace *s_fes, BilinearFormIntegrator *pd_bilin, Operator::Type oid) : pbform(s_fes), pbformmix(s_fes,s_fes), Mh(oid), Mhmix(oid)
 {
    pbform.AddDomainIntegrator(pd_bilin);
+   pbformmix.AddDomainIntegrator(pd_bilin);
 }
 
 Operator* TestOperator::GetOperator()
@@ -100,17 +104,61 @@ Operator* TestOperator::GetOperator()
    return Mop;
 }
 
+Operator* TestOperator::GetOperatorMixed()
+{
+   pbformmix.Update();
+   pbformmix.Assemble(0);
+   pbformmix.Finalize(0);
+   pbformmix.ParallelAssemble(Mhmix);
+
+   Operator *Mop;
+   Mhmix.Get(Mop);
+   return Mop;
+}
+
 TestOperator::~TestOperator()
 {
    /* MFEM gets ownership of the BilinearFormIntegrators */
-   Array<BilinearFormIntegrator*> *dbfi = pbform.GetDBFI();
-   for (int i = 0; i < dbfi->Size(); i++) (*dbfi)[i] = NULL;
+   {
+      Array<BilinearFormIntegrator*> *dbfi = pbform.GetDBFI();
+      for (int i = 0; i < dbfi->Size(); i++) (*dbfi)[i] = NULL;
+   }
+   {
+      Array<BilinearFormIntegrator*> *dbfi = pbformmix.GetDBFI();
+      for (int i = 0; i < dbfi->Size(); i++) (*dbfi)[i] = NULL;
+   }
 }
 
 static void PetscParMatrixInftyNorm(PetscParMatrix& op_M,PetscReal *norm)
 {
    PetscErrorCode ierr;
    ierr = MatNorm(op_M,NORM_INFINITY,norm); PCHKERRQ(op_M,ierr);
+}
+
+static void RunTest(ParFiniteElementSpace *fes, BilinearFormIntegrator *bilin, PDBilinearFormIntegrator *bilin_pd, const std::string& name)
+{
+
+   TestOperator    op(fes,bilin);
+   TestOperator op_pd(fes,bilin_pd);
+
+   PetscParMatrix      op_M(PETSC_COMM_WORLD,   op.GetOperator(),Operator::PETSC_MATAIJ);
+   PetscParMatrix   op_M_pd(PETSC_COMM_WORLD,op_pd.GetOperator(),Operator::PETSC_MATAIJ);
+   PetscParMatrix    op_M_m(PETSC_COMM_WORLD,   op.GetOperatorMixed(),Operator::PETSC_MATAIJ);
+   PetscParMatrix op_M_pd_m(PETSC_COMM_WORLD,op_pd.GetOperatorMixed(),Operator::PETSC_MATAIJ);
+
+   PetscReal norm;
+
+   op_M_pd -= op_M;
+   PetscParMatrixInftyNorm(op_M_pd,&norm);
+   PetscPrintf(PETSC_COMM_WORLD,"[%s] ||   op_M_pd - op_M||: %g\n",name.c_str(),(double)norm);
+
+   op_M_m -= op_M;
+   PetscParMatrixInftyNorm(op_M_m,&norm);
+   PetscPrintf(PETSC_COMM_WORLD,"[%s] ||    op_M_m - op_M||: %g\n",name.c_str(),(double)norm);
+
+   op_M_pd_m -= op_M;
+   PetscParMatrixInftyNorm(op_M_pd_m,&norm);
+   PetscPrintf(PETSC_COMM_WORLD,"[%s] || op_M_pd_m - op_M||: %g\n",name.c_str(),(double)norm);
 }
 
 int main(int argc, char *argv[])
@@ -154,7 +202,7 @@ int main(int argc, char *argv[])
       ierr = PetscOptionsIntArray("-mu_exclude","Elements' tag to exclude for mu optimization",NULL,mu_excl,&n_mu_excl,&flg);CHKERRQ(ierr);
       if (!flg) n_mu_excl = 0;
 
-      ierr = PetscOptionsBool("-glvis","Activate GLVis monitoring of Newton process",NULL,glvis,&glvis,NULL);CHKERRQ(ierr);
+      ierr = PetscOptionsBool("-glvis","Activate GLVis monitoring",NULL,glvis,&glvis,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-test_partitioning","Test with a fixed element partition",NULL,test_part,&test_part,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBool("-test_progress","Report progress when testing",NULL,test_progress,&test_progress,NULL);CHKERRQ(ierr);
 
@@ -260,6 +308,9 @@ int main(int argc, char *argv[])
    PDCoefficient *mu_pd = NULL;
    BilinearFormIntegrator *mu_bilin = NULL;
    PDBilinearFormIntegrator *mu_bilin_pd = NULL;
+
+   std::string testname;
+
    /* scalar space for param */
    if (mu_scal)
    {
@@ -269,27 +320,20 @@ int main(int argc, char *argv[])
 
       ParFiniteElementSpace* fes = new ParFiniteElementSpace(pmesh,s_fec);
 
-      if (s_scal) /* test scalar space intergrators */
+      if (s_scal) /* test scalar space integrators */
       {
+         testname    = "SP_SS";
          mu_bilin    = new MassIntegrator(*mu);
          mu_bilin_pd = new PDMassIntegrator(*mu_pd);
       }
       else /* test vector space integrators */
       {
+         testname    = "SP_VS";
          mu_bilin    = new VectorFEMassIntegrator(*mu);
          mu_bilin_pd = new PDVectorFEMassIntegrator(*mu_pd);
       }
 
-      TestOperator    op(fes,mu_bilin);
-      TestOperator op_pd(fes,mu_bilin_pd);
-
-      PetscParMatrix    op_M(PETSC_COMM_WORLD,   op.GetOperator(),Operator::PETSC_MATAIJ);
-      PetscParMatrix op_M_pd(PETSC_COMM_WORLD,op_pd.GetOperator(),Operator::PETSC_MATAIJ);
-      op_M -= op_M_pd;
-
-      PetscReal norm;
-      PetscParMatrixInftyNorm(op_M,&norm);
-      PetscPrintf(PETSC_COMM_WORLD,"Error at line %d: %g\n",__LINE__,(double)norm);
+      RunTest(fes,mu_bilin,mu_bilin_pd,testname);
 
       delete mu_pd;
       delete mu_bilin;
@@ -305,16 +349,8 @@ int main(int argc, char *argv[])
          mu_bilin    = new VectorFEMassIntegrator(*mu_vec);
          mu_bilin_pd = new PDVectorFEMassIntegrator(*mu_pd);
 
-         TestOperator    op(fes,mu_bilin);
-         TestOperator op_pd(fes,mu_bilin_pd);
-
-         PetscParMatrix    op_M(PETSC_COMM_WORLD,   op.GetOperator(),Operator::PETSC_MATAIJ);
-         PetscParMatrix op_M_pd(PETSC_COMM_WORLD,op_pd.GetOperator(),Operator::PETSC_MATAIJ);
-         op_M -= op_M_pd;
-
-         PetscReal norm;
-         PetscParMatrixInftyNorm(op_M,&norm);
-         PetscPrintf(PETSC_COMM_WORLD,"Error at line %d: %g\n",__LINE__,(double)norm);
+         testname += "_VI";
+         RunTest(fes,mu_bilin,mu_bilin_pd,testname);
 
          delete mu_pd;
          delete mu_bilin;
@@ -332,6 +368,7 @@ int main(int argc, char *argv[])
 #if 0
       if (s_scal)
       {
+         testname    = "VP_SS";
          fes         = new ParFiniteElementSpace(pmesh,s_fec,pmesh->Dimension());
          mu_bilin    = new VectorMassIntegrator(*mu);
          mu_bilin_pd = new PDMassIntegrator(*mu_pd);
@@ -339,20 +376,13 @@ int main(int argc, char *argv[])
       else
 #endif
       {
+         testname    = "VP_VS";
          fes         = new ParFiniteElementSpace(pmesh,s_fec);
          mu_bilin    = new VectorFEMassIntegrator(*mu_vec);
          mu_bilin_pd = new PDVectorFEMassIntegrator(*mu_pd);
       }
-      TestOperator    op(fes,mu_bilin);
-      TestOperator op_pd(fes,mu_bilin_pd);
 
-      PetscParMatrix    op_M(PETSC_COMM_WORLD,   op.GetOperator(),Operator::PETSC_MATAIJ);
-      PetscParMatrix op_M_pd(PETSC_COMM_WORLD,op_pd.GetOperator(),Operator::PETSC_MATAIJ);
-      op_M -= op_M_pd;
-
-      PetscReal norm;
-      PetscParMatrixInftyNorm(op_M,&norm);
-      PetscPrintf(PETSC_COMM_WORLD,"Error at line %d: %g\n",__LINE__,(double)norm);
+      RunTest(fes,mu_bilin,mu_bilin_pd,testname);
 
       delete mu_pd;
       delete mu_bilin;

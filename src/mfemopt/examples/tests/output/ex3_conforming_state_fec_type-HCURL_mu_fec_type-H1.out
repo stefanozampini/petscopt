@@ -1,4 +1,8 @@
 Using param fec type H1, order 2
 Using state fec type HCURL, order 2
-Error at line 292: 6.38595e-17
-Error at line 317: 1.11022e-16
+[SP_VS] ||   op_M_pd - op_M||: 2.73002e-16
+[SP_VS] ||    op_M_m - op_M||: 2.26598e-16
+[SP_VS] || op_M_pd_m - op_M||: 2.63461e-16
+[SP_VS_VI] ||   op_M_pd - op_M||: 1.11022e-16
+[SP_VS_VI] ||    op_M_m - op_M||: 1.86483e-17
+[SP_VS_VI] || op_M_pd_m - op_M||: 1.11022e-16
