@@ -28,7 +28,7 @@ static PetscErrorCode EvalObjective(Vec U, Vec M, PetscReal time, PetscReal *val
   PetscFunctionBeginUser;
   ierr = VecGetArrayRead(U,&u);CHKERRQ(ierr);
   ierr = VecGetArrayRead(Uobj,&uobj);CHKERRQ(ierr);
-  *val = 0.5*((u[0]-uobj[0])*(u[0]-uobj[0]) + (u[1]-uobj[1])*(u[1]-uobj[1]));
+  *val = PetscRealPart(0.5*((u[0]-uobj[0])*(u[0]-uobj[0]) + (u[1]-uobj[1])*(u[1]-uobj[1])));
   ierr = VecRestoreArrayRead(U,&u);CHKERRQ(ierr);
   ierr = VecRestoreArrayRead(Uobj,&uobj);CHKERRQ(ierr);
   PetscFunctionReturn(0);
