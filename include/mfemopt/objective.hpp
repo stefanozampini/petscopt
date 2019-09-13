@@ -177,11 +177,13 @@ public:
    virtual ~TVRegularizer();
 };
 
+}
+
+/* TODO move to *.h file */
 PETSC_EXTERN PetscErrorCode mfemopt_eval_tdobj(Vec,Vec,PetscReal,PetscReal*,void*);
 PETSC_EXTERN PetscErrorCode mfemopt_eval_tdobj_x(Vec,Vec,PetscReal,Vec,void*);
 PETSC_EXTERN PetscErrorCode mfemopt_eval_tdobj_xx(Vec,Vec,PetscReal,Mat,void*);
 
-}
 #endif
 
 #endif

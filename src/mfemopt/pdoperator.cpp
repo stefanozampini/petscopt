@@ -91,7 +91,7 @@ PDOperator::~PDOperator()
    delete HOp[2][2];
 }
 
-void PDOperator::SetBCHandler(mfem::PetscBCHandler* _bc)
+void PDOperator::SetBCHandler(PetscBCHandler* _bc)
 {
    /* Model bchandler */
    bc = _bc;
@@ -248,6 +248,8 @@ void PDOperatorHessian::Update(const Vector& itdst,const Vector& ist, const Vect
    l.SetDataAndSize(il.GetData(),il.Size());
 }
 
+}
+
 PetscErrorCode mfemopt_setupts(TS ts,Vec X0,Vec M,void* ctx)
 {
    PetscErrorCode ierr;
@@ -323,8 +325,6 @@ PetscErrorCode mfemopt_hessiandae_mxt(TS ts,PetscReal t,Vec u,Vec u_t,Vec M,Vec 
    mfem::PetscParVector y(Y,true);
    hop->Mult(r,y);
    PetscFunctionReturn(0);
-}
-
 }
 
 PetscErrorCode PDOperatorGradientMFFD_Private(void *ctx, Vec x, Vec y)

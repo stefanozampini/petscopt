@@ -71,7 +71,7 @@ void PDBilinearFormIntegrator::ComputeGradient_Internal(ParGridFunction *sgf, co
    if (!sworkgf) sworkgf = new ParGridFunction(sfes);
    *sworkgf = 0.0;
 
-   mfem::Array<bool>& elactive = pdcoeff->GetActiveElements();
+   Array<bool>& elactive = pdcoeff->GetActiveElements();
    for (int e = 0; e < pmesh->GetNE(); e++)
    {
       if (!elactive[e]) continue;
@@ -143,7 +143,7 @@ void PDBilinearFormIntegrator::ComputeGradientAdjoint_Internal(ParGridFunction *
    /* needed by element assembly */
    pdcoeff->SetUseDerivCoefficients();
 
-   mfem::Array<bool>& elactive = pdcoeff->GetActiveElements();
+   Array<bool>& elactive = pdcoeff->GetActiveElements();
    for (int e = 0; e < pmesh->GetNE(); e++)
    {
       if (!elactive[e]) continue;

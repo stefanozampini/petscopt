@@ -349,7 +349,7 @@ void TikhonovRegularizer::SetUpHessian_MM(const Vector& u,const Vector& m,double
    }
 }
 
-void TikhonovRegularizer::Eval(const mfem::Vector& u,const mfem::Vector& m,double t,double* f)
+void TikhonovRegularizer::Eval(const Vector& u,const Vector& m,double t,double* f)
 {
    MFEM_VERIFY(m0,"Init() not called");
    SetUpHessian_MM(u,m,t);
@@ -361,7 +361,7 @@ void TikhonovRegularizer::Eval(const mfem::Vector& u,const mfem::Vector& m,doubl
    *f = 0.5*InnerProduct(m0->GetComm(),x,Mx);
 }
 
-void TikhonovRegularizer::EvalGradient_M(const mfem::Vector& u,const mfem::Vector& m,double t,mfem::Vector &g)
+void TikhonovRegularizer::EvalGradient_M(const Vector& u,const Vector& m,double t,Vector &g)
 {
    MFEM_VERIFY(m0,"Init() not called");
    SetUpHessian_MM(u,m,t);
@@ -520,7 +520,7 @@ void TDLeastSquares::InitDeltaCoefficients()
    }
 }
 
-void TDLeastSquares::EvalGradient_X(const Vector& state, const Vector& m, double time, mfem::Vector& g)
+void TDLeastSquares::EvalGradient_X(const Vector& state, const Vector& m, double time, Vector& g)
 {
    InitDeltaCoefficients();
 
@@ -864,7 +864,7 @@ void TVRegularizer::Eval(const Vector& state, const Vector& m, double time, doub
    MPI_Allreduce(&lf,f,1,MPI_DOUBLE_PRECISION,MPI_SUM,mesh->GetComm());
 }
 
-void TVRegularizer::EvalGradient_M(const Vector& state, const Vector& m, double time, mfem::Vector& g)
+void TVRegularizer::EvalGradient_M(const Vector& state, const Vector& m, double time, Vector& g)
 {
    Array<int> vdofs;
 
@@ -1006,7 +1006,7 @@ void TVRegularizer::SetUpHessian_MM(const Vector& x,const Vector& m,double t)
    if (!H_MM) H_MM = H;
    else
    {
-      PetscParMatrix *pH_MM = dynamic_cast<mfem::PetscParMatrix *>(H_MM);
+      PetscParMatrix *pH_MM = dynamic_cast<PetscParMatrix *>(H_MM);
       MFEM_VERIFY(pH_MM,"Unsupported operator type");
 
       Mat B;
@@ -1016,6 +1016,8 @@ void TVRegularizer::SetUpHessian_MM(const Vector& x,const Vector& m,double t)
       ierr = MatHeaderReplace(*pH_MM,&B); CCHKERRQ(mesh->GetComm(),ierr);
       delete H;
    }
+}
+
 }
 
 PetscErrorCode mfemopt_eval_tdobj(Vec U,Vec M,PetscReal t,PetscReal* f,void* ctx)
@@ -1056,8 +1058,6 @@ PetscErrorCode mfemopt_eval_tdobj_xx(Vec U,Vec M,PetscReal t,Mat A,void* ctx)
    obj->SetUpHessian_XX(u,m,t);
    if (A) { ierr = PetscObjectStateIncrease((PetscObject)A);CHKERRQ(ierr); }
    PetscFunctionReturn(0);
-}
-
 }
 
 PetscErrorCode ObjComputeHessianMFFD_Private(void *ctx, Vec x, Vec y)

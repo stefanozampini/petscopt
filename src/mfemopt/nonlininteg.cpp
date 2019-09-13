@@ -16,7 +16,7 @@ VTVIntegrator::VTVIntegrator(double _beta, bool _ind)
    project = false;
 }
 
-void VTVIntegrator::SetDualCoefficients(const mfem::Array<mfem::VectorGridFunctionCoefficient*>& _WQs)
+void VTVIntegrator::SetDualCoefficients(const Array<VectorGridFunctionCoefficient*>& _WQs)
 {
    WQs.SetSize(_WQs.Size());
    WQs.Assign(_WQs);

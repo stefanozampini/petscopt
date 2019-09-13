@@ -107,12 +107,14 @@ public:
    virtual ~PDOperator();
 };
 
+}
+
+/* TODO move to *.h file */
 PETSC_EXTERN PetscErrorCode mfemopt_setupts(TS,Vec,Vec,void*);
 PETSC_EXTERN PetscErrorCode mfemopt_gradientdae(TS,PetscReal,Vec,Vec,Vec,Mat,void*);
 PETSC_EXTERN PetscErrorCode mfemopt_hessiandae_xtm(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,Vec,void*);
 PETSC_EXTERN PetscErrorCode mfemopt_hessiandae_mxt(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,Vec,void*);
 
-}
 #endif
 
 #endif
