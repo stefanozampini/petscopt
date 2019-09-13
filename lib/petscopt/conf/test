@@ -3,10 +3,10 @@ ifeq ($(RM),true)
 .SECONDARY: $(ex%.o) $(ex%f.o) $(ex%f90.o)
 endif
 
-ex%f90: ex%f90.o | chkopts
+ex%f90: ex%f90.o
 	-${FLINKER} -o $@ $^  ${PETSCOPT_LIB}
-ex%f: ex%f.o | chkopts
+ex%f: ex%f.o
 	-${FLINKER} -o $@ $^  ${PETSCOPT_LIB}
-ex%: ex%.o | chkopts
+ex%: ex%.o
 	-${CXXLINKER} -o $@ $^  ${PETSCOPT_LIB}
 	${DSYMUTIL} $@
