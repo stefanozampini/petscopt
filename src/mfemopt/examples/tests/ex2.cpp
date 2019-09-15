@@ -280,11 +280,8 @@ public:
    DataReplicator *drep;
    ParameterMap *pmap;
    bool tvopt;
-            // ZZZ
-   Operator *_M;
-   PetscLinearSolver *Minv;
 
-   RegularizedMultiSourceMisfit(MultiSourceMisfit*,TVRegularizer*,DataReplicator*,ParameterMap*,bool tvopt = false,PetscParMatrix* M = NULL);
+   RegularizedMultiSourceMisfit(MultiSourceMisfit*,TVRegularizer*,DataReplicator*,ParameterMap*,bool tvopt = false);
    virtual void ComputeObjective(const Vector&,double*) const;
    virtual void ComputeGradient(const Vector&,Vector&) const;
    virtual Operator& GetHessian(const Vector&) const;
@@ -292,7 +289,7 @@ public:
 
    virtual void Update(int,const Vector&,const Vector&,const Vector&,const Vector&);
    //virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&);
-   virtual ~RegularizedMultiSourceMisfit() { delete H; delete Minv;}
+   virtual ~RegularizedMultiSourceMisfit() { delete H; }
 };
 
 class RegularizedMultiSourceMisfitHessian: public Operator
@@ -699,19 +696,13 @@ MultiSourceMisfitHessian::~MultiSourceMisfitHessian()
    for (int i = 0; i < arrayS.Size(); i++) { delete arrayS[i]; }
 }
 
-RegularizedMultiSourceMisfit::RegularizedMultiSourceMisfit(MultiSourceMisfit *_obj, TVRegularizer *_reg, DataReplicator *_drep, ParameterMap *_pmap, bool _tvopt, PetscParMatrix *M)
+RegularizedMultiSourceMisfit::RegularizedMultiSourceMisfit(MultiSourceMisfit *_obj, TVRegularizer *_reg, DataReplicator *_drep, ParameterMap *_pmap, bool _tvopt)
 {
    obj   = _obj;
    reg   = _reg;
    drep  = _drep;
    pmap  = _pmap;
    tvopt = _tvopt;
-   _M = NULL;
-   Minv = NULL;
-   if (M) {
-     _M = M;
-     Minv = new PetscLinearSolver(*M,"mass_");
-   }
    H     = NULL;
 
    height = width = drep->IsMaster() ? _obj->Height() : 0.0;
@@ -1284,7 +1275,7 @@ int main(int argc, char *argv[])
 
    PetscBool test_part = PETSC_FALSE, test_null = PETSC_FALSE, test_progress = PETSC_TRUE;
    PetscBool test_newton = PETSC_FALSE, test_opt = PETSC_FALSE;
-   PetscBool test_misfit[3] = {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}, test_misfit_reg[2] = {PETSC_FALSE,PETSC_FALSE}, test_misfit_internal = PETSC_FALSE;
+   PetscBool test_misfit[3] = {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}, test_misfit_reg[3] = {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}, test_misfit_internal = PETSC_FALSE;
    PetscReal test_newton_noise = 0.0;
    PetscBool glvis = PETSC_TRUE, save = PETSC_FALSE;
 
@@ -1370,8 +1361,8 @@ int main(int argc, char *argv[])
       ierr = PetscOptionsBool("-test_progress","Report progress when testing",NULL,test_progress,&test_progress,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsBoolArray("-test_misfit","Test misfit function callbacks",NULL,test_misfit,(i=3,&i),NULL);CHKERRQ(ierr);
       for (int j=i; j<3; j++) test_misfit[j] = test_misfit[i > 0 ? i-1 : 0];
-      ierr = PetscOptionsBoolArray("-test_misfit_reg","Test regularized misfit function callbacks",NULL,test_misfit_reg,(i=2,&i),NULL);CHKERRQ(ierr);
-      for (int j=i; j<2; j++) test_misfit_reg[j] = test_misfit_reg[i > 0 ? i-1 : 0];
+      ierr = PetscOptionsBoolArray("-test_misfit_reg","Test regularized misfit function callbacks",NULL,test_misfit_reg,(i=3,&i),NULL);CHKERRQ(ierr);
+      for (int j=i; j<3; j++) test_misfit_reg[j] = test_misfit_reg[i > 0 ? i-1 : 0];
       ierr = PetscOptionsBool("-test_misfit_internal","Tests internal objects inside misfit function",NULL,test_misfit_internal,&test_misfit_internal,NULL);CHKERRQ(ierr);
 
       ierr = PetscOptionsEnd();CHKERRQ(ierr);
@@ -1740,12 +1731,6 @@ int main(int argc, char *argv[])
       mu_inv_pd->SaveVisIt(visit.str().c_str());
    }
 
-   /* ZZZ */
-   TikhonovRegularizer *tk = NULL;
-   PetscParMatrix *M = NULL;
-   //tk = new TikhonovRegularizer(mu_inv_pd);
-   //M = new PetscParMatrix(PETSC_COMM_WORLD,tk->GetHessianOperator_MM(),Operator::PETSC_MATAIJ);
-
    /* Total variation regularizer */
    TVRegularizer *tv = new TVRegularizer(mu_inv_pd,tvb,tvpd);
    tv->SetScale(tva);
@@ -1753,28 +1738,7 @@ int main(int argc, char *argv[])
    tv->Project(tvpr);
 
    /* The full objective: misfit + regularization */
-   RegularizedMultiSourceMisfit *robj = new RegularizedMultiSourceMisfit(obj,tv,drep,&pmap,tvopt,M);
-
-   if (test_misfit_internal)
-   {
-      Vector muv;
-      if (!test_null) robj->ComputeGuess(muv);
-      else muv = muv_exact;
-      Vector dummy;
-      double f;
-
-      /* Misfit in terms of mu, the optimization variable is the inverse of the map */
-      Vector m(muv);
-      if (tvopt) pmap.InverseMap(muv,m);
-      PetscErrorCode ierr;
-
-      MPI_Comm comm = PETSC_COMM_WORLD;
-      ierr = PetscPrintf(comm,"---------------------------------------\n");CCHKERRQ(comm,ierr);
-      ierr = PetscPrintf(comm,"TV tests\n");CCHKERRQ(comm,ierr);
-      tv->Eval(dummy,m,0.0,&f);
-      tv->TestFDGradient(comm,dummy,m,0.0,1.e-6,test_progress);
-      tv->TestFDHessian(comm,dummy,m,0.0);
-   }
+   RegularizedMultiSourceMisfit *robj = new RegularizedMultiSourceMisfit(obj,tv,drep,&pmap,tvopt);
 
    /* Test callbacks for full objective */
    if (test_misfit_reg[0])
@@ -1787,9 +1751,12 @@ int main(int argc, char *argv[])
       }
       if (!master) m.SetSize(0);
 
-      double f;
-      robj->ComputeObjective(m,&f);
-      PetscPrintf(PETSC_COMM_WORLD,"Regularized objective %g\n",f);
+      double f1,f2;
+      robj->ComputeObjective(m,&f1);
+      tv->SetScale(0.0);
+      robj->ComputeObjective(m,&f2);
+      PetscPrintf(PETSC_COMM_WORLD,"Regularized objective %g (LS %g, TV %g)\n",f1,f2,f1-f2);
+      tv->SetScale(tva);
    }
 
    /* Test callbacks for full objective gradient */
@@ -1803,8 +1770,31 @@ int main(int argc, char *argv[])
       }
       if (!master) m.SetSize(0);
 
-      Vector y(m.Size());
+      Vector y(m.Size()),y2(m.Size());
       robj->Mult(m,y);
+      double f,f1,f2;
+      f = std::sqrt(InnerProduct(PETSC_COMM_WORLD,y,y));
+      tv->SetScale(0.0);
+      robj->Mult(m,y2);
+      y -= y2;
+      f1 = std::sqrt(InnerProduct(PETSC_COMM_WORLD,y2,y2));
+      f2 = std::sqrt(InnerProduct(PETSC_COMM_WORLD,y,y));
+      PetscPrintf(PETSC_COMM_WORLD,"Regularized gradient norm %g (LS %g, TV %g)\n",f,f1,f2);
+      tv->SetScale(tva);
+   }
+
+   /* Taylor test */
+   if (test_misfit_reg[2])
+   {
+      Vector m(muv_exact.Size());
+      if (!test_null) robj->ComputeGuess(m);
+      else
+      {
+         pmap.InverseMap(muv_exact,m);
+      }
+      if (!master) m.SetSize(0);
+      tv->UpdateDual(m);
+      robj->TestTaylor(PETSC_COMM_WORLD,m,true);
    }
 
 
@@ -2002,13 +1992,8 @@ int main(int argc, char *argv[])
             /* new replicator */
             delete drep;
             drep = new DataReplicator(PETSC_COMM_WORLD, rpmesh ? nrep : 1, contig);
-            // ZZZ
-            //delete tk;
-            //delete M;
-            //tk = new TikhonovRegularizer(mu_inv_pd);
-            //M = new PetscParMatrix(PETSC_COMM_WORLD,tk->GetHessianOperator_MM(),Operator::PETSC_MATAIJ);
             delete robj;
-            robj = new RegularizedMultiSourceMisfit(obj,tv,drep,&pmap,tvopt,M);
+            robj = new RegularizedMultiSourceMisfit(obj,tv,drep,&pmap,tvopt);
          }
       }
       if (save)
@@ -2085,10 +2070,6 @@ int main(int argc, char *argv[])
          delete U;
       }
    }
-
-   /* ZZZ */
-   delete M;
-   delete tk;
 
    if (rpmesh) pmesh = NULL;
    delete rpmesh;

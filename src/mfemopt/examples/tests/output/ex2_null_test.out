@@ -21,14 +21,15 @@ ReducedFunctional::TestFDGradient, delta: 1e-08
 ||g|| = 2.0637e-12, ||g_fd|| = 2.18127e-12, ||g - g_fd|| = 1.17585e-13, ||g-g_fd||/||g_fd|| = 0.0539064, cos() = 1.
 ReducedFunctional::TestFDHessian
 ||H||_inf = 6.60925, ||H_fd||_inf = 6.61478, ||H - H_fd||_inf = 0.00553663, ||H-H_fd||_inf/||H_fd||_inf = 0.000837009
----------------------------------------
-TV tests
-ObjectiveFunction::TestFDGradient, delta: 1e-06
--> hang tight while computing design gradient
-||g|| = 0., ||g_fd|| = 0., ||g - g_fd|| = 0., ||g-g_fd||/||g_fd|| = nan., cos() = nan.
-ObjectiveFunction::TestFDHessian design x design
-||H||_inf = 0., ||H_fd||_inf = 0., ||H - H_fd||_inf = 0., ||H-H_fd||_inf/||H_fd||_inf = nan.
-Regularized objective 1.48861e-23
+Regularized objective 1.48861e-23 (LS 1.48861e-23, TV 0.)
+Regularized gradient norm 2.0637e-12 (LS 2.0637e-12, TV 0.)
+-------------------------- ReducedFunctional::TestTaylor ---------------------------
+		Gradient				Hessian
+--------------------------------------------------------------------------
+0.0430547	0.00000 	0	0.00330403	0.00000 	0
+0.0111776	1.94556 	2	0.000412064	3.00329 	3
+0.00284741	1.97289 	2	5.00090e-05	3.04261 	3
+0.000718557	1.98647 	2	5.79716e-06	3.10877 	3
 =======================================
 NC 0 -> Number of dofs 11
 Initial objective 1.48861e-23 (LS 1.48861e-23, TV 0.)

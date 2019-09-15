@@ -20,13 +20,6 @@ PDOperator::TestFDGradient wrt design
 ||G|| = 0.860933, ||G^T|| = 1.21997, ||G - (G^T)^T||/||G|| = 9.67168e-17, ||G_fd|| = 0.860933, ||G_fd - G|| = 2.68188e-08
 ---------------------------------------
 Misfit objective 3.42603e-05
----------------------------------------
-TV tests
-ObjectiveFunction::TestFDGradient, delta: 1e-06
--> hang tight while computing design gradient
-||g|| = 0., ||g_fd|| = 0., ||g - g_fd|| = 0., ||g-g_fd||/||g_fd|| = nan., cos() = nan.
-ObjectiveFunction::TestFDHessian design x design
-||H||_inf = 5.33333e-09, ||H_fd||_inf = 5.33333e-09, ||H - H_fd||_inf = 8.27181e-25, ||H-H_fd||_inf/||H_fd||_inf = 1.55096e-16
 =======================================
 NC 0 -> Number of dofs 20
 Initial objective 3.42873e-05 (LS 3.42603e-05, TV 2.7e-08)
