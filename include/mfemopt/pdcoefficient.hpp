@@ -31,6 +31,7 @@ private:
    mfem::Coefficient*       s_coeff;
    mfem::MatrixCoefficient* m_coeff;
 
+   mfem::Array<PetscInt> local_cols;
    mfem::Array<PetscInt> global_cols;
 
    mfem::Array<bool>   pcoeffexcl;
@@ -102,6 +103,7 @@ public:
    mfem::Array<mfem::ParGridFunction*>& GetCoeffs() { return pcoeffgf; }
    mfem::Array<mfem::ParGridFunction*>& GetDerivCoeffs() { return deriv_work_coeffgf; }
    mfem::Array<mfem::ParGridFunction*>& GetGradCoeffs() { return pgradgf; }
+   mfem::Array<PetscInt>& GetLocalCols() { return local_cols; }
    mfem::Array<PetscInt>& GetGlobalCols() { return global_cols; }
    mfem::PetscParMatrix* GetP() { return P; }
    mfem::Array<bool>& GetExcludedElements() { return pcoeffexcl; }
