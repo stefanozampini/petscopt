@@ -51,6 +51,7 @@ void PDCoefficient::Reset()
    deriv_coeffgf.SetSize(0);
    deriv_work_coeffgf.SetSize(0);
    pcoeffv0.SetSize(0);
+   local_cols.SetSize(0);
    global_cols.SetSize(0);
    delete pfes;
    lsize = 0;
@@ -312,9 +313,11 @@ void PDCoefficient::SetUpOperators()
       P = new PetscParMatrix(pfes->Dof_TrueDof_Matrix(),Operator::PETSC_MATAIJ);
       R = new PetscParMatrix(PETSC_COMM_SELF,pfes->GetRestrictionMatrix());
       PetscInt cst = P->GetColStart();
+      local_cols.SetSize(P->Width());
       global_cols.SetSize(P->Width());
       for (int i = 0; i < P->Width(); i++)
       {
+         local_cols[i] = i;
          global_cols[i] = i + cst;
       }
       pcoeffiniti.SetSize(0);
@@ -388,7 +391,7 @@ void PDCoefficient::SetUpOperators()
       /* compute dof_truedof and restriction on active dofs */
       PetscParMatrix *PT = new PetscParMatrix(pfes->Dof_TrueDof_Matrix(),Operator::PETSC_MATAIJ);
 
-      Array<PetscInt> local_cols;
+      local_cols.SetSize(0);
       local_cols.Reserve(PT->Width());
 
       global_cols.SetSize(0);
