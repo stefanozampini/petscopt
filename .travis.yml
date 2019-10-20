@@ -29,7 +29,7 @@ env:
     - CPPFLAGS='-Wno-unused-command-line-argument'
     - PETSC_COMMIT=
     #- MFEM_COMMIT=v4.0
-    - MFEM_COMMIT=b25280d
+    - MFEM_COMMIT=9f90d5b
 
   matrix:
 
