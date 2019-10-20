@@ -22,6 +22,7 @@ void PDCoefficient::Reset()
    pwork.SetSize(0);
    delete P;
    delete R;
+   delete trueTransfer;
    delete s_coeff;
    delete m_coeff;
    delete deriv_s_coeff;
@@ -77,6 +78,7 @@ void PDCoefficient::Init()
    R = NULL;
    pfes = NULL;
    l2gf = NULL;
+   trueTransfer = NULL;
 }
 
 PDCoefficient::PDCoefficient()
@@ -182,6 +184,9 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
    else mfem_error("Unhandled case");
 
    pfes = new ParFiniteElementSpace(mesh,fec,1,Ordering::byVDIM);
+   { /* only relevant for refinement operations */
+      pfes->SetUpdateOperatorType(Operator::MFEM_SPARSEMAT);
+   }
 
    /* store values of projected initial coefficients
       and create actual coefficients to be used */
@@ -300,6 +305,8 @@ void PDCoefficient::SetUpOperators()
    MFEM_VERIFY(pfes,"Missing ParFiniteElementSpace()!");
    delete P;
    delete R;
+   delete trueTransfer;
+   trueTransfer = NULL;
 
    /* mask for elements that are active in the integration of forms for state variables */
    sforminteg.SetSize(pcoeffexcl.Size());
@@ -311,7 +318,7 @@ void PDCoefficient::SetUpOperators()
       sforminteg = true;
 
       P = new PetscParMatrix(pfes->Dof_TrueDof_Matrix(),Operator::PETSC_MATAIJ);
-      R = new PetscParMatrix(PETSC_COMM_SELF,pfes->GetRestrictionMatrix());
+      R = new PetscParMatrix(pfes->GetParMesh()->GetComm(),pfes->GetRestrictionMatrix(),Operator::PETSC_MATAIJ);
       PetscInt cst = P->GetColStart();
       local_cols.SetSize(P->Width());
       global_cols.SetSize(P->Width());
@@ -470,12 +477,8 @@ void PDCoefficient::SetUpOperators()
       P = new PetscParMatrix(*PT,rows,global_cols);
       delete PT;
 
-      for (int i = 0; i < rows.Size(); i++)
-      {
-         rows[i] = i;
-      }
-      PT = new PetscParMatrix(pfes->GetRestrictionMatrix());
-      R = new PetscParMatrix(*PT,local_cols,rows);
+      PT = new PetscParMatrix(pfes->GetParMesh()->GetComm(),pfes->GetRestrictionMatrix(),Operator::PETSC_MATAIJ);
+      R = new PetscParMatrix(*PT,global_cols,rows);
       delete PT;
 
       /* store true- and v- dofs for excluded regions */
@@ -708,7 +711,7 @@ void PDCoefficient::GetCurrentVector(Vector& m)
    MFEM_VERIFY(!usederiv,"This should not happen");
    MFEM_VERIFY(m.Size() == lsize,"Invalid Vector size " << m.Size() << "!. Should be " << lsize);
    double *data = m.GetData();
-   int n = P->Width();
+   int n = R->Height();
    for (int i=0; i<pcoeffgf.Size(); i++)
    {
       Vector pmi(data,n);
@@ -832,11 +835,17 @@ void PDCoefficient::UpdateExcl()
    }
 }
 
-void PDCoefficient::Update()
+void PDCoefficient::Update(bool want_true)
 {
    long fseq = pfes->GetSequence();
-   pfes->Update();
+   pfes->Update(true);
    if (fseq == pfes->GetSequence()) return;
+
+   PetscParMatrix *oP = NULL;
+   if (want_true) /* save previous dof_truedof */
+   {
+      oP = new PetscParMatrix(P,Operator::ANY_TYPE);
+   }
 
    /* Update excluded regions */
    UpdateExcl();
@@ -878,8 +887,17 @@ void PDCoefficient::Update()
       *deriv_work_coeffgf[i] = 0.0;
    }
 
-   /* SetUp operators and conforming dofs. For excl regions, also the fixed values */
+   /* SetUp operators and conforming dofs. For excl regions, also the fixed values
+      Deletes any previous P,R and trueTransfer set */
    SetUpOperators();
+
+   /* transfer operator for true data as triple matrix product (R * gftransfer * P) */
+   if (want_true)
+   {
+      PetscParMatrix pT(pfes->GetParMesh()->GetComm(),pfes->GetUpdateOperator(),Operator::PETSC_MATAIJ);
+      trueTransfer = mfem::TripleMatrixProduct(R,&pT,oP);
+   }
+   delete oP;
 
    /* No need to update s_coeff, m_coeff, deriv_s_coeff, deriv_m_coeff */
 }
