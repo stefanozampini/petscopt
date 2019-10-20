@@ -7,7 +7,7 @@ namespace mfemopt
 {
 using namespace mfem;
 
-ReplicatedParMesh::ReplicatedParMesh(MPI_Comm comm, Mesh &mesh, int nrep, bool contig)
+ReplicatedParMesh::ReplicatedParMesh(MPI_Comm comm, Mesh &mesh, int nrep, bool contig, int **part)
 {
    PetscErrorCode ierr;
    PetscSubcomm   subcomm;
@@ -43,7 +43,8 @@ ReplicatedParMesh::ReplicatedParMesh(MPI_Comm comm, Mesh &mesh, int nrep, bool c
    if (!contig) for (int i = 0; i < mesh.GetNE(); i++) child_part[i] *= nrep;
    parent_mesh = new ParMesh(parent_comm, mesh, child_part, 1);
 
-   delete [] child_part;
+   if (part) *part = child_part;
+   else delete [] child_part;
    ierr = PetscSubcommDestroy(&subcomm); CCHKERRQ(comm,ierr);
 }
 
