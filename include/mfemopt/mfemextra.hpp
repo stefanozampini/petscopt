@@ -31,7 +31,7 @@ private:
    mfem::ParMesh *child_mesh;
 
 public:
-   ReplicatedParMesh(MPI_Comm,mfem::Mesh&,int,bool=true);
+   ReplicatedParMesh(MPI_Comm,mfem::Mesh&,int,bool=true,int** =NULL);
    inline mfem::ParMesh* GetChild() { return child_mesh; }
    inline mfem::ParMesh* GetParent() { return parent_mesh; }
    inline int GetColor() { return color; }
