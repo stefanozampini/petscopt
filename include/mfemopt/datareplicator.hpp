@@ -30,6 +30,9 @@ public:
    DataReplicator(MPI_Comm,int,bool=true);
    inline int GetColor() { return color; }
    bool IsMaster() { return color ? false : true; }
+   MPI_Comm GetParentComm() { return parent_comm; }
+   MPI_Comm GetChildComm() { return child_comm; }
+   MPI_Comm GetRedComm() { return red_comm; }
 
    void Broadcast(const std::string&,int,const void*,int,void*,MPI_Datatype);
    void Broadcast(const std::string&,const mfem::Array<bool>&,mfem::Array<bool>&);
