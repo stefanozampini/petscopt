@@ -476,7 +476,6 @@ void PDCoefficient::SetUpOperators()
       }
       P = new PetscParMatrix(*PT,rows,global_cols);
       delete PT;
-
       PT = new PetscParMatrix(pfes->GetParMesh()->GetComm(),pfes->GetRestrictionMatrix(),Operator::PETSC_MATAIJ);
       R = new PetscParMatrix(*PT,global_cols,rows);
       delete PT;
@@ -489,7 +488,7 @@ void PDCoefficient::SetUpOperators()
       for (int g = 0; g < pcoeffgf.Size(); g++)
       {
          /* vdofs */
-         Vector& vgf = (*pcoeffgf)[g];
+         Vector& vgf = *(pcoeffgf[g]);
          const int stgf = g*pcoeffiniti.Size();
          for (int i = 0; i < pcoeffiniti.Size(); i++)
          {
@@ -497,7 +496,7 @@ void PDCoefficient::SetUpOperators()
          }
 
          /* tdofs */
-         Vector& v0 = (*pcoeffv0)[g];
+         Vector& v0 = *(pcoeffv0[g]);
          const int st0 = g*piniti.Size();
          for (int i = 0; i < piniti.Size(); i++)
          {
@@ -747,9 +746,10 @@ void PDCoefficient::Distribute(const Vector& m, Array<ParGridFunction*>& agf)
    MFEM_VERIFY(m.Size() == lsize,"Invalid Vector size " << m.Size() << "!. Should be " << lsize);
    for (int i = 0; i < agf.Size(); i++)
    {
+      pwork = 0.0;
       const int st1 = i*piniti.Size();
       for (int j = 0; j < piniti.Size(); j++) pwork[piniti[j]] = usederiv ? 0.0 : pinitv[st1 + j];
-      const int st2 = i*pwork.Size();
+      const int st2 = i*pactii.Size();
       for (int j = 0; j < pactii.Size(); j++) pwork[pactii[j]] = m[st2 + j];
       agf[i]->Distribute(pwork);
    }
