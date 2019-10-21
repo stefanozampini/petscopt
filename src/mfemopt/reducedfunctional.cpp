@@ -199,6 +199,7 @@ void ReducedFunctional::TestTaylor(MPI_Comm comm, const Vector& mIn, const Vecto
 
       tG[i] = std::abs(hobj-obj-h*v1);
 
+      tH[i] = 0.0;
       if (testhess)
       {
          tH[i] = std::abs(hobj-obj-h*v1-h*h*v2/2.);
