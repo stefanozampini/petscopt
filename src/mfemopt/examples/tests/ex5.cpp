@@ -59,11 +59,13 @@ class PizzaBoxMesh : public Mesh
 private:
    int _rx,_ry,_rz;
    double _sx0,_sy0,_sz0;
+   double _h;
    Array<int> _refs;
 
 public:
    PizzaBoxMesh(int,int,int,double,double,double,int,int,int,double,double* =NULL,double* =NULL);
    int GetAnisoRefines();
+   double GetSeismicH() { return _h; }
    Array<int>& GetAnisoRefinements() { return _refs; }
    ~PizzaBoxMesh();
 };
@@ -77,9 +79,10 @@ PizzaBoxMesh::PizzaBoxMesh(int rx,int ry,int rz,double sx0,double sy0,double sz0
    _sx0 = sx0;
    _sy0 = sy0;
    _sz0 = sz0;
-   double hx = h * std::pow(2,_rx);
-   double hy = h * std::pow(2,_ry);
-   double hz = h * std::pow(2,_rz);
+   _h = h;
+   double hx = _h * std::pow(2,_rx);
+   double hy = _h * std::pow(2,_ry);
+   double hz = _h * std::pow(2,_rz);
 
    int NVert, NElem, NBdrElem;
 
@@ -237,7 +240,7 @@ PizzaBoxMesh::PizzaBoxMesh(int rx,int ry,int rz,double sx0,double sy0,double sz0
    FinalizeTopology();
    EnsureNCMesh();
 
-   // array containing a sequence of anisotropic refinements to reach the hx = hy = hz limit the seismic code desires
+   // array containing a sequence of anisotropic refinements to reach the _h = hx = hy = hz limit the seismic code desires
    int maxr = _rx > _ry ? _rx : _ry;
    maxr = maxr > _rz ? maxr : _rz;
    _refs.Reserve(maxr);
@@ -664,7 +667,7 @@ void OptHandler::SetUpEM(MPI_Group group, int nrep, int nref)
    ls[1] = anel;
    ls[2] = nel;
    MPI_Allreduce(&ls,&gs,3,MPIU_INT,MPI_SUM,_worldcomm);
-   PetscPrintf(_worldcomm,"Number of mapped optimization dofs %D for EM, active elements %D, total elements %D\n",gs[0],gs[1],gs[2]);
+   PetscPrintf(_worldcomm,"Number of mapped optimization dofs for EM %D, active elements %D, total elements %D\n",gs[0],gs[1],gs[2]);
 
 #if DUMP_DEBUG
    {
@@ -696,6 +699,7 @@ void OptHandler::SetUpSeismic(MPI_Group group, int nref)
 {
    MPI_Comm_create(_worldcomm,group,&_secomm);
 
+   double finalh = _optmesh->GetSeismicH();
    ParMesh *roptmesh = NULL;
    PDCoefficient *_sepd = NULL;
    if (_secomm != MPI_COMM_NULL)
@@ -741,6 +745,7 @@ void OptHandler::SetUpSeismic(MPI_Group group, int nref)
          else
          {
             roptmesh->UniformRefinement();
+            finalh /= 2.;
          }
          _sepd->Update(true);
          if (!i)
@@ -759,9 +764,122 @@ void OptHandler::SetUpSeismic(MPI_Group group, int nref)
       {
          _setrans = ParMult(_sepd->GetR(),_sepd->GetP());
       }
+
       Array<bool> exel = _sepd->GetExcludedElements();
       nel = exel.Size();
       for (int i = 0; i < exel.Size(); i++) if (exel[i]) nel--;
+
+      /* lexicographic reordering */
+      {
+         Array<ParGridFunction*>& pgf = _sepd->GetCoeffs();
+         ParMesh *pmesh = pgf[0]->ParFESpace()->GetParMesh();
+
+         // coords
+         ParGridFunction x_coord(pgf[0]->ParFESpace());
+         ParGridFunction y_coord(pgf[0]->ParFESpace());
+         ParGridFunction z_coord(pgf[0]->ParFESpace());
+         double *coord;
+         for (int i = 0; i < pmesh->GetNV(); i++)
+         {
+            coord = pmesh->GetVertex(i);
+            x_coord(i) = coord[0];
+            y_coord(i) = coord[1];
+            z_coord(i) = coord[2];
+         }
+
+         // project on active dofs only
+         PetscParMatrix *R = _sepd->GetR();
+         Vector ax(R->Height());
+         Vector ay(R->Height());
+         Vector az(R->Height());
+         R->Mult(x_coord,ax);
+         R->Mult(y_coord,ay);
+         R->Mult(z_coord,az);
+
+         // bounding box
+         double bb_ll[3] = {PETSC_MAX_REAL,PETSC_MAX_REAL,PETSC_MAX_REAL};
+         double bb_ur[3] = {PETSC_MIN_REAL,PETSC_MIN_REAL,PETSC_MIN_REAL};
+         for (int i = 0; i < R->Height(); i++)
+         {
+            if (ax[i] < bb_ll[0]) bb_ll[0] = ax[i];
+            if (ax[i] > bb_ur[0]) bb_ur[0] = ax[i];
+            if (ay[i] < bb_ll[1]) bb_ll[1] = ay[i];
+            if (ay[i] > bb_ur[1]) bb_ur[1] = ay[i];
+            if (az[i] < bb_ll[2]) bb_ll[2] = az[i];
+            if (az[i] > bb_ur[2]) bb_ur[2] = az[i];
+         }
+
+         int nx = (bb_ur[0] - bb_ll[0])/finalh + 1;
+         int ny = (bb_ur[1] - bb_ll[1])/finalh + 1;
+         int nz = (bb_ur[2] - bb_ll[2])/finalh + 1;
+         //printf("LL %g %g %g, UR %g %g %g, N %d %d %d (%g)\n",bb_ll[0],bb_ll[1],bb_ll[2],bb_ur[0],bb_ur[1],bb_ur[2],nx,ny,nz,finalh);
+         ax -= bb_ll[0];
+         ay -= bb_ll[1];
+         az -= bb_ll[2];
+
+         ax /= bb_ur[0] - bb_ll[0];
+         ay /= bb_ur[1] - bb_ll[1];
+         az /= bb_ur[2] - bb_ll[2];
+
+         ax *= nx-1;
+         ay *= ny-1;
+         az *= nz-1;
+         Array<PetscInt> ind2lex(R->Height()),lex2ind(R->Height());
+         for (int i = 0; i < R->Height(); i++)
+         {
+            // Z fastest (top to bottom) - x (left to right) - y slowest (left to right)
+            //ind2lex[i] =  ay[i]*nx*nz + ax[i]*nz + (nz - 1 - az[i]);
+            // Z fastest (top to bottom) - y (left to right) - x slowest (left to right)
+            ind2lex[i] =  ax[i]*ny*nz + ay[i]*nz + (nz - 1 - az[i]);
+            lex2ind[ind2lex[i]] = i;
+         }
+
+         Array<PetscInt> identity(_setrans->Width());
+         for (int i = 0; i < _setrans->Width(); i++) identity[i] = i;
+         PetscParMatrix *t = new PetscParMatrix(*_setrans,lex2ind,identity);
+         delete _setrans;
+         _setrans = t;
+
+         ax = PETSC_MIN_REAL;
+         ay = PETSC_MIN_REAL;
+         az = PETSC_MIN_REAL;
+         for (int xx = 0; xx < nx; xx++)
+         {
+            for (int yy = 0; yy < ny; yy++)
+            {
+               for (int zz = 0; zz < nz; zz++)
+               {
+                  int ii = xx*ny*nz + yy*nz + zz;
+                  ax[lex2ind[ii]] = xx*(bb_ur[0]-bb_ll[0])/(nx-1.) + bb_ll[0];
+                  ay[lex2ind[ii]] = yy*(bb_ur[1]-bb_ll[1])/(ny-1.) + bb_ll[1];
+                  az[lex2ind[ii]] = zz*(bb_ur[2]-bb_ll[2])/(nz-1.) + bb_ll[2];
+               }
+            }
+         }
+         Array<ParGridFunction*> fake(1);
+         fake[0] = &x_coord;
+         _sepd->Distribute(ax,fake);
+         fake[0] = &y_coord;
+         _sepd->Distribute(ay,fake);
+         fake[0] = &z_coord;
+         _sepd->Distribute(az,fake);
+         {
+            std::ofstream mesh_ofs("testmesh");
+            mesh_ofs.precision(8);
+            pmesh->Print(mesh_ofs);
+
+            std::ofstream xofs("xcoord");
+            xofs.precision(8);
+            x_coord.Save(xofs);
+            std::ofstream yofs("ycoord");
+            yofs.precision(8);
+            y_coord.Save(yofs);
+            std::ofstream zofs("zcoord");
+            zofs.precision(8);
+            z_coord.Save(zofs);
+         }
+
+      }
    }
    if (_secomm != MPI_COMM_NULL)
    {
