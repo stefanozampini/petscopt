@@ -107,6 +107,7 @@ public:
    mfem::Array<PetscInt>& GetLocalCols() { return local_cols; }
    mfem::Array<PetscInt>& GetGlobalCols() { return global_cols; }
    mfem::PetscParMatrix* GetP() { return P; }
+   mfem::PetscParMatrix* GetR() { return R; }
    mfem::PetscParMatrix* GetTrueTransferOperator() { return trueTransfer; }
    mfem::Array<bool>& GetExcludedElements() { return pcoeffexcl; }
    mfem::Array<bool>& GetActiveElements() { return sforminteg; }
