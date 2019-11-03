@@ -515,7 +515,7 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
      {
         HypreBoomerAMG *t = new HypreBoomerAMG(*hA);
         t->SetPrintLevel(0);
-        solver = t;
+        solver = new SymmetricSolver(t,true);
      }
      else
      {
@@ -523,13 +523,13 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
         {
            HypreADS *t = new HypreADS(*hA,pde.fes);
            t->SetPrintLevel(0);
-           solver = t;
+           solver = new SymmetricSolver(t,true);
         }
         else
         {
            HypreAMS *t = new HypreAMS(*hA,pde.fes);
            t->SetPrintLevel(0);
-           solver = t;
+           solver = new SymmetricSolver(t,true);
         }
      }
   }
@@ -543,7 +543,7 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
      {
         HypreBoomerAMG *t = new HypreBoomerAMG(*ohA);
         t->SetPrintLevel(0);
-        solver = t;
+        solver = new SymmetricSolver(t,true);
      }
      else
      {
@@ -551,13 +551,13 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
         {
            HypreADS *t = new HypreADS(*ohA,pde.fes);
            t->SetPrintLevel(0);
-           solver = t;
+           solver = new SymmetricSolver(t,true);
         }
         else
         {
            HypreAMS *t = new HypreAMS(*ohA,pde.fes);
            t->SetPrintLevel(0);
-           solver = t;
+           solver = new SymmetricSolver(t,true);
         }
      }
   }
@@ -589,13 +589,13 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
         {
            HypreADS *t = new HypreADS(*hA,pde.fes);
            t->SetPrintLevel(0);
-           solver = t;
+           solver = new SymmetricSolver(t,true);
         }
         else
         {
            HypreAMS *t = new HypreAMS(*hA,pde.fes);
            t->SetPrintLevel(0);
-           solver = t;
+           solver = new SymmetricSolver(t,true);
         }
 #else
         solver = new PetscPreconditioner(*pA);

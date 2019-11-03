@@ -107,6 +107,19 @@ public:
    virtual ~DiagonalMatrixCoefficient();
 };
 
+class SymmetricSolver : public mfem::Solver
+{
+private:
+   mfem::Solver *isolver;
+   bool own;
+public:
+   SymmetricSolver(mfem::Solver*,bool);
+   virtual void SetOperator(const mfem::Operator &op);
+   virtual void Mult(const mfem::Vector&,mfem::Vector&) const;
+   virtual void MultTranspose(const mfem::Vector&,mfem::Vector&) const;
+   virtual ~SymmetricSolver();
+};
+
 }
 #endif
 

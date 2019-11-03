@@ -281,4 +281,26 @@ DiagonalMatrixCoefficient::~DiagonalMatrixCoefficient()
   if (own) delete VQ;
 }
 
+SymmetricSolver::SymmetricSolver(Solver *solver, bool owner) : isolver(solver), own(owner) {}
+
+void SymmetricSolver::SetOperator(const Operator &op)
+{
+  isolver->SetOperator(op);
+}
+
+void SymmetricSolver::Mult(const Vector &b, Vector& x) const
+{
+  isolver->Mult(b,x);
+}
+
+void SymmetricSolver::MultTranspose(const Vector &b, Vector& x) const
+{
+  isolver->Mult(b,x);
+}
+
+SymmetricSolver::~SymmetricSolver()
+{
+  if (own) delete isolver;
+}
+
 }
