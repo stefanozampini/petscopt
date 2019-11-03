@@ -38,10 +38,16 @@ PetscPreconditionerFactory* ModelHeat::GetPreconditionerFactory()
 {
    if (!pfactory)
    {
-      pfactory = new PreconditionerFactory(*this,"heat model preconditioner factory");
+      pfactory = (*this).NewPreconditionerFactory();
    }
    return pfactory;
 }
+
+PetscPreconditionerFactory* ModelHeat::NewPreconditionerFactory()
+{
+   return new PreconditionerFactory(*this,"heat model preconditioner factory");
+}
+
 
 void ModelHeat::InitForms(Coefficient* mu, MatrixCoefficient* sigma)
 {
