@@ -1,4 +1,6 @@
 #include <mfemopt/receiver.hpp>
+#include <mfemopt/private/mfemoptpetscmacros.h>
+#include <petsc/private/tsimpl.h>
 #include <sstream>
 #include <algorithm>
 #include <limits>
@@ -7,16 +9,24 @@ namespace mfemopt
 {
 using namespace mfem;
 
+void Receiver::Init()
+{
+   W = NULL;
+   ts = NULL;
+}
+
 Receiver::Receiver() : center(), idata(), idata_isfinalized(false) { }
 
 Receiver::Receiver(double _x) : center(), idata(), idata_isfinalized(false)
 {
+   Init();
    center.SetSize(1);
    center[0] = _x;
 }
 
 Receiver::Receiver(double _x, double _y) : center(), idata(), idata_isfinalized(false)
 {
+   Init();
    center.SetSize(2);
    center[0] = _x;
    center[1] = _y;
@@ -24,6 +34,7 @@ Receiver::Receiver(double _x, double _y) : center(), idata(), idata_isfinalized(
 
 Receiver::Receiver(double _x, double _y, double _z) : center(), idata(), idata_isfinalized(false)
 {
+   Init();
    center.SetSize(3);
    center[0] = _x;
    center[1] = _y;
@@ -32,16 +43,19 @@ Receiver::Receiver(double _x, double _y, double _z) : center(), idata(), idata_i
 
 Receiver::Receiver(const std::string& filename) : center(), idata(), idata_isfinalized(false)
 {
+   Init();
    Load(filename);
 }
 
 Receiver::Receiver(const Vector& _center, const std::vector<double> & T, const std::vector<double> & X, const std::vector<double> & Y, const std::vector<double> & Z) :
           center(), idata(), idata_isfinalized(false)
 {
+   Init();
    MFEM_ASSERT(X.size() && T.size() <= X.size(),"X data insufficient");
    MFEM_ASSERT(!Y.size() || T.size() <= Y.size(),"Y data insufficient");
    MFEM_ASSERT(!Z.size() || T.size() <= Z.size(),"Z data insufficient");
    center = _center;
+
    // Time history
    idata.reserve(T.size());
    for (unsigned int i = 0; i < T.size(); i++)
@@ -54,6 +68,45 @@ Receiver::Receiver(const Vector& _center, const std::vector<double> & T, const s
       idata.push_back(sig);
    }
    FinalizeIData();
+
+   SetUpData();
+}
+
+void Receiver::SetUpData()
+{
+   PetscErrorCode ierr;
+   TSTrajectory tj;
+
+   ierr = VecDestroy(&W);CCHKERRQ(PETSC_COMM_SELF,ierr);
+   ierr = TSDestroy(&ts);CCHKERRQ(PETSC_COMM_SELF,ierr);
+
+   if (!idata.size()) return;
+
+   ierr = VecCreateSeq(PETSC_COMM_SELF,3,&W);CCHKERRQ(PETSC_COMM_SELF,ierr);
+   ierr = TSCreate(PETSC_COMM_SELF,&ts);CCHKERRQ(PETSC_COMM_SELF,ierr);
+   ierr = TSSetSolution(ts,W);CCHKERRQ(PETSC_COMM_SELF,ierr);
+   ierr = TSSetMaxSteps(ts,idata.size());CCHKERRQ(PETSC_COMM_SELF,ierr);
+   ierr = TSSetSaveTrajectory(ts);CCHKERRQ(PETSC_COMM_SELF,ierr);
+   ierr = TSGetTrajectory(ts,&tj);CCHKERRQ(PETSC_COMM_SELF,ierr);
+   ierr = PetscObjectSetOptionsPrefix((PetscObject)tj,"receiver_");CCHKERRQ(PETSC_COMM_SELF,ierr);
+   ierr = TSTrajectorySetType(tj,ts,TSTRAJECTORYMEMORY);CCHKERRQ(PETSC_COMM_SELF,ierr);
+   ierr = TSTrajectorySetFromOptions(tj,ts);CCHKERRQ(PETSC_COMM_SELF,ierr);
+   ierr = TSTrajectorySetSolutionOnly(tj,PETSC_TRUE);CCHKERRQ(PETSC_COMM_SELF,ierr);
+   tj->adjoint_solve_mode = PETSC_FALSE;
+   ierr = TSTrajectorySetUp(tj,ts);CCHKERRQ(PETSC_COMM_SELF,ierr);
+
+   /* populate trajectory */
+   for (unsigned int i = 0; i < idata.size(); i++) {
+     PetscScalar *w;
+
+     ierr = VecGetArray(W,&w);CCHKERRQ(PETSC_COMM_SELF,ierr);
+     w[0] = idata[i].v_x;
+     w[1] = idata[i].v_y;
+     w[2] = idata[i].v_z;
+     ierr = VecRestoreArray(W,&w);CCHKERRQ(PETSC_COMM_SELF,ierr);
+     ierr = TSSetStepNumber(ts,i);CCHKERRQ(PETSC_COMM_SELF,ierr);
+     ierr = TSTrajectorySet(tj,ts,i,idata[i].t,W);CCHKERRQ(PETSC_COMM_SELF,ierr);
+   }
 }
 
 void Receiver::FinalizeIData()
@@ -70,60 +123,19 @@ void Receiver::GetIData(double time, Vector& vals)
       vals = 0.0;
       return;
    }
-   signal_data data;
-   data.t = time;
-   InterpolateLinear(data);
-   switch (vals.Size())
-   {
-      case 3:
-         vals[2] = data.v_z;
-      case 2:
-         vals[1] = data.v_y;
-      case 1:
-         vals[0] = data.v_x;
-         break;
-      default:
-         MFEM_ABORT("Invalid dimension " << vals.Size());
-         break;
-   }
-}
+   PetscErrorCode ierr;
 
-// interpolates input data at a given time stored in interp.t by using a binary_search
-// results are placed in interp.v_x, interp.v_y and interp.v_z
-void Receiver::InterpolateLinear(struct signal_data& interp)
-{
-  interp.v_x = interp.v_y = interp.v_z = std::numeric_limits<double>::min();
-  double lx,ly,lz;
-  double ux,uy,uz;
-  double t0,t1,t = interp.t,tt;
-  std::vector<struct signal_data>::iterator it1,it2,lb;
+   TSTrajectory tj;
+   ierr = TSGetTrajectory(ts,&tj);CCHKERRQ(PETSC_COMM_SELF,ierr);
 
-  MFEM_VERIFY(idata.size(),"Missing input data");
-  MFEM_VERIFY(idata_isfinalized,"Input data not sorted!");
-  /* XXX */ MFEM_VERIFY(interp.t >= idata[0].t,"Cannot extrapolate input data! " << interp.t << " < " << idata[0].t);
-  if (interp.t < idata[0].t)
-  {
-     MFEM_WARNING("Cannot extrapolate input data! " << interp.t << " < " << idata[0].t);
-     interp.t = idata[0].t;
-  }
-  it1 = idata.begin();
-  it2 = idata.end();
-  lb = std::lower_bound(it1,it2,interp,ltcompare);
-  /* XXX */ MFEM_VERIFY(lb != it2,"Cannot extrapolate! " << interp.t << " > " << (*(lb-1)).t);
-  if (lb == it2)
-  {
-     MFEM_WARNING("Cannot extrapolate! " << interp.t << " > " << (*(lb-1)).t);
-     lb--;
-  }
-  t1 = lb->t;
-  ux = lb->v_x;
-  uy = lb->v_y;
-  uz = lb->v_z;
-  if (lb == it1) {    /* t0 = t1; */ tt = 1.0;            lx = ux;      ly = uy;      lz = uz; }
-  else           { lb--; t0 = lb->t; tt = (t-t0)/(t1-t0); lx = lb->v_x; ly = lb->v_y; lz = lb->v_z; }
-  interp.v_x = lx * (1.0 - tt) + ux * tt;
-  interp.v_y = ly * (1.0 - tt) + uy * tt;
-  interp.v_z = lz * (1.0 - tt) + uz * tt;
+   PetscScalar ptime = time;
+   ierr = TSTrajectoryGetVecs(tj,ts,PETSC_DECIDE,&ptime,W,NULL);CCHKERRQ(PETSC_COMM_SELF,ierr);
+
+   vals = 0.0;
+   PetscScalar *w;
+   ierr = VecGetArray(W,&w);CCHKERRQ(PETSC_COMM_SELF,ierr);
+   for (int i = 0; i < std::min(vals.Size(),3); i++) vals[i] = w[i];
+   ierr = VecRestoreArray(W,&w);CCHKERRQ(PETSC_COMM_SELF,ierr);
 }
 
 void Receiver::Dump(const std::string& filename, bool binary)
@@ -164,6 +176,8 @@ void Receiver::Load(const std::string& filename, bool binary)
    MFEM_VERIFY(f.is_open(),"Error opening (r) " << filename);
 
    ASCIILoad(f);
+   FinalizeIData();
+   SetUpData();
 }
 
 void Receiver::ASCIILoad(std::istream& f)
@@ -190,7 +204,14 @@ void Receiver::ASCIILoad(std::istream& f)
       f >> sig.v_z;
       idata.push_back(sig);
    }
-   FinalizeIData();
+}
+
+Receiver::~Receiver()
+{
+   PetscErrorCode ierr;
+
+   ierr = VecDestroy(&W);CCHKERRQ(PETSC_COMM_SELF,ierr);
+   ierr = TSDestroy(&ts);CCHKERRQ(PETSC_COMM_SELF,ierr);
 }
 
 ReceiverMonitor::ReceiverMonitor(ParGridFunction* _u, const DenseMatrix& _points, const std::string& _filename) :
