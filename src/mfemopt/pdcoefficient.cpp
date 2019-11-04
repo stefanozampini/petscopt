@@ -806,6 +806,9 @@ void PDCoefficient::FillExcl()
 
 void PDCoefficient::UpdateExcl()
 {
+   ParMesh *mesh = pfes->GetParMesh();
+   pcoeffexcl.SetSize(mesh->GetNE());
+   pcoeffexcl = false;
    if (!l2gf) return;
 
    ParFiniteElementSpace *l2fes = l2gf->ParFESpace();
@@ -815,8 +818,6 @@ void PDCoefficient::UpdateExcl()
 
    l2gf->Update();
 
-   ParMesh *mesh = l2fes->GetParMesh();
-   pcoeffexcl.SetSize(mesh->GetNE());
    pcoeffexcl = true;
    Array<int> dofs;
    Vector     vals;
