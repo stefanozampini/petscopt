@@ -247,7 +247,7 @@ static PetscErrorCode AdjointTSOptionsHandler(PetscOptionItems *PetscOptionsObje
   TS             adjts = (TS)obj;
   AdjointCtx     *adj_ctx;
   PetscContainer container;
-  PetscBool      jcon,rksp;
+  PetscBool      jcon,rksp,dadj,flg;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -257,6 +257,8 @@ static PetscErrorCode AdjointTSOptionsHandler(PetscOptionItems *PetscOptionsObje
   ierr = PetscOptionsBool("-constjacobians","Whether or not the DAE Jacobians are constant",NULL,jcon,&jcon,NULL);CHKERRQ(ierr);
   rksp = PETSC_FALSE;
   ierr = PetscOptionsBool("-reuseksp","Reuse the KSP solver from the nonlinear model",NULL,rksp,&rksp,NULL);CHKERRQ(ierr);
+  dadj = PETSC_FALSE;
+  ierr = PetscOptionsBool("-dadj","Use a discrete adjoint",NULL,dadj,&dadj,&flg);CHKERRQ(ierr);
   ierr = PetscOptionsTail();CHKERRQ(ierr);
   ierr = PetscObjectQuery((PetscObject)adj_ctx->fwdts,"_ts_splitJac",(PetscObject*)&container);CHKERRQ(ierr);
   if (container) {
@@ -290,6 +292,17 @@ static PetscErrorCode AdjointTSOptionsHandler(PetscOptionItems *PetscOptionsObje
     ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
     ierr = TSGetSNES(adjts,&snes);CHKERRQ(ierr);
     ierr = SNESSetKSP(snes,ksp);CHKERRQ(ierr);
+  }
+
+  if (dadj) { /* discrete adjoint */
+    TSAdapt        adapt;
+    PetscErrorCode (*step)(TS);
+
+    ierr = PetscObjectQueryFunction((PetscObject)adj_ctx->fwdts,"AdjointTSStep_C",&step);CHKERRQ(ierr);
+    if (!step) SETERRQ1(PetscObjectComm((PetscObject)adj_ctx->fwdts),PETSC_ERR_SUP,"No discrete adjoint step for %s",((PetscObject)adj_ctx->fwdts)->type_name);
+    adjts->ops->step = step;
+    ierr = TSGetAdapt(adjts,&adapt);CHKERRQ(ierr);
+    ierr = TSAdaptSetType(adapt,TSADAPTHISTORY);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
 }
