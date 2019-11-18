@@ -9,6 +9,21 @@
 
 /* ------------------ Wrappers for quadrature evaluation ----------------------- */
 
+PetscErrorCode TSQuadratureRHS(TS qts, PetscReal t, Vec q, Vec F, void *ctx)
+{
+  Vec              U;
+  TSQuadratureCtx* q = (TSQuadratureCtx*)ctx;
+  PetscErrorCode   ierr;
+
+  PetscFunctionBegin;
+  if (!q->eval) SETERRQ(PetscObjectComm((PetscObject)qts),PETSC_ERR_PLIB,"Missing eval function");
+  /* Get the proper U  */
+  PetscStackPush("TS quadrature function");
+  ierr = (*q->eval)(U,time,F,q->eval_ctx);CHKERRQ(ierr);
+  PetscStackPop;
+  PetscFunctionReturn(0);
+}
+
 PetscErrorCode TSQuadratureCtxDestroy_Private(void *ptr)
 {
   TSQuadratureCtx* q = (TSQuadratureCtx*)ptr;
@@ -235,7 +250,23 @@ PetscErrorCode TSQuadraturePostStep_Private(TS ts)
   ierr = TSGetPrevTime(ts,&ptime);CHKERRQ(ierr);
   dt   = time - ptime;
 
-  /* scalar quadrature (psquad have been initialized with the first function evaluation) */
+  /* objective quadrature */
+  if (qeval_ctx->squadts) {
+    TS qts = qeval_ctx->squadts;
+
+    ierr = TSSetTime(qts,ptime);CHKERRQ(ierr);
+    ierr = TSSetTimeStep(qts,dt);CHKERRQ(ierr);
+    ierr = TSStep(qts);CHKERRQ(ierr);
+  }
+  /* vector (gradient or Hessian) quadrature */
+  if (qeval_ctx->vquadts) {
+    TS qts = qeval_ctx->vquadts;
+
+    ierr = TSSetTime(qts,ptime);CHKERRQ(ierr);
+    ierr = TSSetTimeStep(qts,dt);CHKERRQ(ierr);
+    ierr = TSStep(qts);CHKERRQ(ierr);
+  }
+#if 0
   if (qeval_ctx->seval) {
     PetscStackPush("TS scalar quadrature function");
     ierr = (*qeval_ctx->seval)(solution,time,&squad,qeval_ctx->seval_ctx);CHKERRQ(ierr);
@@ -243,8 +274,9 @@ PetscErrorCode TSQuadraturePostStep_Private(TS ts)
     qeval_ctx->squad += dt*(squad+qeval_ctx->psquad)/2.0;
     qeval_ctx->psquad = squad;
   }
-
+#endif
   /* scalar quadrature (qeval_ctx->wquad[qeval_ctx->old] have been initialized with the first function evaluation) */
+#if 0
   if (qeval_ctx->veval) {
     PetscScalar t[2];
     PetscInt    tmp;
@@ -263,6 +295,7 @@ PetscErrorCode TSQuadraturePostStep_Private(TS ts)
     qeval_ctx->cur = qeval_ctx->old;
     qeval_ctx->old = tmp;
   }
+#endif
   if (qeval_ctx->user && qeval_ctx->userafter) {
     PetscStackPush("User post-step function");
     ierr = (*qeval_ctx->user)(ts);CHKERRQ(ierr);
@@ -361,7 +394,7 @@ PetscErrorCode TSLinearizedICApply_Private(TS ts, PetscReal t0, Vec x0, Vec desi
   PetscFunctionReturn(0);
 }
 
-/* auxiliary function to solve a forward model with a quadrature */
+/* auxiliary function to solve an ODE with an additional quadrature */
 PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direction, Vec quadvec, PetscReal *quadscalar)
 {
   TS              model = NULL;
@@ -446,6 +479,37 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
 
   ierr = TSGetMaxTime(ts,&tf);CHKERRQ(ierr);
   ierr = TSGetTime(ts,&t0);CHKERRQ(ierr);
+
+  if (seval || seval_fixed) {
+    Vec v;
+    if (!qeval_ctx->squadts) {
+      ierr = TSCreate(PetscObjectComm((PetscObject)ts),&qeval_ctx->squadts);CHKERRQ(ierr);
+      ierr = VecCreateMPI(PetscObjectComm((PetscObject)ts),1,PETSC_DECIDE,&v);CHKERRQ(ierr);
+      ierr = TSSetSolution(qeval_ctx->squadts,v);CHKERRQ(ierr);
+      ierr = VecDestroy(&v);CHKERRQ(ierr);
+/* Sol */
+    }
+    //ierr = TSSetApplicationContext(qeval_ctx->squadts,qeval_ctx);CHKERRQ(ierr);
+    ierr = TSSetType(qeval_ctx->squadts,((PetscObject)ts)->type_name);CHKERRQ(ierr);
+    ierr = TSSetTime(qeval_ctx->squadts,t0);CHKERRQ(ierr);
+    ierr = TSSetStepNumber(qeval_ctx->squadts,0);CHKERRQ(ierr);
+    ierr = TSSetRHSFunction(qeval_ctx->squadts,TSQuadratureRHS,qeval_ctx);CHKERRQ(ierr);
+    ierr = TSGetSolution(qeval_ctx->squadts,&v);CHKERRQ(ierr);
+    if (seval_fixed) {
+      Vec sol;
+      PetscScalar *s;
+
+      ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
+      ierr = VecGetArray(v,&s);CHKERRQ(ierr);
+      PetscStackPush("TS scalar quadrature function (fixed time)");
+      ierr = (*seval_fixed)(sol,t0,s,qeval_ctx->seval_ctx);CHKERRQ(ierr);
+      PetscStackPop;
+      ierr = VecRestoreArray(v,&s);CHKERRQ(ierr);
+    } else {
+      ierr = VecSet(v,0.0);CHKERRQ(ierr);
+    }
+  }
+#if 0
   /* fixed term at t0 for scalar quadrature */
   if (seval_fixed) {
     Vec sol;
@@ -455,6 +519,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     ierr = (*seval_fixed)(sol,t0,&qeval_ctx->squad,qeval_ctx->seval_ctx);CHKERRQ(ierr);
     PetscStackPop;
   }
+
   /* initialize trapz rule for scalar quadrature */
   if (qeval_ctx->seval) {
     Vec sol;
@@ -464,6 +529,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     ierr = (*qeval_ctx->seval)(sol,t0,&qeval_ctx->psquad,qeval_ctx->seval_ctx);CHKERRQ(ierr);
     PetscStackPop;
   }
+#endif
   if (qeval_ctx->veval) {
     PetscBool has;
 
