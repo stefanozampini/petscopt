@@ -26,7 +26,7 @@ typedef struct {
   PetscReal t0,tf;
 } AdjEvalQuadCtx;
 
-static PetscErrorCode EvalQuadIntegrand_ADJ(Vec L, PetscReal t, Vec F, void* ctx)
+static PetscErrorCode EvalQuadIntegrand_ADJ(Vec L, Vec Ldot, PetscReal t, Vec F, void* ctx)
 {
   Mat            adjF_m;
   AdjEvalQuadCtx *q = (AdjEvalQuadCtx*)ctx;
@@ -228,7 +228,7 @@ static PetscErrorCode AdjointTSPostStep(TS adjts)
       ierr = TSGetTime(adjts,&t);CHKERRQ(ierr);
       ierr = PetscContainerGetPointer(container,(void**)&qeval_ctx);CHKERRQ(ierr);
       PetscStackPush("ADJTS vector quadrature function");
-      ierr = (*qeval_ctx->veval)(lambda,t,qeval_ctx->wquad[qeval_ctx->old],qeval_ctx->veval_ctx);CHKERRQ(ierr);
+      ierr = (*qeval_ctx->veval)(lambda,NULL,t,qeval_ctx->wquad[qeval_ctx->old],qeval_ctx->veval_ctx);CHKERRQ(ierr);
       PetscStackPop;
     }
   }
@@ -1166,7 +1166,7 @@ initialize:
     ierr = TSGetSolution(adjts,&lambda);CHKERRQ(ierr);
     ierr = VecLockReadPush(lambda);CHKERRQ(ierr);
     PetscStackPush("ADJTS vector quadrature function");
-    ierr = (*qeval_ctx->veval)(lambda,t0,qeval_ctx->wquad[qeval_ctx->old],qeval_ctx->veval_ctx);CHKERRQ(ierr);
+    ierr = (*qeval_ctx->veval)(lambda,NULL,t0,qeval_ctx->wquad[qeval_ctx->old],qeval_ctx->veval_ctx);CHKERRQ(ierr);
     PetscStackPop;
     ierr = VecLockReadPop(lambda);CHKERRQ(ierr);
     ierr = TSSetPostStep(adjts,TSQuadraturePostStep_Private);CHKERRQ(ierr); /* XXX */

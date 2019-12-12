@@ -33,7 +33,7 @@ typedef struct {
   Vec   work;
 } FWDEvalQuadCtx;
 
-static PetscErrorCode EvalQuadObj_FWD(Vec U, PetscReal t, PetscReal *f, void* ctx)
+static PetscErrorCode EvalQuadObj_FWD(Vec U, Vec Udot, PetscReal t, PetscReal *f, void* ctx)
 {
   FWDEvalQuadCtx *evalctx = (FWDEvalQuadCtx*)ctx;
   PetscErrorCode ierr;
@@ -43,7 +43,7 @@ static PetscErrorCode EvalQuadObj_FWD(Vec U, PetscReal t, PetscReal *f, void* ct
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode EvalQuadObjFixed_FWD(Vec U, PetscReal t, PetscReal *f, void* ctx)
+static PetscErrorCode EvalQuadObjFixed_FWD(Vec U, Vec Udot, PetscReal t, PetscReal *f, void* ctx)
 {
   FWDEvalQuadCtx *evalctx = (FWDEvalQuadCtx*)ctx;
   PetscErrorCode ierr;
@@ -53,7 +53,7 @@ static PetscErrorCode EvalQuadObjFixed_FWD(Vec U, PetscReal t, PetscReal *f, voi
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode EvalQuadIntegrand_FWD(Vec U, PetscReal t, Vec F, void* ctx)
+static PetscErrorCode EvalQuadIntegrand_FWD(Vec U, Vec Udot, PetscReal t, Vec F, void* ctx)
 {
   FWDEvalQuadCtx *evalctx = (FWDEvalQuadCtx*)ctx;
   PetscBool      has_m;
@@ -64,7 +64,7 @@ static PetscErrorCode EvalQuadIntegrand_FWD(Vec U, PetscReal t, Vec F, void* ctx
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode EvalQuadIntegrandFixed_FWD(Vec U, PetscReal t, Vec F, void* ctx)
+static PetscErrorCode EvalQuadIntegrandFixed_FWD(Vec U, Vec Udot, PetscReal t, Vec F, void* ctx)
 {
   FWDEvalQuadCtx *evalctx = (FWDEvalQuadCtx*)ctx;
   PetscBool      has_m;
@@ -92,7 +92,7 @@ typedef struct {
 } TLMEvalQuadCtx;
 
 /* computes d^2 f / dp^2 direction + d^2 f / dp dx U + (L^T \otimes I_M)(H_MM direction + H_MU U + H_MUdot Udot) during TLM runs */
-static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx)
+static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, Vec Udot, PetscReal t, Vec F, void* ctx)
 {
   TLMEvalQuadCtx *q = (TLMEvalQuadCtx*)ctx;
   TS             fwdts = q->fwdts;
@@ -175,7 +175,7 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, PetscReal t, Vec F, void* ctx
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode EvalQuadIntegrandFixed_TLM(Vec U, PetscReal t, Vec F, void* ctx)
+static PetscErrorCode EvalQuadIntegrandFixed_TLM(Vec U, Vec Udot, PetscReal t, Vec F, void* ctx)
 {
   TLMEvalQuadCtx *q = (TLMEvalQuadCtx*)ctx;
   TS             fwdts = q->fwdts;
@@ -238,7 +238,7 @@ PetscErrorCode TSQuadraturePostStep_Private(TS ts)
   /* scalar quadrature (psquad have been initialized with the first function evaluation) */
   if (qeval_ctx->seval) {
     PetscStackPush("TS scalar quadrature function");
-    ierr = (*qeval_ctx->seval)(solution,time,&squad,qeval_ctx->seval_ctx);CHKERRQ(ierr);
+    ierr = (*qeval_ctx->seval)(solution,NULL,time,&squad,qeval_ctx->seval_ctx);CHKERRQ(ierr);
     PetscStackPop;
     qeval_ctx->squad += dt*(squad+qeval_ctx->psquad)/2.0;
     qeval_ctx->psquad = squad;
@@ -250,7 +250,7 @@ PetscErrorCode TSQuadraturePostStep_Private(TS ts)
     PetscInt    tmp;
 
     PetscStackPush("TS vector quadrature function");
-    ierr = (*qeval_ctx->veval)(solution,time,qeval_ctx->wquad[qeval_ctx->cur],qeval_ctx->veval_ctx);CHKERRQ(ierr);
+    ierr = (*qeval_ctx->veval)(solution,NULL,time,qeval_ctx->wquad[qeval_ctx->cur],qeval_ctx->veval_ctx);CHKERRQ(ierr);
     PetscStackPop;
 
     /* trapezoidal rule */
@@ -394,6 +394,12 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     ierr = TSGetTSObj(ts,&funchead);CHKERRQ(ierr);
   }
 
+  /* quadrature evaluations */
+  seval       = direction ? NULL : (quadscalar ? EvalQuadObj_FWD      : NULL);
+  seval_fixed = direction ? NULL : (quadscalar ? EvalQuadObjFixed_FWD : NULL);
+  veval       = quadvec ? (direction ? EvalQuadIntegrand_TLM      : EvalQuadIntegrand_FWD)      : NULL;
+  veval_fixed = quadvec ? (direction ? EvalQuadIntegrandFixed_TLM : EvalQuadIntegrandFixed_FWD) : NULL;
+
   /* solution vector */
   ierr = TSGetSolution(ts,&U);CHKERRQ(ierr);
   if (!U) {
@@ -404,12 +410,6 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
   if (X) {
     ierr = VecCopy(X,U);CHKERRQ(ierr);
   }
-
-  /* quadrature evaluations */
-  seval       = direction ? NULL : (quadscalar ? EvalQuadObj_FWD      : NULL);
-  seval_fixed = direction ? NULL : (quadscalar ? EvalQuadObjFixed_FWD : NULL);
-  veval       = quadvec ? (direction ? EvalQuadIntegrand_TLM      : EvalQuadIntegrand_FWD)      : NULL;
-  veval_fixed = quadvec ? (direction ? EvalQuadIntegrandFixed_TLM : EvalQuadIntegrandFixed_FWD) : NULL;
 
   /* init contexts for quadrature evaluations */
   qfwd.obj    = funchead;
@@ -452,7 +452,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
 
     ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
     PetscStackPush("TS scalar quadrature function (fixed time)");
-    ierr = (*seval_fixed)(sol,t0,&qeval_ctx->squad,qeval_ctx->seval_ctx);CHKERRQ(ierr);
+    ierr = (*seval_fixed)(sol,NULL,t0,&qeval_ctx->squad,qeval_ctx->seval_ctx);CHKERRQ(ierr);
     PetscStackPop;
   }
   /* initialize trapz rule for scalar quadrature */
@@ -461,7 +461,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
 
     ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
     PetscStackPush("TS scalar quadrature function");
-    ierr = (*qeval_ctx->seval)(sol,t0,&qeval_ctx->psquad,qeval_ctx->seval_ctx);CHKERRQ(ierr);
+    ierr = (*qeval_ctx->seval)(sol,NULL,t0,&qeval_ctx->psquad,qeval_ctx->seval_ctx);CHKERRQ(ierr);
     PetscStackPop;
   }
   if (qeval_ctx->veval) {
@@ -521,7 +521,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
 
       ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
       PetscStackPush("TS vector quadrature function (fixed time)");
-      ierr = (*veval_fixed)(sol,t0,qeval_ctx->wquad[4],qeval_ctx->veval_ctx);CHKERRQ(ierr);
+      ierr = (*veval_fixed)(sol,NULL,t0,qeval_ctx->wquad[4],qeval_ctx->veval_ctx);CHKERRQ(ierr);
       PetscStackPop;
       ierr = VecAXPY(qeval_ctx->vquad,1.0,qeval_ctx->wquad[4]);CHKERRQ(ierr);
     }
@@ -532,7 +532,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
 
       ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
       PetscStackPush("TS vector quadrature function");
-      ierr = (*qeval_ctx->veval)(sol,t0,qeval_ctx->wquad[qeval_ctx->old],qeval_ctx->veval_ctx);CHKERRQ(ierr);
+      ierr = (*qeval_ctx->veval)(sol,NULL,t0,qeval_ctx->wquad[qeval_ctx->old],qeval_ctx->veval_ctx);CHKERRQ(ierr);
       PetscStackPop;
     }
   }
@@ -564,7 +564,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     tt   = tfup;
     ierr = TSSolve(ts,NULL);CHKERRQ(ierr);
 
-    /* determine if TS finised before the max time requested */
+    /* determine if TS finished before the max time requested */
     ierr = TSGetTime(ts,&tfup);CHKERRQ(ierr);
     stop = (PetscAbsReal(tt-tfup) < PETSC_SMALL) ? PETSC_FALSE : PETSC_TRUE;
     if (has_f && seval_fixed) {
@@ -573,7 +573,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
 
       ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
       PetscStackPush("TS scalar quadrature function (fixed time)");
-      ierr = (*seval_fixed)(sol,tfup,&v,qeval_ctx->seval_ctx);CHKERRQ(ierr);
+      ierr = (*seval_fixed)(sol,NULL,tfup,&v,qeval_ctx->seval_ctx);CHKERRQ(ierr);
       PetscStackPop;
       qeval_ctx->squad += v;
     }
@@ -582,7 +582,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
 
       ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
       PetscStackPush("TS vector quadrature function (fixed time)");
-      ierr = (*veval_fixed)(sol,tfup,qeval_ctx->wquad[4],qeval_ctx->veval_ctx);CHKERRQ(ierr);
+      ierr = (*veval_fixed)(sol,NULL,tfup,qeval_ctx->wquad[4],qeval_ctx->veval_ctx);CHKERRQ(ierr);
       PetscStackPop;
       ierr = VecAXPY(qeval_ctx->vquad,1.0,qeval_ctx->wquad[4]);CHKERRQ(ierr);
     }

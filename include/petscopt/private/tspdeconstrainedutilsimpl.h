@@ -4,8 +4,8 @@
 #include <petscts.h>
 
 /* prototypes for cost integral evaluation */
-typedef PetscErrorCode (*SQuadEval)(Vec,PetscReal,PetscReal*,void*);
-typedef PetscErrorCode (*VQuadEval)(Vec,PetscReal,Vec,void*);
+typedef PetscErrorCode (*SQuadEval)(Vec,Vec,PetscReal,PetscReal*,void*);
+typedef PetscErrorCode (*VQuadEval)(Vec,Vec,PetscReal,Vec,void*);
 
 typedef struct {
   PetscErrorCode (*user)(TS); /* user post step method */
