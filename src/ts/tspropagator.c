@@ -3,6 +3,7 @@
 #include <petscopt/adjointts.h>
 #include <petscopt/tlmts.h>
 #include <petscopt/private/tsoptimpl.h>
+#include <petscopt/private/adjointtsimpl.h>
 #include <petsc/private/tshistoryimpl.h>
 
 /* ------------------ Routines for the Mat that represents the linearized propagator ----------------------- */
@@ -100,7 +101,7 @@ static PetscErrorCode MatMultTranspose_Propagator(Mat A, Vec x, Vec y)
   } else {
     ierr = VecCopy(x,tlmworkrhs);CHKERRQ(ierr);
   }
-  ierr = AdjointTSComputeInitialConditions(prop->adjlts,tlmworkrhs,PETSC_TRUE,PETSC_TRUE);CHKERRQ(ierr);
+  ierr = AdjointTSComputeInitialConditions(prop->adjlts,tlmworkrhs,PETSC_TRUE);CHKERRQ(ierr);
   ierr = TSSetStepNumber(prop->adjlts,0);CHKERRQ(ierr);
   ierr = TSRestartStep(prop->adjlts);CHKERRQ(ierr);
   ierr = TSSetTime(prop->adjlts,prop->t0);CHKERRQ(ierr);
@@ -122,7 +123,7 @@ static PetscErrorCode MatMultTranspose_Propagator(Mat A, Vec x, Vec y)
     ierr = TSSetExactFinalTime(prop->adjlts,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
   }
   ierr = TSSetMaxTime(prop->adjlts,prop->tf);CHKERRQ(ierr);
-  ierr = TSSolve(prop->adjlts,NULL);CHKERRQ(ierr);
+  ierr = AdjointTSSolveWithQuadrature_Private(prop->adjlts);CHKERRQ(ierr);
   ierr = AdjointTSFinalizeQuadrature(prop->adjlts);CHKERRQ(ierr);
   prop->lts->trajectory = NULL;
   prop->tj = prop->model->trajectory;

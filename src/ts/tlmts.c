@@ -1,3 +1,4 @@
+#include <petscopt/tsutils.h>
 #include <petscopt/private/tlmtsimpl.h>
 #include <petscopt/private/tsoptimpl.h>
 #include <petscopt/private/tssplitjacimpl.h>
@@ -497,8 +498,6 @@ PetscErrorCode TSCreateTLMTS(TS ts, TS* lts)
   TSIFunction      ifunc;
   TSRHSFunction    rhsfunc;
   TSI2Function     i2func;
-  TSType           type;
-  TSEquationType   eqtype;
   KSPType          ksptype;
   const char       *prefix;
   PetscReal        atol,rtol,dtol;
@@ -510,9 +509,7 @@ PetscErrorCode TSCreateTLMTS(TS ts, TS* lts)
   PetscValidPointer(lts,2);
   ierr = TSGetI2Function(ts,NULL,&i2func,NULL);CHKERRQ(ierr);
   if (i2func) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_SUP,"Second order DAEs are not supported");
-  ierr = TSCreate(PetscObjectComm((PetscObject)ts),lts);CHKERRQ(ierr);
-  ierr = TSGetType(ts,&type);CHKERRQ(ierr);
-  ierr = TSSetType(*lts,type);CHKERRQ(ierr);
+  ierr = TSCreateWithTS(ts,lts);CHKERRQ(ierr);
   ierr = TSGetTolerances(ts,&atol,&vatol,&rtol,&vrtol);CHKERRQ(ierr);
   ierr = TSSetTolerances(*lts,atol,vatol,rtol,vrtol);CHKERRQ(ierr);
   if (ts->adapt) {
@@ -571,22 +568,20 @@ PetscErrorCode TSCreateTLMTS(TS ts, TS* lts)
     }
   }
 
-  /* the equation type is the same */
-  ierr = TSGetEquationType(ts,&eqtype);CHKERRQ(ierr);
-  ierr = TSSetEquationType(*lts,eqtype);CHKERRQ(ierr);
-
   /* tangent linear model DAE is linear */
   ierr = TSSetProblemType(*lts,TS_LINEAR);CHKERRQ(ierr);
 
   /* tangent linear model linear solver -> propagate KSP info of the forward model but use a different object */
-  ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
-  ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-  ierr = KSPGetType(ksp,&ksptype);CHKERRQ(ierr);
-  ierr = KSPGetTolerances(ksp,&rtol,&atol,&dtol,&maxits);CHKERRQ(ierr);
-  ierr = TSGetSNES(*lts,&snes);CHKERRQ(ierr);
-  ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-  if (ksptype) { ierr = KSPSetType(ksp,ksptype);CHKERRQ(ierr); }
-  ierr = KSPSetTolerances(ksp,rtol,atol,dtol,maxits);CHKERRQ(ierr);
+  if (ts->snes) {
+    ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
+    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+    ierr = KSPGetType(ksp,&ksptype);CHKERRQ(ierr);
+    ierr = KSPGetTolerances(ksp,&rtol,&atol,&dtol,&maxits);CHKERRQ(ierr);
+    ierr = TSGetSNES(*lts,&snes);CHKERRQ(ierr);
+    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+    if (ksptype) { ierr = KSPSetType(ksp,ksptype);CHKERRQ(ierr); }
+    ierr = KSPSetTolerances(ksp,rtol,atol,dtol,maxits);CHKERRQ(ierr);
+  }
 
   /* handle specific TLMTS options */
   ierr = PetscObjectAddOptionsHandler((PetscObject)(*lts),TLMTSOptionsHandler,NULL,NULL);CHKERRQ(ierr);

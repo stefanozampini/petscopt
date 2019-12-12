@@ -2,6 +2,7 @@
 #include <petscopt/tlmts.h>
 #include <petscopt/private/tsobjimpl.h>
 #include <petscopt/private/tsoptimpl.h>
+#include <petscopt/private/adjointtsimpl.h>
 #include <petscopt/private/tspdeconstrainedutilsimpl.h>
 #include <petsc/private/tshistoryimpl.h>
 
@@ -114,7 +115,7 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   ierr = AdjointTSSetDirectionVec(tshess->soats,x);CHKERRQ(ierr);
   ierr = AdjointTSSetTLMTSAndFOATS(tshess->soats,tshess->tlmts,tshess->GN ? NULL : tshess->foats);CHKERRQ(ierr);
   ierr = AdjointTSSetQuadratureVec(tshess->soats,y);CHKERRQ(ierr);
-  ierr = AdjointTSComputeInitialConditions(tshess->soats,NULL,PETSC_TRUE,PETSC_TRUE);CHKERRQ(ierr);
+  ierr = AdjointTSComputeInitialConditions(tshess->soats,NULL,PETSC_TRUE);CHKERRQ(ierr);
   ierr = TSSetStepNumber(tshess->soats,0);CHKERRQ(ierr);
   ierr = TSRestartStep(tshess->soats);CHKERRQ(ierr);
   ierr = TSHistoryGetTimeStep(tshess->modeltj->tsh,PETSC_TRUE,0,&dt);CHKERRQ(ierr);
@@ -138,7 +139,7 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
     ierr = TSSetMaxSteps(tshess->soats,nsteps-1);CHKERRQ(ierr);
     ierr = TSSetExactFinalTime(tshess->soats,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
   }
-  ierr = TSSolve(tshess->soats,NULL);CHKERRQ(ierr);
+  ierr = AdjointTSSolveWithQuadrature_Private(tshess->soats);CHKERRQ(ierr);
   ierr = AdjointTSFinalizeQuadrature(tshess->soats);CHKERRQ(ierr);
 
   ierr = AdjointTSSetQuadratureVec(tshess->soats,NULL);CHKERRQ(ierr);
@@ -201,7 +202,7 @@ static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec de
     ierr = AdjointTSSetTimeLimits(adjts,t0,tf);CHKERRQ(ierr);
     ierr = AdjointTSSetDesignVec(adjts,design);CHKERRQ(ierr);
     ierr = AdjointTSSetQuadratureVec(adjts,gradient);CHKERRQ(ierr);
-    ierr = AdjointTSComputeInitialConditions(adjts,NULL,PETSC_TRUE,PETSC_TRUE);CHKERRQ(ierr);
+    ierr = AdjointTSComputeInitialConditions(adjts,NULL,PETSC_TRUE);CHKERRQ(ierr);
     ierr = AdjointTSEventHandler(adjts);CHKERRQ(ierr);
     ierr = TSSetFromOptions(adjts);CHKERRQ(ierr);
     ierr = AdjointTSSetTimeLimits(adjts,t0,tf);CHKERRQ(ierr);
@@ -221,7 +222,7 @@ static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec de
         ierr = TSSetExactFinalTime(adjts,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
       }
     }
-    ierr = TSSolve(adjts,NULL);CHKERRQ(ierr);
+    ierr = AdjointTSSolveWithQuadrature_Private(adjts);CHKERRQ(ierr);
     ierr = AdjointTSFinalizeQuadrature(adjts);CHKERRQ(ierr);
     ierr = TSDestroy(&adjts);CHKERRQ(ierr);
 
@@ -461,7 +462,7 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
   ierr = TSSetTimeStep(tshess->foats,dt);CHKERRQ(ierr);
   ierr = AdjointTSSetTimeLimits(tshess->foats,tshess->t0,tshess->tf);CHKERRQ(ierr);
   if (!tshess->GN) { /* not needed for Gauss-Newton approximation */
-    ierr = AdjointTSComputeInitialConditions(tshess->foats,NULL,PETSC_TRUE,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = AdjointTSComputeInitialConditions(tshess->foats,NULL,PETSC_TRUE);CHKERRQ(ierr);
     ierr = TSGetAdapt(tshess->foats,&adapt);CHKERRQ(ierr);
     ierr = PetscObjectTypeCompare((PetscObject)adapt,TSADAPTHISTORY,&istr);CHKERRQ(ierr);
     if (istr) {

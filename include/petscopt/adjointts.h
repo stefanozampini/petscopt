@@ -6,7 +6,7 @@
 PETSC_EXTERN PetscErrorCode TSCreateAdjointTS(TS,TS*);
 PETSC_EXTERN PetscErrorCode AdjointTSGetTS(TS,TS*);
 PETSC_EXTERN PetscErrorCode AdjointTSComputeForcing(TS,PetscReal,Vec,PetscBool*,Vec);
-PETSC_EXTERN PetscErrorCode AdjointTSComputeInitialConditions(TS,Vec,PetscBool,PetscBool);
+PETSC_EXTERN PetscErrorCode AdjointTSComputeInitialConditions(TS,Vec,PetscBool);
 PETSC_EXTERN PetscErrorCode AdjointTSSetQuadratureVec(TS,Vec);
 PETSC_EXTERN PetscErrorCode AdjointTSSetDesignVec(TS,Vec);
 PETSC_EXTERN PetscErrorCode AdjointTSSetDirectionVec(TS,Vec);
