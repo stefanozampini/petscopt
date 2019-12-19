@@ -41,7 +41,7 @@ Vec Object: 1 MPI processes
     of hand-coded and finite difference Hessian entries greater than <threshold>.
   Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Hessian is probably correct.
-  ||H - Hfd||_F/||H||_F = 0.000111593, ||H - Hfd||_F = 0.000385241
+  ||H - Hfd||_F/||H||_F = 0.000111615, ||H - Hfd||_F = 0.000385316
 
 Gradient via adjoint
 Vec Object: 1 MPI processes
@@ -66,13 +66,13 @@ Vec Object: 1 MPI processes
 TLM matrix
 Mat Object: 1 MPI processes
   type: seqdense
--5.1151913240493518e-01 5.1151913240493518e-01 5.3939402561100758e-01 
--3.4315692964142247e-01 3.4315692964142247e-01 1.1764839691656794e+00 
+-5.1151913240493441e-01 5.1151913240493441e-01 5.3939402561100669e-01 
+-3.4315692964142236e-01 3.4315692964142236e-01 1.1764839691656801e+00 
 Mat Object: 1 MPI processes
   type: seqdense
--5.1151899795183664e-01 -3.4315693188653168e-01 
-5.1151899795183664e-01 3.4315693188653168e-01 
-5.3939395424883940e-01 1.1764839322362881e+00 
+-5.1151899795183631e-01 -3.4315693188653146e-01 
+5.1151899795183631e-01 3.4315693188653146e-01 
+5.3939395424883840e-01 1.1764839322362886e+00 
 
 Gradient via TLM (explicit)
 Vec Object: 1 MPI processes

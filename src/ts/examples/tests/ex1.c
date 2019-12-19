@@ -1334,7 +1334,7 @@ int main(int argc, char* argv[])
         ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
         ierr = TSComputeObjectiveAndGradient(ts,t0,dt,tf,U,M,NULL,&objdx[j]);CHKERRQ(ierr);
       }
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"%D-th component of gradient should be (approximated) %g\n",i,(double)((objdx[0]-objdx[1])/(2.*dx)));CHKERRQ(ierr);
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"%D-th component of gradient should be (approximated) %g (%1.16e %1.16e)\n",i,(double)((objdx[0]-objdx[1])/(2.*dx)),objdx[0],objdx[1]);CHKERRQ(ierr);
     }
   }
 

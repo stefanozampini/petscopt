@@ -1,17 +1,18 @@
 mu 1., steps 0, ftime 0.5
 mu 1., steps 7, ftime 0.5
-  0 TAO,  Function value: 0.0708569,  Residual: 0.00975169 
-  1 TAO,  Function value: 1.12824e-14,  Residual: 2.08486e-08 
+  0 TAO,  Function value: 0.0708569,  Residual: 0.00973832 
+  1 TAO,  Function value: 2.92081e-13,  Residual: 9.94483e-08 
+  2 TAO,  Function value: 1.91962e-20,  Residual: 1.12476e-11 
 Tao Object: 1 MPI processes
   type: tron
-  Total PG its: 3,  PG tolerance: 0.001 
+  Total PG its: 6,  PG tolerance: 0.001 
   TaoLineSearch Object: 1 MPI processes
     type: more-thuente
     maximum function evaluations=30
     tolerances: ftol=0.0001, rtol=1e-10, gtol=0.9
     total number of function evaluations=0
     total number of gradient evaluations=0
-    total number of function/gradient evaluations=1
+    total number of function/gradient evaluations=2
     using variable bounds
     Termination reason: 1
   KSP Object: 1 MPI processes
@@ -26,15 +27,15 @@ Tao Object: 1 MPI processes
     Mat Object: 1 MPI processes
       type: submatrix
       rows=1, cols=1
-  total KSP iterations: 1
+  total KSP iterations: 2
   Active Set subset type: subvec
   convergence tolerances: gatol=1e-13,   steptol=0.,   gttol=1e-05
-  Residual in Function/Gradient:=2.08486e-08
-  Objective value=1.12824e-14
-  total number of iterations=1,                          (max: 50)
-  total number of function/gradient evaluations=12,      (max: 4000)
-  total number of Hessian evaluations=1
+  Residual in Function/Gradient:=1.12476e-11
+  Objective value=1.91962e-20
+  total number of iterations=2,                          (max: 50)
+  total number of function/gradient evaluations=17,      (max: 4000)
+  total number of Hessian evaluations=2
   Solution converged:    ||g(X)||/||g(X0)|| <= gttol
 Vec Object: 1 MPI processes
   type: seq
-0.999999
+1.

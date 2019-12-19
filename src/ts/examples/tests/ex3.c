@@ -616,7 +616,7 @@ int main(int argc,char **argv)
   ierr = TSSetDM(ts,da);CHKERRQ(ierr);
   ierr = TSSetProblemType(ts,TS_NONLINEAR);CHKERRQ(ierr);
   ierr = TSSetEquationType(ts,TS_EQ_DAE_SEMI_EXPLICIT_INDEX1);CHKERRQ(ierr);
-  ierr = TSSetType(ts,TSBDF);CHKERRQ(ierr);
+  ierr = TSSetType(ts,TSTHETA);CHKERRQ(ierr);
   ierr = TSSetIFunction(ts,NULL,FormIFunction,NULL);CHKERRQ(ierr);
   ierr = DMCreateMatrix(da,&J);CHKERRQ(ierr);
   ierr = TSSetIJacobian(ts,J,J,FormIJacobian,NULL);CHKERRQ(ierr);
@@ -635,8 +635,8 @@ int main(int argc,char **argv)
     ierr = DMCreateGlobalVector(da,&vrtol);CHKERRQ(ierr);
     ierr = VecStrideSet(vatol,0,satol);CHKERRQ(ierr);
     ierr = VecStrideSet(vrtol,0,srtol);CHKERRQ(ierr);
-    ierr = VecStrideSet(vatol,1,PETSC_INFINITY);CHKERRQ(ierr);
-    ierr = VecStrideSet(vrtol,1,PETSC_INFINITY);CHKERRQ(ierr);
+    ierr = VecStrideSet(vatol,1,-1);CHKERRQ(ierr);
+    ierr = VecStrideSet(vrtol,1,-1);CHKERRQ(ierr);
     ierr = TSSetTolerances(ts,satol,vatol,srtol,vrtol);CHKERRQ(ierr);
     ierr = VecDestroy(&vatol);CHKERRQ(ierr);
     ierr = VecDestroy(&vrtol);CHKERRQ(ierr);
@@ -694,11 +694,11 @@ int main(int argc,char **argv)
   ierr = TaoSetObjectiveRoutine(tao,FormObjective,ts);CHKERRQ(ierr);
   ierr = TaoTestGradient(tao,M,G);CHKERRQ(ierr);
   ierr = TaoDestroy(&tao);CHKERRQ(ierr);
-  ierr = VecDestroy(&G);CHKERRQ(ierr);
 
   /* Test gradient with Taylor test */
   ierr = TSTaylorTest(ts,0.0,0.0,0.0,NULL,M,NULL);CHKERRQ(ierr);
 
+  ierr = VecDestroy(&G);CHKERRQ(ierr);
   ierr = VecDestroy(&M);CHKERRQ(ierr);
   ierr = TSDestroy(&ts);CHKERRQ(ierr);
   ierr = PetscFinalize();
@@ -713,6 +713,6 @@ int main(int argc,char **argv)
       suffix: 1
       filter: sed -e "s/-nan/nan/g" -e "s/coded Hessian/coded Gradient/g"
       nsize: 2
-      args: -ts_max_time 0.01 -da_grid_x 20 -da_grid_y 20 -ts_trajectory_type memory -ic_snes {{0 1}separate output} -ts_rtol 1.e-6 -ts_atol 1.e-6 -test {{0,0 1,0 0,1 1,1}separate output} -tao_test_gradient -taylor_ts_hessian  -tshessian_mffd  -tsgradient_adjoint_ts_adapt_type history
+      args: -ts_max_steps 4 -da_grid_x 20 -da_grid_y 20 -ts_trajectory_type memory -ic_snes {{0 1}separate output} -test {{0,0 1,0 0,1 1,1}separate output} -tao_test_gradient -taylor_ts_hessian  -tshessian_mffd
 
 TEST*/
