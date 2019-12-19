@@ -4,9 +4,18 @@
 #include <petscts.h>
 
 /* prototypes for cost integral evaluation */
-typedef PetscErrorCode (*SQuadEval)(Vec,Vec,PetscReal,PetscReal*,void*);
-typedef PetscErrorCode (*VQuadEval)(Vec,Vec,PetscReal,Vec,void*);
+typedef PetscErrorCode (*QuadEval)(Vec,Vec,PetscReal,Vec,void*);
+typedef struct {
+  Vec       U;
+  Vec       Udot;
+  Vec       design;
+  QuadEval  evalquad;
+  QuadEval  evalquad_fixed;
+  void      *evalquadctx;
+} TSQuadCtx;
 
+typedef PetscErrorCode (*SQuadEval)(Vec,Vec,PetscReal,Vec,void*);
+typedef PetscErrorCode (*VQuadEval)(Vec,Vec,PetscReal,Vec,void*);
 typedef struct {
   PetscErrorCode (*user)(TS); /* user post step method */
   PetscBool      userafter;   /* call user-defined poststep after quadrature evaluation */
@@ -21,6 +30,8 @@ typedef struct {
   PetscInt       cur,old;     /* pointers to current and old wquad vectors for trapezoidal rule */
 } TSQuadratureCtx;
 
+PETSC_INTERN PetscErrorCode TSCreateQuadTS(MPI_Comm,Vec,PetscBool,TSQuadCtx*,TS*);
+PETSC_INTERN PetscErrorCode QuadTSUpdateStates(TS,Vec,Vec);
 PETSC_INTERN PetscErrorCode TSQuadraturePostStep_Private(TS);
 PETSC_INTERN PetscErrorCode TSQuadratureCtxDestroy_Private(void*);
 PETSC_INTERN PetscErrorCode TSLinearizedICApply_Private(TS, PetscReal,Vec,Vec,Vec,Vec,PetscBool,PetscBool);

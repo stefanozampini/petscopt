@@ -4,9 +4,234 @@
 #include <petsc/private/tsimpl.h> /* adapt and poststep dependency */
 #include <petsc/private/kspimpl.h>
 #include <petsc/private/petscimpl.h>
+#include <petsc/private/dmimpl.h>
 #include <petscopt/tlmts.h>
+#include <petscopt/augmentedts.h>
 #include <petscdm.h>
+#include <petscdmcomposite.h>
+#include <petscdmshell.h>
 
+#include <petsc/private/matimpl.h>
+typedef struct {
+  PetscScalar diag;
+} Mat_ConstantDiagonal;
+
+static PetscErrorCode MatGetRow_ConstantDiagonal(Mat A, PetscInt row, PetscInt *ncols, PetscInt *cols[], PetscScalar *vals[])
+{
+  Mat_ConstantDiagonal *ctx = (Mat_ConstantDiagonal*)A->data;
+  PetscErrorCode       ierr;
+
+  PetscFunctionBegin;
+  if (ncols) *ncols = 1;
+  if (cols) {
+    ierr = PetscMalloc1(1,cols);CHKERRQ(ierr);
+    (*cols)[0] = row;
+  }
+  if (vals) {
+    ierr = PetscMalloc1(1,vals);CHKERRQ(ierr);
+    (*vals)[0] = ctx->diag;
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode MatRestoreRow_ConstantDiagonal(Mat A, PetscInt row, PetscInt *ncols, PetscInt *cols[], PetscScalar *vals[])
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  if (ncols) *ncols = 0;
+  if (cols) {
+    ierr = PetscFree(*cols);CHKERRQ(ierr);
+    *cols = NULL;
+  }
+  if (vals) {
+    ierr = PetscFree(*vals);CHKERRQ(ierr);
+    *vals = NULL;
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode MatMultTranspose_ConstantDiagonal(Mat A, Vec x, Vec y)
+{
+  Mat_ConstantDiagonal *ctx = (Mat_ConstantDiagonal*)A->data;
+  PetscErrorCode       ierr;
+
+  PetscFunctionBegin;
+  ierr = VecAXPBY(y,ctx->diag,0.0,x);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode MatMultAdd_ConstantDiagonal(Mat mat,Vec v1,Vec v2,Vec v3)
+{
+  PetscErrorCode       ierr;
+  Mat_ConstantDiagonal *ctx = (Mat_ConstantDiagonal*)mat->data;
+
+  PetscFunctionBegin;
+  if (v2 == v3) {
+    ierr = VecAXPBY(v3,ctx->diag,1.0,v1);CHKERRQ(ierr);
+  } else {
+    ierr = VecAXPBYPCZ(v3,ctx->diag,1.0,0.0,v1,v2);CHKERRQ(ierr);
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode MatMultTransposeAdd_ConstantDiagonal(Mat mat,Vec v1,Vec v2,Vec v3)
+{
+  PetscErrorCode       ierr;
+  Mat_ConstantDiagonal *ctx = (Mat_ConstantDiagonal*)mat->data;
+
+  PetscFunctionBegin;
+  if (v2 == v3) {
+    ierr = VecAXPBY(v3,ctx->diag,1.0,v1);CHKERRQ(ierr);
+  } else {
+    ierr = VecAXPBYPCZ(v3,ctx->diag,1.0,0.0,v1,v2);CHKERRQ(ierr);
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode add_missing_cdiag(Mat);
+
+static PetscErrorCode MatDuplicate_ConstantDiagonal(Mat A, MatDuplicateOption op, Mat *B)
+{
+  PetscErrorCode       ierr;
+  Mat_ConstantDiagonal *actx = (Mat_ConstantDiagonal*)A->data;
+
+  PetscFunctionBegin;
+  ierr = MatCreate(PetscObjectComm((PetscObject)A),B);CHKERRQ(ierr);
+  ierr = MatSetSizes(*B,A->rmap->n,A->cmap->n,A->rmap->N,A->cmap->N);CHKERRQ(ierr);
+  ierr = MatSetBlockSizesFromMats(*B,A,A);CHKERRQ(ierr);
+  ierr = MatSetType(*B,MATCONSTANTDIAGONAL);CHKERRQ(ierr);
+  ierr = PetscLayoutReference(A->rmap,&(*B)->rmap);CHKERRQ(ierr);
+  ierr = PetscLayoutReference(A->cmap,&(*B)->cmap);CHKERRQ(ierr);
+  if (op == MAT_COPY_VALUES) {
+    Mat_ConstantDiagonal *bctx = (Mat_ConstantDiagonal*)(*B)->data;
+    bctx->diag = actx->diag;
+  }
+  ierr = add_missing_cdiag(*B);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode MatMissingDiagonal_ConstantDiagonal(Mat mat,PetscBool *missing,PetscInt *dd)
+{
+  PetscFunctionBegin;
+  *missing = PETSC_FALSE;
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode add_missing_cdiag(Mat A)
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = MatSetOperation(A,MATOP_MULT_TRANSPOSE,(void (*)(void))MatMultTranspose_ConstantDiagonal);CHKERRQ(ierr);
+  ierr = MatSetOperation(A,MATOP_MULT_TRANSPOSE_ADD,(void (*)(void))MatMultTransposeAdd_ConstantDiagonal);CHKERRQ(ierr);
+  ierr = MatSetOperation(A,MATOP_DUPLICATE,(void (*)(void))MatDuplicate_ConstantDiagonal);CHKERRQ(ierr);
+  ierr = MatSetOperation(A,MATOP_MISSING_DIAGONAL,(void (*)(void))MatMissingDiagonal_ConstantDiagonal);CHKERRQ(ierr);
+  ierr = MatSetOperation(A,MATOP_MULT_ADD,(void (*)(void))MatMultAdd_ConstantDiagonal);CHKERRQ(ierr);
+  ierr = MatSetOperation(A,MATOP_GET_ROW,(void (*)(void))MatGetRow_ConstantDiagonal);CHKERRQ(ierr);
+  ierr = MatSetOperation(A,MATOP_RESTORE_ROW,(void (*)(void))MatRestoreRow_ConstantDiagonal);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode DMGetLocalToGlobalMapping_Dummy(DM dm)
+{
+  Vec            g;
+  IS             is;
+  PetscInt       n,st;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = ISLocalToGlobalMappingDestroy(&dm->ltogmap);CHKERRQ(ierr);
+  ierr = DMGetGlobalVector(dm,&g);CHKERRQ(ierr);
+  ierr = VecGetLocalSize(g,&n);CHKERRQ(ierr);
+  ierr = VecGetOwnershipRange(g,&st,NULL);CHKERRQ(ierr);
+  ierr = ISCreateStride(PetscObjectComm((PetscObject)dm),n,st,1,&is);CHKERRQ(ierr);
+  ierr = ISLocalToGlobalMappingCreateIS(is,&dm->ltogmap);CHKERRQ(ierr);
+  ierr = ISDestroy(&is);CHKERRQ(ierr);
+  ierr = DMRestoreGlobalVector(dm,&g);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode QuadTSUpdateStates(TS ts, Vec U, Vec Udot)
+{
+  TSQuadCtx      *qctx;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TSGetApplicationContext(ts,(void*)&qctx);CHKERRQ(ierr);
+  qctx->U    = U;
+  qctx->Udot = Udot;
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode QuadTSRHSFunction(TS ts, PetscReal time, Vec U, Vec F, void *ctx)
+{
+  TSQuadCtx      *qctx;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TSGetApplicationContext(ts,(void*)&qctx);CHKERRQ(ierr);
+  ierr = (*qctx->evalquad)(qctx->U,qctx->Udot,time,F,qctx->evalquadctx);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode QuadTSRHSJacobian(TS ts, PetscReal time, Vec U, Mat A, Mat P, void *ctx)
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = MatZeroEntries(P);CHKERRQ(ierr);
+  ierr = MatZeroEntries(A);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSCreateQuadTS(MPI_Comm comm, Vec v, PetscBool diffrhs, TSQuadCtx *ctx, TS *qts)
+{
+  Mat            A,B;
+  PetscInt       n;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TSCreate(comm,qts);CHKERRQ(ierr);
+  ierr = TSSetApplicationContext(*qts,ctx);CHKERRQ(ierr);
+  if (!v) {
+    n = 1;
+    ierr = VecCreateMPI(comm,n,PETSC_DECIDE,&v);CHKERRQ(ierr);
+    ierr = TSSetSolution(*qts,v);CHKERRQ(ierr);
+    ierr = VecDestroy(&v);CHKERRQ(ierr);
+  } else {
+    ierr = TSSetSolution(*qts,v);CHKERRQ(ierr);
+    ierr = VecGetLocalSize(v,&n);CHKERRQ(ierr);
+  }
+  ierr = MatCreateConstantDiagonal(comm,n,n,PETSC_DECIDE,PETSC_DECIDE,0.0,&A);CHKERRQ(ierr);
+  ierr = MatCreateConstantDiagonal(comm,n,n,PETSC_DECIDE,PETSC_DECIDE,0.0,&B);CHKERRQ(ierr);
+  ierr = TSSetRHSFunction(*qts,NULL,QuadTSRHSFunction,NULL);CHKERRQ(ierr);
+  ierr = TSSetRHSJacobian(*qts,A,diffrhs ? B : A,QuadTSRHSJacobian,NULL);CHKERRQ(ierr);
+
+  /* Missing ops for MATCONSTANTDIAGONAL */
+  ierr = add_missing_cdiag(A);CHKERRQ(ierr);
+  ierr = add_missing_cdiag(B);CHKERRQ(ierr);
+
+  /* fixes for using DMCOMPOSITE later */
+  {
+    DM  dm;
+    Mat T;
+
+    ierr = TSGetDM(*qts,&dm);CHKERRQ(ierr);
+    dm->ops->getlocaltoglobalmapping = DMGetLocalToGlobalMapping_Dummy;
+    ierr = VecCreateSeq(PETSC_COMM_SELF,1,&v);CHKERRQ(ierr);
+    ierr = DMShellSetLocalVector(dm,v);CHKERRQ(ierr);
+    ierr = VecDestroy(&v);CHKERRQ(ierr);
+    ierr = DMSetMatType(dm,MATCONSTANTDIAGONAL);CHKERRQ(ierr);
+    ierr = MatDuplicate(A,MAT_DO_NOT_COPY_VALUES,&T);CHKERRQ(ierr);
+    ierr = DMShellSetMatrix(dm,T);CHKERRQ(ierr);
+    ierr = MatDestroy(&T);CHKERRQ(ierr);
+  }
+
+  ierr = MatDestroy(&A);CHKERRQ(ierr);
+  ierr = MatDestroy(&B);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
 /* ------------------ Wrappers for quadrature evaluation ----------------------- */
 
 PetscErrorCode TSQuadratureCtxDestroy_Private(void *ptr)
@@ -33,23 +258,33 @@ typedef struct {
   Vec   work;
 } FWDEvalQuadCtx;
 
-static PetscErrorCode EvalQuadObj_FWD(Vec U, Vec Udot, PetscReal t, PetscReal *f, void* ctx)
+static PetscErrorCode EvalQuadObj_FWD(Vec U, Vec Udot, PetscReal t, Vec F, void* ctx)
 {
   FWDEvalQuadCtx *evalctx = (FWDEvalQuadCtx*)ctx;
   PetscErrorCode ierr;
+  PetscScalar    *a;
+  PetscReal      f;
 
   PetscFunctionBegin;
-  ierr = TSObjEval(evalctx->obj,U,evalctx->design,t,f);CHKERRQ(ierr);
+  ierr = TSObjEval(evalctx->obj,U,evalctx->design,t,&f);CHKERRQ(ierr);
+  ierr = VecGetArray(F,&a);CHKERRQ(ierr);
+  a[0] = f;
+  ierr = VecRestoreArray(F,&a);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode EvalQuadObjFixed_FWD(Vec U, Vec Udot, PetscReal t, PetscReal *f, void* ctx)
+static PetscErrorCode EvalQuadObjFixed_FWD(Vec U, Vec Udot, PetscReal t, Vec F, void* ctx)
 {
   FWDEvalQuadCtx *evalctx = (FWDEvalQuadCtx*)ctx;
   PetscErrorCode ierr;
+  PetscScalar    *a;
+  PetscReal      f;
 
   PetscFunctionBegin;
-  ierr = TSObjEvalFixed(evalctx->obj,U,evalctx->design,t,f);CHKERRQ(ierr);
+  ierr = TSObjEvalFixed(evalctx->obj,U,evalctx->design,t,&f);CHKERRQ(ierr);
+  ierr = VecGetArray(F,&a);CHKERRQ(ierr);
+  a[0] = f;
+  ierr = VecRestoreArray(F,&a);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -153,25 +388,29 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, Vec Udot, PetscReal t, Vec F,
     }
   }
   if (Hhas[2][1] && q->init) { /* (L^T \otimes I_M) H_MXdot \etadot, \eta the TLM solution */
-    Vec TLMHdot;
+    Vec TLMHdot = Udot;
     DM  dm;
 
+    if (!Udot) { /* FIXME */
     ierr = TSGetDM(tlmts,&dm);CHKERRQ(ierr);
     ierr = DMGetGlobalVector(dm,&TLMHdot);CHKERRQ(ierr);
     ierr = TSTrajectoryGetVecs(ltj,NULL,PETSC_DECIDE,&t,NULL,TLMHdot);CHKERRQ(ierr);
+    }
     if (AXPY) {
       ierr = TSOptEvalHessianDAE(tsopt,2,1,t,FWDH[0],FWDH[1],q->design,FOAH,TLMHdot,q->work1);CHKERRQ(ierr);
       ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
     } else {
       ierr = TSOptEvalHessianDAE(tsopt,2,1,t,FWDH[0],FWDH[1],q->design,FOAH,TLMHdot,F);CHKERRQ(ierr);
     }
+    if (!Udot) { /* FIXME */
     ierr = DMRestoreGlobalVector(dm,&TLMHdot);CHKERRQ(ierr);
+    }
   }
   ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
   if (rest) {
     ierr = TSTrajectoryRestoreUpdatedHistoryVecs(atj,&FOAH,NULL);CHKERRQ(ierr);
   }
-  q->init = PETSC_TRUE;
+  q->init = PETSC_TRUE; /* FIXME */
   PetscFunctionReturn(0);
 }
 
@@ -208,7 +447,6 @@ PetscErrorCode TSQuadraturePostStep_Private(TS ts)
   PetscContainer    container;
   Vec               solution;
   TSQuadratureCtx   *qeval_ctx;
-  PetscReal         squad = 0.0;
   PetscReal         dt,time,ptime;
   TSConvergedReason reason;
   PetscErrorCode    ierr;
@@ -237,11 +475,18 @@ PetscErrorCode TSQuadraturePostStep_Private(TS ts)
 
   /* scalar quadrature (psquad have been initialized with the first function evaluation) */
   if (qeval_ctx->seval) {
+    Vec dummy; /* FIXME */
+    PetscScalar *a;
+
+    ierr = VecCreateSeq(PETSC_COMM_SELF,1,&dummy);CHKERRQ(ierr);
     PetscStackPush("TS scalar quadrature function");
-    ierr = (*qeval_ctx->seval)(solution,NULL,time,&squad,qeval_ctx->seval_ctx);CHKERRQ(ierr);
+    ierr = (*qeval_ctx->seval)(solution,NULL,time,dummy,qeval_ctx->seval_ctx);CHKERRQ(ierr);
     PetscStackPop;
-    qeval_ctx->squad += dt*(squad+qeval_ctx->psquad)/2.0;
-    qeval_ctx->psquad = squad;
+    ierr = VecGetArray(dummy,&a);CHKERRQ(ierr);
+    qeval_ctx->squad += dt*(*a+qeval_ctx->psquad)/2.0;
+    qeval_ctx->psquad = *a;
+    ierr = VecRestoreArray(dummy,&a);CHKERRQ(ierr);
+    ierr = VecDestroy(&dummy);CHKERRQ(ierr);
   }
 
   /* scalar quadrature (qeval_ctx->wquad[qeval_ctx->old] have been initialized with the first function evaluation) */
@@ -375,7 +620,11 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
   FWDEvalQuadCtx  qfwd;
   TLMEvalQuadCtx  qtlm;
   TSObj           funchead;
+  Vec             dummy;
   PetscErrorCode  ierr;
+
+  QuadEval squad,squad_fixed,vquad,vquad_fixed;
+  void     *squad_ctx,*vquad_ctx;
 
   PetscFunctionBegin;
   if (direction) {
@@ -441,30 +690,43 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
   qeval_ctx->cur       = 0;
   qeval_ctx->old       = 1;
 
-  ierr = TSSetPostStep(ts,TSQuadraturePostStep_Private);CHKERRQ(ierr);
   ierr = TSSetUp(ts);CHKERRQ(ierr);
 
   ierr = TSGetMaxTime(ts,&tf);CHKERRQ(ierr);
   ierr = TSGetTime(ts,&t0);CHKERRQ(ierr);
   /* fixed term at t0 for scalar quadrature */
+  ierr = VecCreateSeq(PETSC_COMM_SELF,1,&dummy);CHKERRQ(ierr);
   if (seval_fixed) {
     Vec sol;
+    PetscScalar *a;
 
     ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
     PetscStackPush("TS scalar quadrature function (fixed time)");
-    ierr = (*seval_fixed)(sol,NULL,t0,&qeval_ctx->squad,qeval_ctx->seval_ctx);CHKERRQ(ierr);
+    ierr = (*seval_fixed)(sol,NULL,t0,dummy,qeval_ctx->seval_ctx);CHKERRQ(ierr);
     PetscStackPop;
+    ierr = VecGetArray(dummy,&a);CHKERRQ(ierr);
+    qeval_ctx->squad = *a;
+    ierr = VecRestoreArray(dummy,&a);CHKERRQ(ierr);
   }
+
   /* initialize trapz rule for scalar quadrature */
   if (qeval_ctx->seval) {
     Vec sol;
+    PetscScalar *a;
 
     ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
     PetscStackPush("TS scalar quadrature function");
-    ierr = (*qeval_ctx->seval)(sol,NULL,t0,&qeval_ctx->psquad,qeval_ctx->seval_ctx);CHKERRQ(ierr);
+    ierr = (*qeval_ctx->seval)(sol,NULL,t0,dummy,qeval_ctx->seval_ctx);CHKERRQ(ierr);
     PetscStackPop;
+    ierr = VecGetArray(dummy,&a);CHKERRQ(ierr);
+    qeval_ctx->psquad = *a;
+    ierr = VecRestoreArray(dummy,&a);CHKERRQ(ierr);
   }
-  if (qeval_ctx->veval) {
+
+  squad = seval;
+  squad_fixed = seval_fixed;
+  squad_ctx = &qfwd;
+  if (veval) {
     PetscBool has;
 
     if (direction) { /* Hessian computations */
@@ -481,6 +743,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     }
     if (!has) { /* cost integrands not present */
       qeval_ctx->veval = NULL;
+      veval = NULL;
     }
     if (!qeval_ctx->wquad) {
       ierr = VecDuplicateVecs(qeval_ctx->vquad,5,&qeval_ctx->wquad);CHKERRQ(ierr);
@@ -495,6 +758,10 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     }
     if (!has) veval_fixed = NULL;
   }
+  vquad = veval;
+  vquad_fixed = veval_fixed;
+  vquad_ctx = direction ? (void*)&qtlm : (void*)&qfwd;
+
   /* for gradient computations, we just need the design vector and one work vector for the function evaluation
      for Hessian computations, we need extra data */
   if (qeval_ctx->veval || veval_fixed) {
@@ -537,6 +804,75 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     }
   }
 
+  /* FIXME */
+  PetscBool diffrhs = (ts->Arhs != ts->Brhs) ? PETSC_TRUE : PETSC_FALSE;
+  TS        ats = NULL;
+  PetscInt  nq = 0;
+  TS        qts[] = {NULL,NULL};
+  TSQuadCtx qctxs[2];
+  PetscErrorCode (*qup[])(TS,Vec,Vec) = {QuadTSUpdateStates,QuadTSUpdateStates};
+  Vec       qvec_fixed[]= {NULL,NULL};
+  if (squad) {
+    DM  dm;
+    Vec v;
+
+    qctxs[nq].evalquad       = squad;
+    qctxs[nq].evalquad_fixed = squad_fixed;
+    qctxs[nq].evalquadctx    = squad_ctx;
+
+    ierr = TSCreateQuadTS(PetscObjectComm((PetscObject)ts),NULL,diffrhs,&qctxs[nq],&qts[nq]);CHKERRQ(ierr);
+
+    /* Init */
+    ierr = TSGetDM(qts[nq],&dm);CHKERRQ(ierr);
+    ierr = DMGetGlobalVector(dm,&qvec_fixed[nq]);CHKERRQ(ierr);
+    ierr = TSGetSolution(qts[nq],&v);CHKERRQ(ierr);
+    ierr = VecSet(v,0.0);CHKERRQ(ierr);
+    ierr = VecSet(qvec_fixed[nq],0.0);CHKERRQ(ierr);
+    if (qctxs[nq].evalquad_fixed) {
+      Vec sol;
+
+      ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
+      ierr = (*qctxs[nq].evalquad_fixed)(sol,NULL,t0,qvec_fixed[nq],qctxs[nq].evalquadctx);CHKERRQ(ierr);
+    }
+    nq++;
+  }
+
+  if (vquad) {
+    DM dm;
+
+    qctxs[nq].evalquad       = vquad;
+    qctxs[nq].evalquad_fixed = vquad_fixed;
+    qctxs[nq].evalquadctx    = vquad_ctx;
+
+    ierr = TSCreateQuadTS(PetscObjectComm((PetscObject)ts),quadvec,diffrhs,&qctxs[nq],&qts[nq]);CHKERRQ(ierr);
+
+    /* Init (add quadvec to qvec_fixed and start from 0) */
+    ierr = TSGetDM(qts[nq],&dm);CHKERRQ(ierr);
+    ierr = DMGetGlobalVector(dm,&qvec_fixed[nq]);CHKERRQ(ierr);
+    ierr = VecSet(qvec_fixed[nq],0.0);CHKERRQ(ierr);
+    if (qctxs[nq].evalquad_fixed) {
+      Vec sol;
+
+      ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
+      ierr = (*qctxs[nq].evalquad_fixed)(sol,NULL,t0,qvec_fixed[nq],qctxs[nq].evalquadctx);CHKERRQ(ierr);
+    }
+    ierr = VecAXPY(qvec_fixed[nq],1.0,quadvec);CHKERRQ(ierr);
+    ierr = VecSet(quadvec,0.0);CHKERRQ(ierr);
+    nq++;
+  }
+
+  /* FIXME: forward quadrature always works */
+  PetscBool new = PETSC_TRUE;
+  PetscOptionsGetBool(NULL,NULL,"-new",&new,NULL);
+  if (nq) {
+    ierr = TSCreateAugmentedTS(ts,nq,qts,NULL,qup,NULL,NULL,NULL,&ats);CHKERRQ(ierr);
+    ierr = AugmentedTSInitialize(ats);CHKERRQ(ierr);
+    ierr = TSSetFromOptions(ats);CHKERRQ(ierr);
+  }
+  TS usedts = new ? ats : ts;
+  if (!usedts) usedts = ts;
+  if (usedts == ats) qtlm.init = PETSC_TRUE;
+  if (usedts != ats)  { ierr = TSSetPostStep(ts,TSQuadraturePostStep_Private);CHKERRQ(ierr); }
   /* forward solve */
   fidt = PETSC_TRUE;
   ierr = TSGetTimeStep(ts,&dt);CHKERRQ(ierr);
@@ -551,7 +887,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     PetscBool has_f = PETSC_FALSE, has_m = PETSC_FALSE;
     PetscReal tt;
 
-    ierr = TSGetTime(ts,&t0);CHKERRQ(ierr);
+    ierr = TSGetTime(usedts,&t0);CHKERRQ(ierr);
     if (direction) { /* we always stop at the selected times */
       PetscBool has1,has2;
 
@@ -560,45 +896,107 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     } else {
       ierr = TSObjHasObjectiveFixed(funchead,t0,tf,&has_f,NULL,&has_m,NULL,NULL,NULL,&tfup);CHKERRQ(ierr);
     }
-    ierr = TSSetMaxTime(ts,tfup);CHKERRQ(ierr);
     tt   = tfup;
-    ierr = TSSolve(ts,NULL);CHKERRQ(ierr);
+    ierr = TSSetMaxTime(usedts,tfup);CHKERRQ(ierr);
+    ierr = TSSolve(usedts,NULL);CHKERRQ(ierr);
 
     /* determine if TS finished before the max time requested */
-    ierr = TSGetTime(ts,&tfup);CHKERRQ(ierr);
+    ierr = TSGetTime(usedts,&tfup);CHKERRQ(ierr);
     stop = (PetscAbsReal(tt-tfup) < PETSC_SMALL) ? PETSC_FALSE : PETSC_TRUE;
-    if (has_f && seval_fixed) {
-      Vec       sol;
-      PetscReal v;
+    if (has_f && squad_fixed) {
+      if (usedts == ats) {
+        DM  dm;
+        Vec sol,v;
+        PetscInt q;
 
-      ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
-      PetscStackPush("TS scalar quadrature function (fixed time)");
-      ierr = (*seval_fixed)(sol,NULL,tfup,&v,qeval_ctx->seval_ctx);CHKERRQ(ierr);
-      PetscStackPop;
-      qeval_ctx->squad += v;
+        q    = 0;
+        ierr = AugmentedTSUpdateModelSolution(ats);CHKERRQ(ierr);
+        ierr = TSGetDM(qts[q],&dm);CHKERRQ(ierr);
+        ierr = DMGetGlobalVector(dm,&v);CHKERRQ(ierr);
+        ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
+        ierr = (*qctxs[q].evalquad_fixed)(sol,NULL,tfup,v,qctxs[q].evalquadctx);CHKERRQ(ierr);
+        ierr = VecAXPY(qvec_fixed[q],1.0,v);CHKERRQ(ierr);
+        ierr = DMRestoreGlobalVector(dm,&v);CHKERRQ(ierr);
+      } else {
+        Vec         sol;
+        PetscScalar *a;
+
+        ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
+        PetscStackPush("TS scalar quadrature function (fixed time)");
+        ierr = (*seval_fixed)(sol,NULL,tfup,dummy,qeval_ctx->seval_ctx);CHKERRQ(ierr);
+        PetscStackPop;
+        ierr = VecGetArray(dummy,&a);CHKERRQ(ierr);
+        qeval_ctx->squad += *a;
+        ierr = VecRestoreArray(dummy,&a);CHKERRQ(ierr);
+      }
     }
-    if (has_m && veval_fixed) { /* we use wquad[4] since wquad[3] can be used by the TLM quadrature */
-      Vec sol;
+    if (has_m && vquad_fixed) { /* we use wquad[4] since wquad[3] can be used by the TLM quadrature */
 
-      ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
-      PetscStackPush("TS vector quadrature function (fixed time)");
-      ierr = (*veval_fixed)(sol,NULL,tfup,qeval_ctx->wquad[4],qeval_ctx->veval_ctx);CHKERRQ(ierr);
-      PetscStackPop;
-      ierr = VecAXPY(qeval_ctx->vquad,1.0,qeval_ctx->wquad[4]);CHKERRQ(ierr);
+      if (usedts == ats) {
+        DM  dm;
+        Vec sol,v;
+        PetscInt q;
+
+        q    = nq-1;
+        ierr = AugmentedTSUpdateModelSolution(ats);CHKERRQ(ierr);
+        ierr = TSGetDM(qts[q],&dm);CHKERRQ(ierr);
+        ierr = DMGetGlobalVector(dm,&v);CHKERRQ(ierr);
+        ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
+        ierr = (*qctxs[q].evalquad_fixed)(sol,NULL,tfup,v,qctxs[q].evalquadctx);CHKERRQ(ierr);
+        ierr = VecAXPY(qvec_fixed[q],1.0,v);CHKERRQ(ierr);
+        ierr = DMRestoreGlobalVector(dm,&v);CHKERRQ(ierr);
+      } else {
+        Vec sol;
+
+        ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
+        PetscStackPush("TS vector quadrature function (fixed time)");
+        ierr = (*veval_fixed)(sol,NULL,tfup,qeval_ctx->wquad[4],qeval_ctx->veval_ctx);CHKERRQ(ierr);
+        PetscStackPop;
+        ierr = VecAXPY(qeval_ctx->vquad,1.0,qeval_ctx->wquad[4]);CHKERRQ(ierr);
+      }
     }
     if (fidt) { /* restore fixed time step */
-      ierr = TSSetTimeStep(ts,dt);CHKERRQ(ierr);
+      ierr = TSSetTimeStep(usedts,dt);CHKERRQ(ierr);
     }
   } while (PetscAbsReal(tfup - tf) > PETSC_SMALL && !stop);
 
+  if (usedts == ats) {
+    PetscInt i;
+
+    ierr = AugmentedTSFinalize(ats);CHKERRQ(ierr);
+    for (i=0;i<nq;i++) {
+      DM  dm;
+      Vec v;
+
+      ierr = TSGetSolution(qts[i],&v);CHKERRQ(ierr);
+      ierr = VecAXPY(v,1.0,qvec_fixed[i]);CHKERRQ(ierr);
+      ierr = TSGetDM(qts[i],&dm);CHKERRQ(ierr);
+      ierr = DMRestoreGlobalVector(dm,&qvec_fixed[i]);CHKERRQ(ierr);
+    }
+  }
+  if (usedts != ats) { /* restore user PostStep */
+    ierr = TSSetPostStep(ts,qeval_ctx->user);CHKERRQ(ierr);
+  }
+  if (quadscalar) {
+    if (usedts == ts) *quadscalar = qeval_ctx->squad;
+    else {
+      Vec         v;
+      PetscScalar *a;
+
+      ierr = TSGetSolution(qts[0],&v);CHKERRQ(ierr);
+      ierr = VecGetArray(v,&a);CHKERRQ(ierr);
+      *quadscalar = PetscRealPart(a[0]);
+      ierr = VecRestoreArray(v,&a);CHKERRQ(ierr);
+    }
+  }
+  ierr = TSDestroy(&qts[0]);CHKERRQ(ierr);
+  ierr = TSDestroy(&qts[1]);CHKERRQ(ierr);
+  ierr = TSDestroy(&ats);CHKERRQ(ierr);
   /* zero contexts for quadrature */
   qeval_ctx->seval_ctx = NULL;
   qeval_ctx->veval_ctx = NULL;
 
-  /* restore user PostStep */
-  ierr = TSSetPostStep(ts,qeval_ctx->user);CHKERRQ(ierr);
-
+  ierr = VecDestroy(&dummy);CHKERRQ(ierr);
   /* get back scalar value */
-  if (quadscalar) *quadscalar = qeval_ctx->squad;
   PetscFunctionReturn(0);
 }
