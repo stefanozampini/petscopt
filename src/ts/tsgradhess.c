@@ -2,6 +2,7 @@
 #include <petscopt/tlmts.h>
 #include <petscopt/private/tsobjimpl.h>
 #include <petscopt/private/tsoptimpl.h>
+#include <petscopt/private/adjointtsimpl.h>
 #include <petscopt/private/tspdeconstrainedutilsimpl.h>
 #include <petsc/private/tshistoryimpl.h>
 
@@ -138,7 +139,13 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
     ierr = TSSetMaxSteps(tshess->soats,nsteps-1);CHKERRQ(ierr);
     ierr = TSSetExactFinalTime(tshess->soats,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
   }
-  ierr = TSSolve(tshess->soats,NULL);CHKERRQ(ierr);
+  PetscBool new = PETSC_FALSE;
+  PetscOptionsGetBool(NULL,NULL,"-new",&new,NULL);
+  if (new) {
+    ierr = AdjointTSSolveWithQuadrature_Private(tshess->soats);CHKERRQ(ierr);
+  } else {
+    ierr = TSSolve(tshess->soats,NULL);CHKERRQ(ierr);
+  }
   ierr = AdjointTSFinalizeQuadrature(tshess->soats);CHKERRQ(ierr);
 
   ierr = AdjointTSSetQuadratureVec(tshess->soats,NULL);CHKERRQ(ierr);
@@ -221,7 +228,13 @@ static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec de
         ierr = TSSetExactFinalTime(adjts,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
       }
     }
-    ierr = TSSolve(adjts,NULL);CHKERRQ(ierr);
+    PetscBool new = PETSC_TRUE;
+    PetscOptionsGetBool(NULL,NULL,"-new",&new,NULL);
+    if (new) {
+      ierr = AdjointTSSolveWithQuadrature_Private(adjts);CHKERRQ(ierr);
+    } else {
+      ierr = TSSolve(adjts,NULL);CHKERRQ(ierr);
+    }
     ierr = AdjointTSFinalizeQuadrature(adjts);CHKERRQ(ierr);
     ierr = TSDestroy(&adjts);CHKERRQ(ierr);
 

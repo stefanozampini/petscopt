@@ -3,6 +3,7 @@
 #include <petscopt/adjointts.h>
 #include <petscopt/tlmts.h>
 #include <petscopt/private/tsoptimpl.h>
+#include <petscopt/private/adjointtsimpl.h>
 #include <petsc/private/tshistoryimpl.h>
 
 /* ------------------ Routines for the Mat that represents the linearized propagator ----------------------- */
@@ -122,7 +123,13 @@ static PetscErrorCode MatMultTranspose_Propagator(Mat A, Vec x, Vec y)
     ierr = TSSetExactFinalTime(prop->adjlts,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
   }
   ierr = TSSetMaxTime(prop->adjlts,prop->tf);CHKERRQ(ierr);
-  ierr = TSSolve(prop->adjlts,NULL);CHKERRQ(ierr);
+  PetscBool new = PETSC_TRUE;
+  PetscOptionsGetBool(NULL,NULL,"-new",&new,NULL);
+  if (new) {
+    ierr = AdjointTSSolveWithQuadrature_Private(prop->adjlts);CHKERRQ(ierr);
+  } else {
+    ierr = TSSolve(prop->adjlts,NULL);CHKERRQ(ierr);
+  }
   ierr = AdjointTSFinalizeQuadrature(prop->adjlts);CHKERRQ(ierr);
   prop->lts->trajectory = NULL;
   prop->tj = prop->model->trajectory;
