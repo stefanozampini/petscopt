@@ -1,5 +1,5 @@
 Using param fec type HDIV, order 2
 Using state fec type HDIV, order 2
-[VP_VS] ||   op_M_pd - op_M||: 0.0201114
+[VP_VS] ||   op_M_pd - op_M||: 1.6309e-16
 [VP_VS] ||    op_M_m - op_M||: 1.14451e-17
-[VP_VS] || op_M_pd_m - op_M||: 0.0201114
+[VP_VS] || op_M_pd_m - op_M||: 1.6309e-16

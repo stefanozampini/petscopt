@@ -22,7 +22,7 @@ Vec Object: 1 MPI processes
   9 TAO,  Function value: 7.52667e-08,  Residual: 0.000672828 
  10 TAO,  Function value: 4.79843e-09,  Residual: 3.20059e-05 
  11 TAO,  Function value: 9.04039e-13,  Residual: 4.37813e-07 
- 12 TAO,  Function value: 1.27829e-19,  Residual: 2.5344e-10 
+ 12 TAO,  Function value: 1.27829e-19,  Residual: 2.53439e-10 
 
 Tao solution
 Vec Object: 1 MPI processes
@@ -41,7 +41,7 @@ Vec Object: 1 MPI processes
     of hand-coded and finite difference Hessian entries greater than <threshold>.
   Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Hessian is probably correct.
-  ||H - Hfd||_F/||H||_F = 0.000111593, ||H - Hfd||_F = 0.000385241
+  ||H - Hfd||_F/||H||_F = 0.000111632, ||H - Hfd||_F = 0.000385375
 
 Gradient via adjoint
 Vec Object: 1 MPI processes

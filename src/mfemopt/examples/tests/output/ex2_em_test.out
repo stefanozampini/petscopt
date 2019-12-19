@@ -19,13 +19,14 @@ ObjectiveFunction::TestFDHessian state x state
 PDOperator::TestFDGradient wrt design
 ||G|| = 0.860933, ||G^T|| = 1.21997, ||G - (G^T)^T||/||G|| = 9.67168e-17, ||G_fd|| = 0.860933, ||G_fd - G|| = 2.68188e-08
 ---------------------------------------
-Misfit objective 3.42603e-05
+Misfit objective 3.42602e-05
 =======================================
 NC 0 -> Number of dofs 20
-Initial objective 3.42873e-05 (LS 3.42603e-05, TV 2.7e-08)
-it=0	lit=0	obj=3.428730e-05	(g,du)=-0.000000e+00	||g||=2.971722e-04	step=1.000000e+00
-it=1	lit=12	obj=4.618077e-06	(g,du)=-7.734990e-05	||g||=1.250587e-04	step=1.000000e+00
-it=2	lit=13	obj=4.380571e-08	(g,du)=-8.796403e-06	||g||=7.274634e-06	step=1.000000e+00
-it=3	lit=13	obj=2.729328e-08	(g,du)=-3.353780e-08	||g||=9.190593e-07	step=1.000000e+00
-Nonlinear newton_ solve converged due to CONVERGED_FNORM_ABS iterations 3
-Final objective (SNES) 2.72933e-08 (LS 2.73722e-10, TV 2.70196e-08)
+Initial objective 3.42872e-05 (LS 3.42602e-05, TV 2.7e-08)
+it=0	lit=0	obj=3.428724e-05	(g,du)=-0.000000e+00	||g||=2.971722e-04	step=1.000000e+00
+it=1	lit=12	obj=3.762615e-06	(g,du)=-7.545189e-05	||g||=1.124430e-04	step=1.000000e+00
+it=2	lit=12	obj=4.664764e-08	(g,du)=-7.225939e-06	||g||=7.860023e-06	step=1.000000e+00
+it=3	lit=14	obj=2.785222e-08	(g,du)=-3.935186e-08	||g||=1.025047e-06	step=1.000000e+00
+it=4	lit=16	obj=2.709664e-08	(g,du)=-1.352069e-09	||g||=1.232030e-07	step=1.000000e+00
+Nonlinear newton_ solve converged due to CONVERGED_FNORM_ABS iterations 4
+Final objective (SNES) 2.70966e-08 (LS 2.23017e-11, TV 2.70743e-08)

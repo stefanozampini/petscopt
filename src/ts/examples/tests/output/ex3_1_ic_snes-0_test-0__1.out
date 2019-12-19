@@ -3,13 +3,13 @@
     of hand-coded and finite difference gradient entries greater than <threshold>.
   Testing hand-coded Gradient, if (for double precision runs) ||G - Gfd||_F/||G||_F is
     O(1.e-8), the hand-coded Gradient is probably correct.
-  ||Gfd|| 4.68393e+11, ||G|| = 4.68449e+11, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 0.000119218, ||G - Gfd|| = 5.58473e+07
-  max-norm ||G - Gfd||/||G|| = 0.000119145, ||G - Gfd|| = 5.58135e+07
+  ||Gfd|| 1.19666e+13, ||G|| = 1.19667e+13, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 4.53802e-05, ||G - Gfd|| = 5.43053e+08
+  max-norm ||G - Gfd||/||G|| = 4.31805e-05, ||G - Gfd|| = 5.16729e+08
 -------------------------- Taylor test results ---------------------------
 		Gradient				Hessian
 --------------------------------------------------------------------------
-2.31856e+09	0.00000 	0	1.39340e+08	0.00000 	0
-5.98027e+08	1.95495 	2	1.64480e+07	3.08263 	3
-1.52073e+08	1.97545 	2	1.54593e+06	3.41137 	3
-3.85991e+07	1.97812 	2	194410. 	2.99130 	3
+6.84340e+10	0.00000 	0	5.07413e+09	0.00000 	0
+1.77278e+10	1.94870 	2	6.49271e+08	2.96627 	3
+4.51529e+09	1.97312 	2	7.89745e+07	3.03936 	3
+1.14041e+09	1.98527 	2	8.15650e+06	3.27536 	3
