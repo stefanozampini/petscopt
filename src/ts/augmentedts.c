@@ -348,7 +348,7 @@ static PetscErrorCode AugmentedTSRHSFunction(TS ats, PetscReal time, Vec U, Vec 
   ierr = DMCompositeGetAccessArray(dm,F,actx->nqts + 1,NULL,actx->F);CHKERRQ(ierr);
   ierr = TSComputeRHSFunction(actx->model,time,actx->U[0],actx->F[0]);CHKERRQ(ierr);
   for (i=0;i<actx->nqts;i++) {
-    if (actx->updatestates[i]) { ierr = (*actx->updatestates[i])(actx->qts[i],actx->U[0],NULL);CHKERRQ(ierr); }
+    if (actx->updatestates[i]) { ierr = (*actx->updatestates[i])(actx->qts[i],actx->U[0],actx->Udot[0]);CHKERRQ(ierr); }
     ierr = TSComputeRHSFunction(actx->qts[i],time,actx->U[i+1],actx->F[i+1]);CHKERRQ(ierr);
     if (actx->updatestates[i]) { ierr = (*actx->updatestates[i])(actx->qts[i],NULL,NULL);CHKERRQ(ierr); }
   }
@@ -374,13 +374,15 @@ static PetscErrorCode AugmentedTSRHSJacobian(TS ats, PetscReal time, Vec U, Mat 
   ierr = MatNestGetSubMat(P,0,0,&Psub);CHKERRQ(ierr);
   ierr = TSComputeRHSJacobian(actx->model,time,actx->U[0],Asub,Psub);CHKERRQ(ierr);
   for (i=0;i<actx->nqts;i++) {
-    if (actx->updatestates[i]) { ierr = (*actx->updatestates[i])(actx->qts[i],actx->U[0],NULL);CHKERRQ(ierr); }
+    if (actx->updatestates[i]) { ierr = (*actx->updatestates[i])(actx->qts[i],actx->U[0],actx->Udot[0]);CHKERRQ(ierr); }
     if (actx->rhsjaccoupling[i]) {
-      TSRHSJacobian c = actx->rhsjaccoupling[i];
+      TSRHSJacobian coupling = actx->rhsjaccoupling[i];
+      PetscInt r = actx->adjoint ? 0 : i+1;
+      PetscInt c = actx->adjoint ? i+1 : 0;
 
-      ierr = MatNestGetSubMat(A,i+1,0,&Asub);CHKERRQ(ierr);
-      ierr = MatNestGetSubMat(P,i+1,0,&Psub);CHKERRQ(ierr);
-      ierr = (*c)(actx->qts[i],time,actx->U[i+1],Asub,Psub,actx);CHKERRQ(ierr);
+      ierr = MatNestGetSubMat(A,r,c,&Asub);CHKERRQ(ierr);
+      ierr = MatNestGetSubMat(P,r,c,&Psub);CHKERRQ(ierr);
+      ierr = (*coupling)(actx->qts[i],time,actx->U[i+1],Asub,Psub,actx);CHKERRQ(ierr);
     }
     ierr = MatNestGetSubMat(A,i+1,i+1,&Asub);CHKERRQ(ierr);
     ierr = MatNestGetSubMat(P,i+1,i+1,&Psub);CHKERRQ(ierr);
@@ -437,12 +439,14 @@ static PetscErrorCode AugmentedTSIJacobian(TS ats, PetscReal time, Vec U, Vec Ud
   for (i=0;i<actx->nqts;i++) {
     if (actx->updatestates[i]) { ierr = (*actx->updatestates[i])(actx->qts[i],actx->U[0],actx->Udot[0]);CHKERRQ(ierr); }
     if (actx->rhsjaccoupling[i]) {
-      TSRHSJacobian c = actx->rhsjaccoupling[i];
+      TSRHSJacobian coupling = actx->rhsjaccoupling[i];
+      PetscInt r = actx->adjoint ? 0 : i+1;
+      PetscInt c = actx->adjoint ? i+1 : 0;
 
-      ierr = MatNestGetSubMat(A,i+1,0,&Asub);CHKERRQ(ierr);
-      ierr = MatNestGetSubMat(P,i+1,0,&Psub);CHKERRQ(ierr);
-      ierr = (*c)(actx->qts[i],time,actx->U[i+1],Asub,Psub,actx);CHKERRQ(ierr);
-      ierr = MatScale(Psub,-1.0);CHKERRQ(ierr);
+      ierr = MatNestGetSubMat(A,r,c,&Asub);CHKERRQ(ierr);
+      ierr = MatNestGetSubMat(P,r,c,&Psub);CHKERRQ(ierr);
+      ierr = (*coupling)(actx->qts[i],time,actx->U[i+1],Asub,Psub,actx);CHKERRQ(ierr);
+      if (Psub) { ierr = MatScale(Psub,-1.0);CHKERRQ(ierr); }
       if (Asub && Asub != Psub) {
         ierr = MatScale(Asub,-1.0);CHKERRQ(ierr);
       }
@@ -542,7 +546,7 @@ PetscErrorCode AugmentedTSFinalize(TS ats)
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactive[], PetscErrorCode (*updatestates[])(TS,Vec,Vec), TSRHSJacobian rhsjaccoupling[], Mat Acoupling[], Mat Bcoupling[], TS* ats)
+PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactive[], PetscErrorCode (*updatestates[])(TS,Vec,Vec), TSRHSJacobian rhsjaccoupling[], Mat Acoupling[], Mat Bcoupling[], PetscBool adjoint, TS* ats)
 {
   SNES             snes;
   KSP              ksp;
@@ -648,11 +652,7 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
   ierr = TSGetTolerances(aug_ctx->model,&atol,&va,&rtol,&vr);CHKERRQ(ierr);
   ierr = DMGetGlobalVector(adm,&vatol);CHKERRQ(ierr);
   ierr = DMGetGlobalVector(adm,&vrtol);CHKERRQ(ierr);
-#if 0
-  /* According to the doc... */
-  ierr = VecSet(vatol,PETSC_INFINITY);CHKERRQ(ierr);
-  ierr = VecSet(vrtol,PETSC_INFINITY);CHKERRQ(ierr);
-#endif
+  /* not contributing to the wlte */
   ierr = VecSet(vatol,-1.0);CHKERRQ(ierr);
   ierr = VecSet(vrtol,-1.0);CHKERRQ(ierr);
   ierr = DMCompositeGetAccessArray(adm,vatol,aug_ctx->nqts + 1,NULL,aug_ctx->U);CHKERRQ(ierr);
@@ -681,6 +681,7 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
   ierr = DMRestoreGlobalVector(adm,&vrtol);CHKERRQ(ierr);
 
   /* setup callbacks */
+  aug_ctx->adjoint = adjoint;
   ierr = TSGetIFunction(aug_ctx->model,NULL,&ifunc,NULL);CHKERRQ(ierr);
   ierr = TSGetRHSFunction(aug_ctx->model,NULL,&rhsfunc,NULL);CHKERRQ(ierr);
   if (ifunc) {
@@ -697,6 +698,8 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
     ierr = MatNestSetSubMat(A,0,0,subA);CHKERRQ(ierr);
     ierr = MatNestSetSubMat(B,0,0,subB);CHKERRQ(ierr);
     for (i=0;i<aug_ctx->nqts;i++) {
+      PetscInt r = aug_ctx->adjoint ? 0 : i+1;
+      PetscInt c = aug_ctx->adjoint ? i+1 : 0;
 
       ierr = TSGetIJacobian(aug_ctx->qts[i],&subA,&subB,NULL,NULL);CHKERRQ(ierr);
       if (A == B && subA != subB) SETERRQ(PetscObjectComm((PetscObject)*ats),PETSC_ERR_PLIB,"Incompatible IJacobian matrices");
@@ -709,8 +712,8 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
         if (subA) { ierr = MatScale(subA,-1.0);CHKERRQ(ierr); }
         if (subB && subB != subA) { ierr = MatScale(subB,-1.0);CHKERRQ(ierr); }
       }
-      if (subA) { ierr = MatNestSetSubMat(A,i+1,0,subA);CHKERRQ(ierr); }
-      if (subB) { ierr = MatNestSetSubMat(B,i+1,0,subB);CHKERRQ(ierr); }
+      if (subA) { ierr = MatNestSetSubMat(A,r,c,subA);CHKERRQ(ierr); }
+      if (subB) { ierr = MatNestSetSubMat(B,r,c,subB);CHKERRQ(ierr); }
     }
     ierr = TSSetIFunction(*ats,NULL,AugmentedTSIFunction,NULL);CHKERRQ(ierr);
     ierr = TSSetIJacobian(*ats,A,B,AugmentedTSIJacobian,NULL);CHKERRQ(ierr);
@@ -731,6 +734,8 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
     ierr = MatNestSetSubMat(B,0,0,subB);CHKERRQ(ierr);
 
     for (i=0;i<aug_ctx->nqts;i++) {
+      PetscInt r = aug_ctx->adjoint ? 0 : i+1;
+      PetscInt c = aug_ctx->adjoint ? i+1 : 0;
 
       ierr = TSGetRHSMats_Private(aug_ctx->qts[i],&subA,&subB);CHKERRQ(ierr);
       if (A == B && subA != subB) SETERRQ(PetscObjectComm((PetscObject)*ats),PETSC_ERR_PLIB,"Incompatible RHSJacobian matrices");
@@ -743,8 +748,8 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
       if (A == B && subA != subB) SETERRQ(PetscObjectComm((PetscObject)*ats),PETSC_ERR_PLIB,"Incompatible RHSJacobian matrices");
       /* this check is needed because we can use an implicit method, and the submatrices will get shifted differently */
       if (A != B && (subA && subA == subB)) SETERRQ(PetscObjectComm((PetscObject)*ats),PETSC_ERR_PLIB,"Incompatible RHSJacobian matrices");
-      if (subA) { ierr = MatNestSetSubMat(A,i+1,0,subA);CHKERRQ(ierr); }
-      if (subB) { ierr = MatNestSetSubMat(B,i+1,0,subB);CHKERRQ(ierr); }
+      if (subA) { ierr = MatNestSetSubMat(A,r,c,subA);CHKERRQ(ierr); }
+      if (subB) { ierr = MatNestSetSubMat(B,r,c,subB);CHKERRQ(ierr); }
     }
 
     ierr = TSSetRHSFunction(*ats,NULL,AugmentedTSRHSFunction,NULL);CHKERRQ(ierr);

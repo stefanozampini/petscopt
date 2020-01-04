@@ -1541,57 +1541,70 @@ PetscErrorCode AdjointTSFinalizeQuadrature(TS adjts)
 
 static PetscErrorCode JacCoupling(TS qts, PetscReal t, Vec Q, Mat A, Mat B, void* ctx)
 {
-  AdjEvalQuadCtx *adjq;
-  TSQuadCtx      *qctx;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  ierr = TSGetApplicationContext(qts,(void*)&qctx);CHKERRQ(ierr);
-  adjq = qctx->evalquadctx;
-  ierr = TSOptEvalGradientDAE(adjq->tsopt,t,NULL,NULL,adjq->design,NULL,NULL);CHKERRQ(ierr);
+  ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+#if 0
+  {
+    AdjEvalQuadCtx *adjq;
+    TSQuadCtx      *qctx;
+    PetscReal      fwdt;
+    ierr = TSGetApplicationContext(qts,(void*)&qctx);CHKERRQ(ierr);
+    adjq = qctx->evalquadctx;
+    fwdt = adjq->tf - t + adjq->t0;
+    ierr = TSOptEvalGradientDAE(adjq->tsopt,fwdt,NULL,NULL,adjq->design,NULL,NULL);CHKERRQ(ierr);
+  }
+#endif
   PetscFunctionReturn(0);
 }
 
 static PetscErrorCode __mat_shell_mult(Mat B, Vec x, Vec y)
 {
-   Mat            A;
-   PetscErrorCode ierr;
+  Mat            A;
+  PetscErrorCode ierr;
 
-   PetscFunctionBeginUser;
-   ierr = MatShellGetContext(B,(void **)&A);CHKERRQ(ierr);
-   ierr = MatMult(A,x,y);CHKERRQ(ierr);
-   PetscFunctionReturn(0);
+  PetscFunctionBeginUser;
+  ierr = MatShellGetContext(B,(void **)&A);CHKERRQ(ierr);
+  ierr = MatMult(A,x,y);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
 }
 
 static PetscErrorCode __mat_shell_multtranspose(Mat B, Vec x, Vec y)
 {
-   Mat            A;
-   PetscErrorCode ierr;
+  Mat            A;
+  PetscErrorCode ierr;
 
-   PetscFunctionBeginUser;
-   ierr = MatShellGetContext(B,(void **)&A);CHKERRQ(ierr);
-   ierr = MatMultTranspose(A,x,y);CHKERRQ(ierr);
-   PetscFunctionReturn(0);
+  PetscFunctionBeginUser;
+  ierr = MatShellGetContext(B,(void **)&A);CHKERRQ(ierr);
+  ierr = MatMultTranspose(A,x,y);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
 }
 
 static PetscErrorCode __mat_shell_destroy(Mat B)
 {
-   Mat            A;
-   PetscErrorCode ierr;
+  Mat            A;
+  PetscErrorCode ierr;
 
-   PetscFunctionBeginUser;
-   ierr = MatShellGetContext(B,(void **)&A);CHKERRQ(ierr);
-   ierr = MatDestroy(&A);CHKERRQ(ierr);
-   PetscFunctionReturn(0);
+  PetscFunctionBeginUser;
+  ierr = MatShellGetContext(B,(void **)&A);CHKERRQ(ierr);
+  ierr = MatDestroy(&A);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
 }
 
-PetscErrorCode MatCreateShellWithMat(Mat A, Mat *B)
+PetscErrorCode MatCreateShellWithMat(Mat A, PetscBool trans, Mat *B)
 {
   PetscErrorCode ierr;
   PetscInt       m,n,M,N;
   PetscInt       i;
   void           (*f[])(void) = { (void (*)())__mat_shell_mult,
                                   (void (*)())__mat_shell_multtranspose,
+                                  (void (*)())__mat_shell_destroy };
+  void           (*t[])(void) = { (void (*)())__mat_shell_multtranspose,
+                                  (void (*)())__mat_shell_mult,
                                   (void (*)())__mat_shell_destroy };
   MatOperation   ops[] = { MATOP_MULT,
                            MATOP_MULT_TRANSPOSE,
@@ -1601,9 +1614,13 @@ PetscErrorCode MatCreateShellWithMat(Mat A, Mat *B)
   ierr = PetscObjectReference((PetscObject)A);CHKERRQ(ierr);
   ierr = MatGetSize(A,&M,&N);CHKERRQ(ierr);
   ierr = MatGetLocalSize(A,&m,&n);CHKERRQ(ierr);
-  ierr = MatCreateShell(PetscObjectComm((PetscObject)A),m,n,M,N,A,B);CHKERRQ(ierr);
+  if (trans) {
+    ierr = MatCreateShell(PetscObjectComm((PetscObject)A),n,m,N,M,A,B);CHKERRQ(ierr);
+  } else {
+    ierr = MatCreateShell(PetscObjectComm((PetscObject)A),m,n,M,N,A,B);CHKERRQ(ierr);
+  }
   for (i=0;i<sizeof(ops)/sizeof(MatOperation);i++) {
-    ierr = MatShellSetOperation(*B,ops[i],f[i]);CHKERRQ(ierr);
+    ierr = MatShellSetOperation(*B,ops[i],trans ? t[i] : f[i]);CHKERRQ(ierr);
   }
   ierr = MatSetUp(*B);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -1625,7 +1642,7 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts)
     TS             ats,qts;
     AdjEvalQuadCtx adjq;
     TSQuadCtx      qctx;
-    Mat            Ac = NULL,Bc = NULL, adjF_m;
+    Mat            Ac = NULL,Bc = NULL;
     PetscErrorCode (*qup)(TS,Vec,Vec) = QuadTSUpdateStates;
     TSRHSJacobian  coup = JacCoupling;
     PetscBool      diffrhs = (adjts->Arhs != adjts->Brhs) ? PETSC_TRUE : PETSC_FALSE;
@@ -1646,17 +1663,18 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts)
     ierr = TSSetPostStep(adjts,AdjointTSPostStep);CHKERRQ(ierr);
     ierr = TSCreateQuadTS(PetscObjectComm((PetscObject)adjts),adj_ctx->quadvec,diffrhs,&qctx,&qts);CHKERRQ(ierr);
 
-    ierr = TSOptEvalGradientDAE(tsopt,adj_ctx->t0,NULL,NULL,adj_ctx->design,NULL,&adjF_m);CHKERRQ(ierr);
-    ierr = MatCreateShellWithMat(adjF_m,&Ac);CHKERRQ(ierr);
+    ierr = MatCreateShellWithMat(tsopt->adjF_m,PETSC_TRUE,&Ac);CHKERRQ(ierr);
     if (diffrhs) {
-      ierr = MatCreateShellWithMat(adjF_m,&Bc);CHKERRQ(ierr);
+      ierr = MatCreateShellWithMat(tsopt->adjF_m,PETSC_TRUE,&Bc);CHKERRQ(ierr);
     } else {
       ierr = PetscObjectReference((PetscObject)Ac);CHKERRQ(ierr);
       Bc   = Ac;
     }
-    ierr = TSCreateAugmentedTS(adjts,1,&qts,NULL,&qup,&coup,&Ac,&Bc,&ats);CHKERRQ(ierr);
-//  ksponly works, ksptranposeonly does not. Bug somewhere in MatNest or MatConstantDiagonal? Write test
-//./ex1 -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type bdf -test_general_final -test_general -ts_rtol 1.e-4 -ts_atol 1.e-4 -ts_trajectory_type memory -use_taylor -test_ifunc -m 1.1 -test_general_double 0 -test_general_final_double 0 -test_remove_multadd 0 -tshessian_view -new  -taylor_ts_hessian_explicit -augmented_tsgradient_adjoint_ksp_view_rhs -augmented_tsgradient_adjoint_ksp_view_solution -augmented_tsgradient_adjoint_ksp_view_mat_explicit -augmented_tsgradient_adjoint_ksp_monitor_true_residual  -augmented_tsgradient_adjoint_snes_type ksponly -augmented_tsgradient_adjoint_snes_monitor
+
+    ierr = TSCreateAugmentedTS(adjts,1,&qts,NULL,&qup,&coup,&Ac,&Bc,PETSC_TRUE,&ats);CHKERRQ(ierr);
+    ierr = MatDestroy(&Ac);CHKERRQ(ierr);
+    ierr = MatDestroy(&Bc);CHKERRQ(ierr);
+    ierr = TSDestroy(&qts);CHKERRQ(ierr);
     if (ats->snes) {
       ierr = SNESSetType(ats->snes,SNESKSPTRANSPOSEONLY);CHKERRQ(ierr);
     }
@@ -1664,10 +1682,7 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts)
     ierr = AugmentedTSInitialize(ats);CHKERRQ(ierr);
     ierr = TSSolve(ats,NULL);CHKERRQ(ierr);
     ierr = AugmentedTSFinalize(ats);CHKERRQ(ierr);
-    ierr = MatDestroy(&Ac);CHKERRQ(ierr);
-    ierr = MatDestroy(&Bc);CHKERRQ(ierr);
     ierr = TSDestroy(&ats);CHKERRQ(ierr);
-    ierr = TSDestroy(&qts);CHKERRQ(ierr);
   } else {
     ierr = TSSolve(adjts,NULL);CHKERRQ(ierr);
   }

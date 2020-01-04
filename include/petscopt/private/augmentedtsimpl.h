@@ -9,6 +9,7 @@ typedef struct {
   TS             *qts;
   PetscErrorCode (**updatestates)(TS,Vec,Vec);
   TSRHSJacobian  *rhsjaccoupling;
+  PetscBool      adjoint;
   Vec            *U;
   Vec            *Udot;
   Vec            *F;

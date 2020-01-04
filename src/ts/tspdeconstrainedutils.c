@@ -865,7 +865,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
   PetscBool new = PETSC_TRUE;
   PetscOptionsGetBool(NULL,NULL,"-new",&new,NULL);
   if (nq) {
-    ierr = TSCreateAugmentedTS(ts,nq,qts,NULL,qup,NULL,NULL,NULL,&ats);CHKERRQ(ierr);
+    ierr = TSCreateAugmentedTS(ts,nq,qts,NULL,qup,NULL,NULL,NULL,PETSC_FALSE,&ats);CHKERRQ(ierr);
     ierr = AugmentedTSInitialize(ats);CHKERRQ(ierr);
     ierr = TSSetFromOptions(ats);CHKERRQ(ierr);
   }
