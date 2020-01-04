@@ -25,6 +25,9 @@ static PetscErrorCode DMGetLocalToGlobalMapping_Dummy(DM dm)
   PetscFunctionReturn(0);
 }
 
+#define NEWOPS 0
+
+#if NEWOPS
 /* the *dd part of the code is wrong */
 static PetscErrorCode MatMissingDiagonal_Nest(Mat mat,PetscBool *missing,PetscInt *dd)
 {
@@ -58,6 +61,125 @@ static PetscErrorCode MatMissingDiagonal_Nest(Mat mat,PetscBool *missing,PetscIn
     }
   }
   ierr = PetscFree(rows);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+#endif
+
+static PetscErrorCode PCSetUp_AugTriangular(PC pc)
+{
+  TS             ats;
+  TSAugCtx       *actx;
+  SNES           snes;
+  KSP            ksp;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = PCShellGetContext(pc,(void**)&ats);CHKERRQ(ierr);
+  PetscCheckAugumentedTS(ats);
+  ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
+  ierr = TSGetSNES(actx->model,&snes);CHKERRQ(ierr);
+  ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+  ierr = KSPSetUp(ksp);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode PCApply_AugTriangular(PC pc, Vec x, Vec y)
+{
+  TS             ats;
+  TSAugCtx       *actx;
+  SNES           snes;
+  KSP            ksp;
+  Mat            A;
+  DM             dm;
+  PetscInt       i;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = PCShellGetContext(pc,(void**)&ats);CHKERRQ(ierr);
+  PetscCheckAugumentedTS(ats);
+  ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
+  if (actx->adjoint) SETERRQ(PetscObjectComm((PetscObject)pc),PETSC_ERR_SUP,"Not implemented");
+  ierr = TSGetSNES(actx->model,&snes);CHKERRQ(ierr);
+  ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+  ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
+  ierr = VecLockReadPush(x);CHKERRQ(ierr);
+  ierr = DMCompositeGetAccessArray(dm,x,actx->nqts + 1,NULL,actx->F);CHKERRQ(ierr);
+  ierr = DMCompositeGetAccessArray(dm,y,actx->nqts + 1,NULL,actx->U);CHKERRQ(ierr);
+  ierr = KSPSolve(ksp,actx->F[0],actx->U[0]);CHKERRQ(ierr);
+  ierr = PCGetOperators(pc,&A,NULL);CHKERRQ(ierr);
+  for (i=0;i<actx->nqts;i++) {
+    Mat Asub;
+    Vec d;
+    DM  qdm;
+
+    /* can be more memory efficient */
+    ierr = MatNestGetSubMat(A,i+1,0,&Asub);CHKERRQ(ierr);
+    if (Asub) {
+      ierr = MatMult(Asub,actx->U[0],actx->U[i+1]);CHKERRQ(ierr);
+      ierr = VecAYPX(actx->U[i+1],-1.,actx->F[i+1]);CHKERRQ(ierr);
+    } else {
+      ierr = VecCopy(actx->F[i+1],actx->U[i+1]);CHKERRQ(ierr);
+    }
+    ierr = MatNestGetSubMat(A,i+1,i+1,&Asub);CHKERRQ(ierr);
+    ierr = TSGetDM(actx->qts[i],&qdm);CHKERRQ(ierr);
+    ierr = DMGetGlobalVector(qdm,&d);CHKERRQ(ierr);
+    ierr = MatGetDiagonal(Asub,d);CHKERRQ(ierr);
+    ierr = VecPointwiseDivide(actx->U[i+1],actx->U[i+1],d);CHKERRQ(ierr);
+    ierr = DMRestoreGlobalVector(qdm,&d);CHKERRQ(ierr);
+  }
+  ierr = DMCompositeRestoreAccessArray(dm,x,actx->nqts + 1,NULL,actx->F);CHKERRQ(ierr);
+  ierr = DMCompositeRestoreAccessArray(dm,y,actx->nqts + 1,NULL,actx->U);CHKERRQ(ierr);
+  ierr = VecLockReadPop(x);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode PCApplyTranspose_AugTriangular(PC pc, Vec x, Vec y)
+{
+  TS             ats;
+  TSAugCtx       *actx;
+  SNES           snes;
+  KSP            ksp;
+  Mat            A;
+  DM             dm;
+  PetscInt       i;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = PCShellGetContext(pc,(void**)&ats);CHKERRQ(ierr);
+  PetscCheckAugumentedTS(ats);
+  ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
+  if (!actx->adjoint) SETERRQ(PetscObjectComm((PetscObject)pc),PETSC_ERR_SUP,"Not implemented");
+  ierr = TSGetSNES(actx->model,&snes);CHKERRQ(ierr);
+  ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+  ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
+  ierr = VecLockReadPush(x);CHKERRQ(ierr);
+  ierr = DMCompositeGetAccessArray(dm,x,actx->nqts + 1,NULL,actx->F);CHKERRQ(ierr);
+  ierr = DMCompositeGetAccessArray(dm,y,actx->nqts + 1,NULL,actx->U);CHKERRQ(ierr);
+  ierr = KSPSolveTranspose(ksp,actx->F[0],actx->U[0]);CHKERRQ(ierr);
+  ierr = PCGetOperators(pc,&A,NULL);CHKERRQ(ierr);
+  for (i=0;i<actx->nqts;i++) {
+    Mat Asub;
+    Vec d;
+    DM  qdm;
+
+    /* can be more memory efficient */
+    ierr = MatNestGetSubMat(A,0,i+1,&Asub);CHKERRQ(ierr);
+    if (Asub) {
+      ierr = MatMultTranspose(Asub,actx->U[0],actx->U[i+1]);CHKERRQ(ierr);
+      ierr = VecAYPX(actx->U[i+1],-1.,actx->F[i+1]);CHKERRQ(ierr);
+    } else {
+      ierr = VecCopy(actx->F[i+1],actx->U[i+1]);CHKERRQ(ierr);
+    }
+    ierr = MatNestGetSubMat(A,i+1,i+1,&Asub);CHKERRQ(ierr);
+    ierr = TSGetDM(actx->qts[i],&qdm);CHKERRQ(ierr);
+    ierr = DMGetGlobalVector(qdm,&d);CHKERRQ(ierr);
+    ierr = MatGetDiagonal(Asub,d);CHKERRQ(ierr);
+    ierr = VecPointwiseDivide(actx->U[i+1],actx->U[i+1],d);CHKERRQ(ierr);
+    ierr = DMRestoreGlobalVector(qdm,&d);CHKERRQ(ierr);
+  }
+  ierr = DMCompositeRestoreAccessArray(dm,x,actx->nqts + 1,NULL,actx->F);CHKERRQ(ierr);
+  ierr = DMCompositeRestoreAccessArray(dm,y,actx->nqts + 1,NULL,actx->U);CHKERRQ(ierr);
+  ierr = VecLockReadPop(x);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -301,35 +423,13 @@ static PetscErrorCode AugmentedTSOptionsHandler(PetscOptionItems *PetscOptionsOb
   TS             ats = (TS)obj;
   TSAugCtx       *actx;
   PetscErrorCode ierr;
-  PetscBool      flg = PETSC_FALSE;
 
   PetscFunctionBegin;
   PetscCheckAugumentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   ierr = TSSetFromOptions(actx->model);CHKERRQ(ierr);
   ierr = PetscOptionsHead(PetscOptionsObject,"Augmented TS options");CHKERRQ(ierr);
-  ierr = PetscOptionsBool("-reusepc","Reuse the PC solver from the nonlinear model",NULL,flg,&flg,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsTail();CHKERRQ(ierr);
-  if (flg) {
-    SNES snes;
-    KSP  ksp;
-    PC   mpc,pc;
-
-    ierr = TSGetSNES(actx->model,&snes);CHKERRQ(ierr);
-    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-    ierr = KSPGetPC(ksp,&mpc);CHKERRQ(ierr);
-    ierr = TSGetSNES(ats,&snes);CHKERRQ(ierr);
-    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-    ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
-    ierr = PetscObjectTypeCompare((PetscObject)pc,PCFIELDSPLIT,&flg);CHKERRQ(ierr);
-    if (flg) {
-      KSP *ksps;
-
-      ierr = PCSetUp(pc);CHKERRQ(ierr);
-      ierr = PCFieldSplitGetSubKSP(pc,NULL,&ksps);CHKERRQ(ierr);
-      ierr = KSPSetPC(ksps[0],mpc);CHKERRQ(ierr);
-    }
-  }
   PetscFunctionReturn(0);
 }
 
@@ -548,9 +648,6 @@ PetscErrorCode AugmentedTSFinalize(TS ats)
 
 PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactive[], PetscErrorCode (*updatestates[])(TS,Vec,Vec), TSRHSJacobian rhsjaccoupling[], Mat Acoupling[], Mat Bcoupling[], PetscBool adjoint, TS* ats)
 {
-  SNES             snes;
-  KSP              ksp;
-  PC               pc;
   Mat              A,B;
   DM               dm,adm;
   Vec              vatol,vrtol,va,vr;
@@ -559,11 +656,9 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
   TSIFunction      ifunc;
   TSRHSFunction    rhsfunc;
   TSI2Function     i2func;
-  KSPType          ksptype;
-  PCType           pctype;
   const char       *prefix;
-  PetscReal        atol,rtol,dtol;
-  PetscInt         i,maxits;
+  PetscReal        atol,rtol;
+  PetscInt         i;
   PetscErrorCode   ierr;
 
   PetscFunctionBegin;
@@ -755,8 +850,10 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
     ierr = TSSetRHSFunction(*ats,NULL,AugmentedTSRHSFunction,NULL);CHKERRQ(ierr);
     ierr = TSSetRHSJacobian(*ats,A,B,AugmentedTSRHSJacobian,NULL);CHKERRQ(ierr);
   }
+#if NEWOPS
   ierr = MatSetOperation(A,MATOP_MISSING_DIAGONAL,(void (*)(void))MatMissingDiagonal_Nest);CHKERRQ(ierr);
   ierr = MatSetOperation(B,MATOP_MISSING_DIAGONAL,(void (*)(void))MatMissingDiagonal_Nest);CHKERRQ(ierr);
+#endif
   ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
@@ -764,60 +861,21 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
   ierr = MatDestroy(&A);CHKERRQ(ierr);
   ierr = MatDestroy(&B);CHKERRQ(ierr);
 
-  /* propagate KSP info of the forward model but use a different object */
+  /* Setup PC for augmented system */
   if (aug_ctx->model->snes) {
-    PetscBool isshell;
-    PC        pcshell = NULL;
+    SNES snes;
+    KSP  ksp;
+    PC   pc;
 
-    ierr = TSGetSNES(aug_ctx->model,&snes);CHKERRQ(ierr);
-    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-    ierr = KSPGetType(ksp,&ksptype);CHKERRQ(ierr);
-    ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
-    ierr = PCGetType(pc,&pctype);CHKERRQ(ierr);
-    ierr = PetscStrcmp(pctype,PCSHELL,&isshell);CHKERRQ(ierr);
-    if (isshell) pcshell = pc;
-    ierr = KSPGetTolerances(ksp,&rtol,&atol,&dtol,&maxits);CHKERRQ(ierr);
     ierr = TSGetSNES(*ats,&snes);CHKERRQ(ierr);
     ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-    ierr = SNESGetJacobian(snes,&A,&B,NULL,NULL);CHKERRQ(ierr);
-    ierr = KSPSetOperators(ksp,A,B);CHKERRQ(ierr);
-    if (ksptype) { ierr = KSPSetType(ksp,ksptype);CHKERRQ(ierr); }
-    ierr = KSPSetTolerances(ksp,rtol,atol,dtol,maxits);CHKERRQ(ierr);
-    if (aug_ctx->nqts) {
-      KSP *ksps;
-      PC  subpc;
-
-      ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
-      ierr = PCSetType(pc,PCFIELDSPLIT);CHKERRQ(ierr);
-      ierr = PCFieldSplitSetType(pc,PC_COMPOSITE_ADDITIVE);CHKERRQ(ierr);
-      ierr = PCFieldSplitSetDMSplits(pc,PETSC_FALSE);CHKERRQ(ierr);
-      ierr = PCSetUp(pc);CHKERRQ(ierr);
-      ierr = PCFieldSplitGetSubKSP(pc,NULL,&ksps);CHKERRQ(ierr);
-      if (ksptype) {
-        ierr = KSPSetType(ksps[0],ksptype);CHKERRQ(ierr);
-      }
-      if (pctype) {
-        if (pcshell) {
-          ierr = KSPSetPC(ksps[0],pcshell);CHKERRQ(ierr);
-        } else {
-          ierr = KSPGetPC(ksps[0],&subpc);CHKERRQ(ierr);
-          ierr = PCSetType(subpc,pctype);CHKERRQ(ierr);
-        }
-      }
-      for (i=0;i<aug_ctx->nqts;i++) {
-        ierr = KSPSetType(ksps[i+1],KSPPREONLY);CHKERRQ(ierr);
-        ierr = KSPGetPC(ksps[i+1],&subpc);CHKERRQ(ierr);
-        ierr = PCSetType(subpc,PCJACOBI);CHKERRQ(ierr);
-      }
-      ierr = PetscFree(ksps);CHKERRQ(ierr);
-    } else if (pctype) {
-      if (pcshell) {
-        ierr = KSPSetPC(ksp,pcshell);CHKERRQ(ierr);
-      } else {
-        ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
-        ierr = PCSetType(pc,pctype);CHKERRQ(ierr);
-      }
-    }
+    ierr = KSPSetType(ksp,KSPPREONLY);CHKERRQ(ierr);
+    ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
+    ierr = PCSetType(pc,PCSHELL);CHKERRQ(ierr);
+    ierr = PCShellSetContext(pc,*ats);CHKERRQ(ierr);
+    ierr = PCShellSetSetUp(pc,PCSetUp_AugTriangular);CHKERRQ(ierr);
+    ierr = PCShellSetApply(pc,PCApply_AugTriangular);CHKERRQ(ierr);
+    ierr = PCShellSetApplyTranspose(pc,PCApplyTranspose_AugTriangular);CHKERRQ(ierr);
   }
 
   /* handle specific options */

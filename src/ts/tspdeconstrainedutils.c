@@ -11,6 +11,8 @@
 #include <petscdmcomposite.h>
 #include <petscdmshell.h>
 
+#define NEWOPS 0
+#if NEWOPS
 #include <petsc/private/matimpl.h>
 typedef struct {
   PetscScalar diag;
@@ -132,6 +134,7 @@ static PetscErrorCode add_missing_cdiag(Mat A)
   ierr = MatSetOperation(A,MATOP_RESTORE_ROW,(void (*)(void))MatRestoreRow_ConstantDiagonal);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
+#endif
 
 static PetscErrorCode DMGetLocalToGlobalMapping_Dummy(DM dm)
 {
@@ -208,10 +211,11 @@ PetscErrorCode TSCreateQuadTS(MPI_Comm comm, Vec v, PetscBool diffrhs, TSQuadCtx
   ierr = TSSetRHSFunction(*qts,NULL,QuadTSRHSFunction,NULL);CHKERRQ(ierr);
   ierr = TSSetRHSJacobian(*qts,A,diffrhs ? B : A,QuadTSRHSJacobian,NULL);CHKERRQ(ierr);
 
+#if NEWOPS
   /* Missing ops for MATCONSTANTDIAGONAL */
   ierr = add_missing_cdiag(A);CHKERRQ(ierr);
   ierr = add_missing_cdiag(B);CHKERRQ(ierr);
-
+#endif
   /* fixes for using DMCOMPOSITE later */
   {
     DM  dm;
