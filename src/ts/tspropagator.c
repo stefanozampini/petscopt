@@ -101,7 +101,7 @@ static PetscErrorCode MatMultTranspose_Propagator(Mat A, Vec x, Vec y)
   } else {
     ierr = VecCopy(x,tlmworkrhs);CHKERRQ(ierr);
   }
-  ierr = AdjointTSComputeInitialConditions(prop->adjlts,tlmworkrhs,PETSC_TRUE,PETSC_TRUE);CHKERRQ(ierr);
+  ierr = AdjointTSComputeInitialConditions(prop->adjlts,tlmworkrhs,PETSC_TRUE);CHKERRQ(ierr);
   ierr = TSSetStepNumber(prop->adjlts,0);CHKERRQ(ierr);
   ierr = TSRestartStep(prop->adjlts);CHKERRQ(ierr);
   ierr = TSSetTime(prop->adjlts,prop->t0);CHKERRQ(ierr);

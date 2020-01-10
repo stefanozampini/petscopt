@@ -13,6 +13,12 @@ PetscErrorCode TSCreateWithTS(TS ts, TS *nts)
   ierr = TSSetType(*nts,type);CHKERRQ(ierr);
   ierr = TSGetEquationType(ts,&eqtype);CHKERRQ(ierr);
   ierr = TSSetEquationType(*nts,eqtype);CHKERRQ(ierr);
+  /* this is disabled since it is buggy (up to 3.13) */
+#if 0
+  TSProblemType  prtype;
+  ierr = TSGetProblemType(ts,&prtype);CHKERRQ(ierr);
+  ierr = TSSetProblemType(*nts,prtype);CHKERRQ(ierr);
+#endif
   ierr = PetscObjectTypeCompare((PetscObject)ts,TSRK,&flg);CHKERRQ(ierr);
   if (flg) {
     TSRKType rktype;

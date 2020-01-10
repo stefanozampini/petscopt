@@ -648,18 +648,20 @@ PetscErrorCode AugmentedTSFinalize(TS ats)
 
 PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactive[], PetscErrorCode (*updatestates[])(TS,Vec,Vec), TSRHSJacobian rhsjaccoupling[], Mat Acoupling[], Mat Bcoupling[], PetscBool adjoint, TS* ats)
 {
-  Mat              A,B;
-  DM               dm,adm;
-  Vec              vatol,vrtol,va,vr;
-  PetscContainer   container;
-  TSAugCtx        *aug_ctx;
-  TSIFunction      ifunc;
-  TSRHSFunction    rhsfunc;
-  TSI2Function     i2func;
-  const char       *prefix;
-  PetscReal        atol,rtol;
-  PetscInt         i;
-  PetscErrorCode   ierr;
+  Mat            A,B;
+  DM             dm,adm;
+  Vec            vatol,vrtol,va,vr;
+  PetscContainer container;
+  TSAugCtx       *aug_ctx;
+  TSIFunction    ifunc;
+  TSRHSFunction  rhsfunc;
+  TSI2Function   i2func;
+  TSProblemType  prtype;
+  const char     *prefix;
+  PetscReal      atol,rtol;
+  PetscBool      linear;
+  PetscInt       i;
+  PetscErrorCode ierr;
 
   PetscFunctionBegin;
   PetscValidHeaderSpecific(ts,TS_CLASSID,1);
@@ -673,7 +675,18 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
       PetscValidLogicalCollectiveBool(ts,qactive[i],4);
     }
   }
-  PetscValidPointer(ats,9);
+  if (Acoupling) {
+    for (i=0;i<n;i++) {
+      PetscValidHeaderSpecific(Acoupling[i],MAT_CLASSID,7);
+    }
+  }
+  if (Bcoupling) {
+    for (i=0;i<n;i++) {
+      PetscValidHeaderSpecific(Bcoupling[i],MAT_CLASSID,8);
+    }
+  }
+  PetscValidLogicalCollectiveBool(ts,adjoint,9);
+  PetscValidPointer(ats,10);
   ierr = TSGetI2Function(ts,NULL,&i2func,NULL);CHKERRQ(ierr);
   if (i2func) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_SUP,"Second order DAEs are not supported");
   ierr = TSCreateWithTS(ts,ats);CHKERRQ(ierr);
@@ -730,16 +743,29 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
   }
   ierr = DMCompositeAddDM(adm,dm);CHKERRQ(ierr);
 
+  ierr = TSGetProblemType(aug_ctx->model,&prtype);CHKERRQ(ierr);
+  linear = (prtype == TS_LINEAR ? PETSC_TRUE : PETSC_FALSE);
+
   aug_ctx->nqts = n;
   ierr = PetscMalloc3(aug_ctx->nqts,&aug_ctx->qts,aug_ctx->nqts,&aug_ctx->updatestates,aug_ctx->nqts,&aug_ctx->rhsjaccoupling);CHKERRQ(ierr);
   for (i=0;i<aug_ctx->nqts;i++) {
+
     ierr = PetscObjectReference((PetscObject)qts[i]);CHKERRQ(ierr);
     aug_ctx->qts[i] = qts[i];
     ierr = TSGetDM(aug_ctx->qts[i],&dm);CHKERRQ(ierr);
     ierr = DMCompositeAddDM(adm,dm);CHKERRQ(ierr);
     aug_ctx->updatestates[i]   = updatestates   ? updatestates[i]   : NULL;
     aug_ctx->rhsjaccoupling[i] = rhsjaccoupling ? rhsjaccoupling[i] : NULL;
+    ierr = TSGetProblemType(aug_ctx->qts[i],&prtype);CHKERRQ(ierr);
+    linear = (PetscBool) (linear && (prtype == TS_LINEAR ? PETSC_TRUE : PETSC_FALSE));
   }
+  /* flag only if the problem is linear */
+  /* XXX disabled, since TLM augmented jacobian is not complete (needs offdiag block) */
+#if 0
+  if (linear) {
+    ierr = TSSetProblemType(*ats,TS_LINEAR);CHKERRQ(ierr);
+  }
+#endif
   ierr = DMSetMatType(adm,MATNEST);CHKERRQ(ierr);
   ierr = DMSetUp(adm);CHKERRQ(ierr);
 

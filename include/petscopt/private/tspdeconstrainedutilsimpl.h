@@ -14,22 +14,6 @@ typedef struct {
   void      *evalquadctx;
 } TSQuadCtx;
 
-typedef PetscErrorCode (*SQuadEval)(Vec,Vec,PetscReal,Vec,void*);
-typedef PetscErrorCode (*VQuadEval)(Vec,Vec,PetscReal,Vec,void*);
-typedef struct {
-  PetscErrorCode (*user)(TS); /* user post step method */
-  PetscBool      userafter;   /* call user-defined poststep after quadrature evaluation */
-  SQuadEval      seval;       /* scalar function to be evaluated */
-  void           *seval_ctx;  /* context for scalar function */
-  PetscReal      squad;       /* scalar function value */
-  PetscReal      psquad;      /* previous scalar function value (for trapezoidal rule) */
-  VQuadEval      veval;       /* vector function to be evaluated */
-  void           *veval_ctx;  /* context for vector function */
-  Vec            vquad;       /* used for vector quadrature */
-  Vec            *wquad;      /* quadrature work vectors used by the trapezoidal rule + 3 extra work vectors */
-  PetscInt       cur,old;     /* pointers to current and old wquad vectors for trapezoidal rule */
-} TSQuadratureCtx;
-
 PETSC_INTERN PetscErrorCode TSCreateQuadTS(MPI_Comm,Vec,PetscBool,TSQuadCtx*,TS*);
 PETSC_INTERN PetscErrorCode QuadTSUpdateStates(TS,Vec,Vec);
 PETSC_INTERN PetscErrorCode TSQuadraturePostStep_Private(TS);
