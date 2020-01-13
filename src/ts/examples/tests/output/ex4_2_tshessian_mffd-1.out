@@ -178,7 +178,7 @@ Mat Object: 1 MPI processes
   9 TAO,  Function value: 7.70909e-08,  Residual: 0.00065908 
  10 TAO,  Function value: 7.41529e-09,  Residual: 4.14073e-05 
  11 TAO,  Function value: 1.5461e-12,  Residual: 5.83156e-07 
- 12 TAO,  Function value: 3.33351e-19,  Residual: 4.24953e-10 
+ 12 TAO,  Function value: 3.33351e-19,  Residual: 4.24945e-10 
 
 Tao solution
 Vec Object: 1 MPI processes

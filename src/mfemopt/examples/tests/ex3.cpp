@@ -147,18 +147,55 @@ static void RunTest(ParFiniteElementSpace *fes, BilinearFormIntegrator *bilin, P
    PetscParMatrix op_M_pd_m(PETSC_COMM_WORLD,op_pd.GetOperatorMixed(),Operator::PETSC_MATAIJ);
 
    PetscReal norm;
+   Mat T;
+   std::string oname;
+
+   T = op_M;
+   oname = name + "-op_M";
+   PetscObjectSetName((PetscObject)T,oname.c_str());
+   MatViewFromOptions(T,NULL,"-test_view");
+
+   T = op_M_pd;
+   oname = name + "-op_M_pd";
+   PetscObjectSetName((PetscObject)T,oname.c_str());
+   MatViewFromOptions(T,NULL,"-test_view");
+
+   T = op_M_m;
+   oname = name + "-op_M_m";
+   PetscObjectSetName((PetscObject)T,oname.c_str());
+   MatViewFromOptions(T,NULL,"-test_view");
+
+   T = op_M_pd_m;
+   oname = name + "-op_M_pd_m";
+   PetscObjectSetName((PetscObject)T,oname.c_str());
+   MatViewFromOptions(T,NULL,"-test_view");
 
    op_M_pd -= op_M;
    PetscParMatrixInftyNorm(op_M_pd,&norm);
    PetscPrintf(PETSC_COMM_WORLD,"[%s] ||   op_M_pd - op_M||: %g\n",name.c_str(),(double)norm);
 
+   T = op_M_pd;
+   oname = name + "-diff-op_M_pd";
+   PetscObjectSetName((PetscObject)T,oname.c_str());
+   MatViewFromOptions(T,NULL,"-test_diff_view");
+
    op_M_m -= op_M;
    PetscParMatrixInftyNorm(op_M_m,&norm);
    PetscPrintf(PETSC_COMM_WORLD,"[%s] ||    op_M_m - op_M||: %g\n",name.c_str(),(double)norm);
 
+   T = op_M_m;
+   oname = name + "-diff-op_M_m";
+   PetscObjectSetName((PetscObject)T,oname.c_str());
+   MatViewFromOptions(T,NULL,"-test_diff_view");
+
    op_M_pd_m -= op_M;
    PetscParMatrixInftyNorm(op_M_pd_m,&norm);
    PetscPrintf(PETSC_COMM_WORLD,"[%s] || op_M_pd_m - op_M||: %g\n",name.c_str(),(double)norm);
+
+   T = op_M_pd_m;
+   oname = name + "-diff-op_M_pd_m";
+   PetscObjectSetName((PetscObject)T,oname.c_str());
+   MatViewFromOptions(T,NULL,"-test_diff_view");
 }
 
 int main(int argc, char *argv[])
@@ -358,7 +395,7 @@ int main(int argc, char *argv[])
       }
       delete fes;
    }
-   else if (!s_scal) /* vector space for param */
+   else if (!s_scal) /* vector space for param */ /* TODO: remove !s_scal when PDVectorMassIntegrator is implemented */
    {
       if (mu_excl_fn) mu_pd = new PDCoefficient(*mu_vec,pmesh,mu_fec,excl_fn);
       else            mu_pd = new PDCoefficient(*mu_vec,pmesh,mu_fec,mu_excl_a);
@@ -371,7 +408,7 @@ int main(int argc, char *argv[])
          testname    = "VP_SS";
          fes         = new ParFiniteElementSpace(pmesh,s_fec,pmesh->Dimension());
          mu_bilin    = new VectorMassIntegrator(*mu);
-         mu_bilin_pd = new PDMassIntegrator(*mu_pd);
+         mu_bilin_pd = new PDVectorMassIntegrator(*mu_pd);
       }
       else
 #endif

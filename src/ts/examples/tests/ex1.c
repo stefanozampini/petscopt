@@ -267,6 +267,7 @@ typedef struct {
   PetscScalar b;
   PetscReal   p;
   PetscScalar mm;
+  PetscScalar rhsonlyscale;
   VecScatter  Msct;
   Vec         M;
   Mat         F_MM; /* Hessian workspace */
@@ -305,7 +306,7 @@ static PetscErrorCode EvalGradientDAE(TS ts, PetscReal time, Vec U, Vec Udot, Ve
     /* F_p  : -b*x^p*log(x) */
     /* F_mm : 2*mm*xdot */
     PetscInt    c = 1;
-    PetscScalar lx, v = -PetscPowScalarReal(arr[r-rst],p);
+    PetscScalar lx, v = -PetscPowScalarReal(arr[r-rst],p)*user->rhsonlyscale;
 
     ierr = MatSetValues(J,1,&r,1,&c,&v,INSERT_VALUES);CHKERRQ(ierr);
     c    = 2;
@@ -367,6 +368,7 @@ static PetscErrorCode EvalHessianDAE_UU(TS ts, PetscReal time, Vec U, Vec Udot, 
   ierr = VecGetArrayRead(U,(const PetscScalar**)&arr);CHKERRQ(ierr);
   if (p != 2.0) v = -l*p*b*(p-1.0)*PetscPowScalarReal(arr[0],p - 2.0);
   else          v = -l*p*b*(p-1.0);
+  v *= user->rhsonlyscale;
   ierr = VecRestoreArrayRead(U,(const PetscScalar**)&arr);CHKERRQ(ierr);
   ierr = MatZeroEntries(user->F_UU);CHKERRQ(ierr);
   ierr = MatShift(user->F_UU,v);CHKERRQ(ierr);
@@ -422,8 +424,8 @@ static PetscErrorCode EvalHessianDAE_UM(TS ts, PetscReal time, Vec U, Vec Udot, 
   if (p != 1.0) tmp = PetscPowScalarReal(x,p - 1.0);
   else          tmp = 1.0;
   v[0] = 0.0;
-  v[1] = -l*p*tmp;
-  v[2] = -l*b*tmp*(1.0+p*PetscLogReal(x));
+  v[1] = -l*p*tmp*user->rhsonlyscale;
+  v[2] = -l*b*tmp*user->rhsonlyscale*(1.0+p*PetscLogReal(x));
   ierr = MatZeroEntries(user->F_UM);CHKERRQ(ierr);
   ierr = MatGetOwnershipRange(user->F_UM,&rst,NULL);CHKERRQ(ierr);
   ierr = MatSetValues(user->F_UM,1,&rst,3,id,v,INSERT_VALUES);CHKERRQ(ierr);
@@ -479,8 +481,8 @@ static PetscErrorCode EvalHessianDAE_MU(TS ts, PetscReal time, Vec U, Vec Udot, 
   if (p != 1.0) tmp = PetscPowScalarReal(x,p - 1.0);
   else          tmp = 1.0;
   v[0] = 0.0;
-  v[1] = -l*p*tmp;
-  v[2] = -l*b*tmp*(1.0+p*PetscLogReal(x));
+  v[1] = -l*p*user->rhsonlyscale*tmp;
+  v[2] = -l*b*user->rhsonlyscale*tmp*(1.0+p*PetscLogReal(x));
   ierr = MatZeroEntries(user->F_UM);CHKERRQ(ierr);
   ierr = MatGetOwnershipRange(user->F_UM,&rst,NULL);CHKERRQ(ierr);
   ierr = MatSetValues(user->F_UM,1,&rst,3,id,v,INSERT_VALUES);CHKERRQ(ierr);
@@ -626,10 +628,10 @@ static PetscErrorCode EvalHessianDAE_MM(TS ts, PetscReal time, Vec U, Vec Udot, 
   v[0*3+2] = 0.0;
   v[1*3+0] = 0.0;
   v[1*3+1] = 0.0;
-  v[1*3+2] = -l*tmp*ll;
+  v[1*3+2] = -l*user->rhsonlyscale*tmp*ll;
   v[2*3+0] = 0.0;
-  v[2*3+1] = -l*tmp*ll;
-  v[2*3+2] = -l*b*ll*ll*tmp;
+  v[2*3+1] = -l*user->rhsonlyscale*tmp*ll;
+  v[2*3+2] = -l*user->rhsonlyscale*b*ll*ll*tmp;
   ierr = MatZeroEntries(user->F_MM);CHKERRQ(ierr);
   ierr = MatSetValues(user->F_MM,3,id,3,id,v,ADD_VALUES);CHKERRQ(ierr);
   ierr = VecGetLocalSize(user->M,&dsize);CHKERRQ(ierr);
@@ -802,7 +804,7 @@ static PetscErrorCode FormRHSFunction(TS ts,PetscReal time, Vec U, Vec F,void* c
   PetscFunctionBeginUser;
   ierr = VecGetArray(F,&aF);CHKERRQ(ierr);
   ierr = VecGetArrayRead(U,(const PetscScalar**)&aU);CHKERRQ(ierr);
-  aF[0] = user->b*PetscPowScalarReal(aU[0],user->p);
+  aF[0] = user->b*PetscPowScalarReal(aU[0],user->p)*user->rhsonlyscale;
   ierr = VecRestoreArrayRead(U,(const PetscScalar**)&aU);CHKERRQ(ierr);
   ierr = VecRestoreArray(F,&aF);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -820,6 +822,7 @@ static PetscErrorCode FormRHSJacobian(TS ts,PetscReal time, Vec U, Mat A, Mat P,
   ierr = VecGetArrayRead(U,(const PetscScalar**)&aU);CHKERRQ(ierr);
   if (user->p != 1.0) v = user->b*user->p*PetscPowScalarReal(aU[0],user->p - 1.0); /* x^0 gives error on my Mac */
   else v = user->b*user->p;
+  v *= user->rhsonlyscale;
   ierr = MatGetOwnershipRange(A,&i,NULL);CHKERRQ(ierr);
   ierr = MatSetValues(A,1,&i,1,&i,&v,INSERT_VALUES);CHKERRQ(ierr);
   ierr = VecRestoreArrayRead(U,(const PetscScalar**)&aU);CHKERRQ(ierr);
@@ -909,7 +912,7 @@ int main(int argc, char* argv[])
   UserObjective  userobj;
   UserDAE        userdae;
   TSProblemType  problemtype;
-  PetscScalar    a, b, one = 1.0, m;
+  PetscScalar    a, b, one = 1.0, mm;
   PetscReal      p, t0 = 0.0, tf = 2.0, dt = 0.1, rtf;
   PetscReal      obj,objtest,err,normPhi;
   PetscMPIInt    np;
@@ -948,12 +951,12 @@ int main(int argc, char* argv[])
   a              = 0.5;
   b              = 0.7;
   p              = 1.0;
-  m              = 0.0;
+  mm             = 0.0;
   userobj.isnorm = PETSC_FALSE;
   ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"PDE-constrained options","");
   ierr = PetscOptionsScalar("-a","Initial condition","",a,&a,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsScalar("-b","Grow rate","",b,&b,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsScalar("-m","Mass coefficient","",m,&m,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsScalar("-m","Mass coefficient","",mm,&mm,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-p","Nonlinearity","",p,&p,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-t0","Initial time","",t0,&t0,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-tf","Final time","",tf,&tf,NULL);CHKERRQ(ierr);
@@ -985,12 +988,13 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsEnd();CHKERRQ(ierr);
 
   problemtype = TS_LINEAR;
-  if (!testifunc && !testmix) m = 0.0;
 
   userdae.a  = a;
   userdae.b  = b;
   userdae.p  = p;
-  userdae.mm = m;
+  userdae.mm = mm;
+  userdae.rhsonlyscale = 1.0;
+  if (!testifunc && !testmix) userdae.rhsonlyscale = 1./(mm*mm+1);
 
   dsize = 3;
   if (testm && (testifunc || testmix)) {
@@ -1011,11 +1015,11 @@ int main(int argc, char* argv[])
   ierr = VecCreate(PETSC_COMM_WORLD,&M);CHKERRQ(ierr);
   ierr = VecSetSizes(M,PETSC_DECIDE,dsize);CHKERRQ(ierr);
   ierr = VecSetType(M,VECSTANDARD);CHKERRQ(ierr);
-  ierr = VecSetValue(M,0,a,INSERT_VALUES);CHKERRQ(ierr);
-  ierr = VecSetValue(M,1,b,INSERT_VALUES);CHKERRQ(ierr);
-  ierr = VecSetValue(M,2,p,INSERT_VALUES);CHKERRQ(ierr);
+  ierr = VecSetValue(M,0,userdae.a,INSERT_VALUES);CHKERRQ(ierr);
+  ierr = VecSetValue(M,1,userdae.b,INSERT_VALUES);CHKERRQ(ierr);
+  ierr = VecSetValue(M,2,userdae.p,INSERT_VALUES);CHKERRQ(ierr);
   if (dsize > 3) {
-    ierr = VecSetValue(M,3,m,INSERT_VALUES);CHKERRQ(ierr);
+    ierr = VecSetValue(M,3,userdae.mm,INSERT_VALUES);CHKERRQ(ierr);
   }
   ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
   ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
@@ -1272,7 +1276,7 @@ int main(int argc, char* argv[])
   ierr = TSGetTime(ts,&rtf);CHKERRQ(ierr);
   objtest = 0.0;
   if (userobjective) {
-    PetscScalar bb = b/(m*m+1.0);
+    PetscScalar bb = b/(mm*mm+1.0);
     PetscScalar aa = a*a;
     if (bb != 0.0) { /* we can compute the analytic solution for the objective function */
       if (p == 1.0) {
@@ -1304,7 +1308,7 @@ int main(int argc, char* argv[])
   /* Test the gradient code by finite differencing the objective evaluation */
   if (usefd) {
     PetscInt    i;
-    PetscScalar oa = a, ob = b, om = m;
+    PetscScalar oa = a, ob = b, om = mm;
     PetscReal   op = p;
 
     for (i=0; i<dsize; i++) {
@@ -1388,7 +1392,7 @@ int main(int argc, char* argv[])
     ierr = VecSetValue(M,1,b,INSERT_VALUES);CHKERRQ(ierr);
     ierr = VecSetValue(M,2,p,INSERT_VALUES);CHKERRQ(ierr);
     if (dsize > 3) {
-      ierr = VecSetValue(M,3,m,INSERT_VALUES);CHKERRQ(ierr);
+      ierr = VecSetValue(M,3,mm,INSERT_VALUES);CHKERRQ(ierr);
     }
     ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
     ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
@@ -1491,8 +1495,12 @@ int main(int argc, char* argv[])
 
   test:
     requires: !complex !single
-    timeoutfactor: 2
     suffix: 14
-    args: -t0 1.1 -tf 1.9 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-5 -ts_rtol 1.e-5 -test_event_final -p 1.3 -ts_trajectory_type memory -tshessian_view -tshessian_gn {{0 1}separate output} -test_objective_norm -test_ifunc -m 1.1
+    args: -t0 1.1 -tf 1.9 -dt 0.01 -ts_type theta -test_event_final -p 1.3 -ts_trajectory_type memory -tshessian_view -tshessian_gn {{0 1}separate output} -test_objective_norm -test_ifunc -m 1.1
+
+  test:
+    requires: !complex !single
+    suffix: 15
+    args: -t0 -1.9 -tf -1.1 -dt 0.01 -ts_type theta -test_general_double -test_event_final -p 1.3 -ts_trajectory_type memory -test_objective_norm -test_ifunc {{0 1}} -test_mass 0 -m 1.1 -use_taylor
 
 TEST*/

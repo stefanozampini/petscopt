@@ -25,8 +25,8 @@ NC 0 -> Number of dofs 20
 Initial objective 3.42872e-05 (LS 3.42602e-05, TV 2.7e-08)
 it=0	lit=0	obj=3.428724e-05	(g,du)=-0.000000e+00	||g||=2.971722e-04	step=1.000000e+00
 it=1	lit=12	obj=3.762615e-06	(g,du)=-7.545189e-05	||g||=1.124430e-04	step=1.000000e+00
-it=2	lit=12	obj=4.664763e-08	(g,du)=-7.225938e-06	||g||=7.860022e-06	step=1.000000e+00
-it=3	lit=14	obj=2.785216e-08	(g,du)=-3.935182e-08	||g||=1.025043e-06	step=1.000000e+00
-it=4	lit=16	obj=2.709663e-08	(g,du)=-1.351991e-09	||g||=1.232017e-07	step=1.000000e+00
+it=2	lit=12	obj=4.664764e-08	(g,du)=-7.225939e-06	||g||=7.860023e-06	step=1.000000e+00
+it=3	lit=14	obj=2.785222e-08	(g,du)=-3.935186e-08	||g||=1.025047e-06	step=1.000000e+00
+it=4	lit=16	obj=2.709664e-08	(g,du)=-1.352069e-09	||g||=1.232030e-07	step=1.000000e+00
 Nonlinear newton_ solve converged due to CONVERGED_FNORM_ABS iterations 4
-Final objective (SNES) 2.70966e-08 (LS 2.22987e-11, TV 2.70743e-08)
+Final objective (SNES) 2.70966e-08 (LS 2.23017e-11, TV 2.70743e-08)

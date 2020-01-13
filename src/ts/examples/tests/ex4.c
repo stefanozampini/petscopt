@@ -691,6 +691,6 @@ test:
 
     requires: !complex !single
     suffix: 3
-    args: -ts_type cn -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao  -tao_test_hessian -tf 1 -tshessian_gn {{0 1}}
+    args: -ts_type cn -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao  -tao_test_hessian -tf 1 -tshessian_gn {{0 1}separate output}
 
 TEST*/
