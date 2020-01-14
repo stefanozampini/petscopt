@@ -139,13 +139,7 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
     ierr = TSSetMaxSteps(tshess->soats,nsteps-1);CHKERRQ(ierr);
     ierr = TSSetExactFinalTime(tshess->soats,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
   }
-  PetscBool new = PETSC_FALSE;
-  PetscOptionsGetBool(NULL,NULL,"-new",&new,NULL);
-  if (new) {
-    ierr = AdjointTSSolveWithQuadrature_Private(tshess->soats);CHKERRQ(ierr);
-  } else {
-    ierr = TSSolve(tshess->soats,NULL);CHKERRQ(ierr);
-  }
+  ierr = AdjointTSSolveWithQuadrature_Private(tshess->soats);CHKERRQ(ierr);
   ierr = AdjointTSFinalizeQuadrature(tshess->soats);CHKERRQ(ierr);
 
   ierr = AdjointTSSetQuadratureVec(tshess->soats,NULL);CHKERRQ(ierr);
@@ -228,13 +222,7 @@ static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec de
         ierr = TSSetExactFinalTime(adjts,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
       }
     }
-    PetscBool new = PETSC_TRUE;
-    PetscOptionsGetBool(NULL,NULL,"-new",&new,NULL);
-    if (new) {
-      ierr = AdjointTSSolveWithQuadrature_Private(adjts);CHKERRQ(ierr);
-    } else {
-      ierr = TSSolve(adjts,NULL);CHKERRQ(ierr);
-    }
+    ierr = AdjointTSSolveWithQuadrature_Private(adjts);CHKERRQ(ierr);
     ierr = AdjointTSFinalizeQuadrature(adjts);CHKERRQ(ierr);
     ierr = TSDestroy(&adjts);CHKERRQ(ierr);
 

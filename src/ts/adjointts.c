@@ -522,15 +522,15 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, PetscBoo
   fwdt = adj_ctx->tf - time + adj_ctx->t0;
   ierr = TSGetTSOpt(adj_ctx->fwdts,&tsopt);CHKERRQ(ierr);
   if (adj_ctx->direction) { /* second-order adjoint */
-    TS         fwdts = adj_ctx->fwdts;
-    TS         tlmts = adj_ctx->tlmts;
-    TS         foats = adj_ctx->foats;
-    DM         dm;
-    Vec        soawork0,soawork1;
-    Vec        FWDH,TLMH;
-    PetscBool  hast,HFhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
-                                   {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
-                                   {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
+    TS        fwdts = adj_ctx->fwdts;
+    TS        tlmts = adj_ctx->tlmts;
+    TS        foats = adj_ctx->foats;
+    DM        dm;
+    Vec       soawork0,soawork1;
+    Vec       FWDH,TLMH;
+    PetscBool hast,HFhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                                  {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                                  {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
 
     if (U) SETERRQ(PetscObjectComm((PetscObject)adjts),PETSC_ERR_SUP,"Not implemented");
     ierr = VecSet(F,0.0);CHKERRQ(ierr);
@@ -1463,7 +1463,7 @@ PetscErrorCode AdjointTSFinalizeQuadrature(TS adjts)
 
 #include <petscopt/augmentedts.h>
 
-static PetscErrorCode JacCoupling(TS qts, PetscReal t, Vec Q, Mat A, Mat B, void* ctx)
+static PetscErrorCode JacCoupling(TS qts, PetscReal t, Vec L, Vec Ldot, PetscReal s, Mat A, Mat B, void* ctx)
 {
   PetscErrorCode ierr;
 
@@ -1472,6 +1472,10 @@ static PetscErrorCode JacCoupling(TS qts, PetscReal t, Vec Q, Mat A, Mat B, void
   ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  if (Ldot) {
+    ierr = MatScale(A,-1.0);CHKERRQ(ierr);
+    if (A && A != B) { ierr = MatScale(B,-1.0);CHKERRQ(ierr); }
+  }
 #if 0
   {
     AdjEvalQuadCtx *adjq;
@@ -1568,7 +1572,7 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts)
     TSQuadCtx      qctx;
     Mat            Ac = NULL,Bc = NULL;
     PetscErrorCode (*qup)(TS,Vec,Vec) = QuadTSUpdateStates;
-    TSRHSJacobian  coup = JacCoupling;
+    TSIJacobian    coup = JacCoupling;
     PetscBool      diffrhs = (adjts->Arhs != adjts->Brhs) ? PETSC_TRUE : PETSC_FALSE;
 
     adjq.tsopt   = tsopt;

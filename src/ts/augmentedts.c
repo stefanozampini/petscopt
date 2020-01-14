@@ -185,22 +185,23 @@ static PetscErrorCode PCApplyTranspose_AugTriangular(PC pc, Vec x, Vec y)
 
 static PetscErrorCode AugmentedTSTrajectorySet(TSTrajectory tj,TS ats,PetscInt stepnum,PetscReal time,Vec X)
 {
-  TSAugCtx       *actx;
-  TSTrajectory   mtj;
-  DM             dm;
-  PetscInt       z=0;
-  PetscErrorCode ierr;
+  TSAugCtx         *actx;
+  TSTrajectory     mtj;
+  DM               dm;
+  PetscInt         z=0;
+  PetscObjectState st;
+  PetscErrorCode   ierr;
 
   PetscFunctionBegin;
   PetscCheckAugumentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
-  ierr = VecLockReadPush(X);CHKERRQ(ierr);
+  ierr = PetscObjectStateGet((PetscObject)X,&st);CHKERRQ(ierr);
   ierr = DMCompositeGetAccessArray(dm,X,1,&z,actx->U);CHKERRQ(ierr);
   ierr = TSGetTrajectory(actx->model,&mtj);CHKERRQ(ierr);
   ierr = TSTrajectorySet(mtj,actx->model,stepnum,time,actx->U[0]);CHKERRQ(ierr);
   ierr = DMCompositeRestoreAccessArray(dm,X,1,&z,actx->U);CHKERRQ(ierr);
-  ierr = VecLockReadPop(X);CHKERRQ(ierr);
+  ierr = PetscObjectStateSet((PetscObject)X,st);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -232,11 +233,12 @@ static PetscErrorCode AugmentedTSUpdateSolution(TS ats)
 
 PetscErrorCode AugmentedTSUpdateModelSolution(TS ats)
 {
-  TSAugCtx       *actx;
-  DM             dm;
-  Vec            U,mU;
-  PetscInt       z=0;
-  PetscErrorCode ierr;
+  TSAugCtx         *actx;
+  DM               dm;
+  Vec              U,mU;
+  PetscInt         z=0;
+  PetscObjectState st;
+  PetscErrorCode   ierr;
 
   PetscFunctionBegin;
   PetscCheckAugumentedTS(ats);
@@ -244,11 +246,13 @@ PetscErrorCode AugmentedTSUpdateModelSolution(TS ats)
   ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
   ierr = TSGetSolution(ats,&U);CHKERRQ(ierr);
   ierr = TSGetSolution(actx->model,&mU);CHKERRQ(ierr);
+  ierr = PetscObjectStateGet((PetscObject)U,&st);CHKERRQ(ierr);
   ierr = VecLockReadPush(U);CHKERRQ(ierr);
   ierr = DMCompositeGetAccessArray(dm,U,1,&z,actx->U);CHKERRQ(ierr);
   ierr = VecCopy(actx->U[0],mU);CHKERRQ(ierr);
   ierr = DMCompositeRestoreAccessArray(dm,U,1,&z,actx->U);CHKERRQ(ierr);
   ierr = VecLockReadPop(U);CHKERRQ(ierr);
+  ierr = PetscObjectStateSet((PetscObject)U,st);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -412,7 +416,7 @@ static PetscErrorCode AugmentedTSDestroy_Private(void *ptr)
   for (i=0;i<aug->nqts;i++) {
     ierr = TSDestroy(&aug->qts[i]);CHKERRQ(ierr);
   }
-  ierr = PetscFree3(aug->qts,aug->updatestates,aug->rhsjaccoupling);CHKERRQ(ierr);
+  ierr = PetscFree3(aug->qts,aug->updatestates,aug->jaccoupling);CHKERRQ(ierr);
   ierr = PetscFree3(aug->U,aug->Udot,aug->F);CHKERRQ(ierr);
   ierr = PetscFree(aug);CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -448,7 +452,7 @@ static PetscErrorCode AugmentedTSRHSFunction(TS ats, PetscReal time, Vec U, Vec 
   ierr = DMCompositeGetAccessArray(dm,F,actx->nqts + 1,NULL,actx->F);CHKERRQ(ierr);
   ierr = TSComputeRHSFunction(actx->model,time,actx->U[0],actx->F[0]);CHKERRQ(ierr);
   for (i=0;i<actx->nqts;i++) {
-    if (actx->updatestates[i]) { ierr = (*actx->updatestates[i])(actx->qts[i],actx->U[0],actx->Udot[0]);CHKERRQ(ierr); }
+    if (actx->updatestates[i]) { ierr = (*actx->updatestates[i])(actx->qts[i],actx->U[0],NULL);CHKERRQ(ierr); }
     ierr = TSComputeRHSFunction(actx->qts[i],time,actx->U[i+1],actx->F[i+1]);CHKERRQ(ierr);
     if (actx->updatestates[i]) { ierr = (*actx->updatestates[i])(actx->qts[i],NULL,NULL);CHKERRQ(ierr); }
   }
@@ -474,15 +478,14 @@ static PetscErrorCode AugmentedTSRHSJacobian(TS ats, PetscReal time, Vec U, Mat 
   ierr = MatNestGetSubMat(P,0,0,&Psub);CHKERRQ(ierr);
   ierr = TSComputeRHSJacobian(actx->model,time,actx->U[0],Asub,Psub);CHKERRQ(ierr);
   for (i=0;i<actx->nqts;i++) {
-    if (actx->updatestates[i]) { ierr = (*actx->updatestates[i])(actx->qts[i],actx->U[0],actx->Udot[0]);CHKERRQ(ierr); }
-    if (actx->rhsjaccoupling[i]) {
-      TSRHSJacobian coupling = actx->rhsjaccoupling[i];
+    if (actx->updatestates[i]) { ierr = (*actx->updatestates[i])(actx->qts[i],actx->U[0],NULL);CHKERRQ(ierr); }
+    if (actx->jaccoupling[i]) {
       PetscInt r = actx->adjoint ? 0 : i+1;
       PetscInt c = actx->adjoint ? i+1 : 0;
 
       ierr = MatNestGetSubMat(A,r,c,&Asub);CHKERRQ(ierr);
       ierr = MatNestGetSubMat(P,r,c,&Psub);CHKERRQ(ierr);
-      ierr = (*coupling)(actx->qts[i],time,actx->U[i+1],Asub,Psub,actx);CHKERRQ(ierr);
+      ierr = (*actx->jaccoupling[i])(actx->qts[i],time,actx->U[i+1],NULL,0.0,Asub,Psub,actx);CHKERRQ(ierr);
     }
     ierr = MatNestGetSubMat(A,i+1,i+1,&Asub);CHKERRQ(ierr);
     ierr = MatNestGetSubMat(P,i+1,i+1,&Psub);CHKERRQ(ierr);
@@ -538,18 +541,13 @@ static PetscErrorCode AugmentedTSIJacobian(TS ats, PetscReal time, Vec U, Vec Ud
   ierr = TSComputeIJacobian(actx->model,time,actx->U[0],actx->Udot[0],shift,Asub,Psub,PETSC_FALSE);CHKERRQ(ierr);
   for (i=0;i<actx->nqts;i++) {
     if (actx->updatestates[i]) { ierr = (*actx->updatestates[i])(actx->qts[i],actx->U[0],actx->Udot[0]);CHKERRQ(ierr); }
-    if (actx->rhsjaccoupling[i]) {
-      TSRHSJacobian coupling = actx->rhsjaccoupling[i];
+    if (actx->jaccoupling[i]) {
       PetscInt r = actx->adjoint ? 0 : i+1;
       PetscInt c = actx->adjoint ? i+1 : 0;
 
       ierr = MatNestGetSubMat(A,r,c,&Asub);CHKERRQ(ierr);
       ierr = MatNestGetSubMat(P,r,c,&Psub);CHKERRQ(ierr);
-      ierr = (*coupling)(actx->qts[i],time,actx->U[i+1],Asub,Psub,actx);CHKERRQ(ierr);
-      if (Psub) { ierr = MatScale(Psub,-1.0);CHKERRQ(ierr); }
-      if (Asub && Asub != Psub) {
-        ierr = MatScale(Asub,-1.0);CHKERRQ(ierr);
-      }
+      ierr = (*actx->jaccoupling[i])(actx->qts[i],time,actx->U[i+1],actx->Udot[i+1],shift,Asub,Psub,actx);CHKERRQ(ierr);
     }
     ierr = MatNestGetSubMat(A,i+1,i+1,&Asub);CHKERRQ(ierr);
     ierr = MatNestGetSubMat(P,i+1,i+1,&Psub);CHKERRQ(ierr);
@@ -646,7 +644,7 @@ PetscErrorCode AugmentedTSFinalize(TS ats)
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactive[], PetscErrorCode (*updatestates[])(TS,Vec,Vec), TSRHSJacobian rhsjaccoupling[], Mat Acoupling[], Mat Bcoupling[], PetscBool adjoint, TS* ats)
+PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactive[], PetscErrorCode (*updatestates[])(TS,Vec,Vec), TSIJacobian jaccoupling[], Mat Acoupling[], Mat Bcoupling[], PetscBool adjoint, TS* ats)
 {
   Mat            A,B;
   DM             dm,adm;
@@ -677,11 +675,13 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
   }
   if (Acoupling) {
     for (i=0;i<n;i++) {
+      if (!Acoupling[i]) continue;
       PetscValidHeaderSpecific(Acoupling[i],MAT_CLASSID,7);
     }
   }
   if (Bcoupling) {
     for (i=0;i<n;i++) {
+      if (!Bcoupling[i]) continue;
       PetscValidHeaderSpecific(Bcoupling[i],MAT_CLASSID,8);
     }
   }
@@ -747,25 +747,21 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
   linear = (prtype == TS_LINEAR ? PETSC_TRUE : PETSC_FALSE);
 
   aug_ctx->nqts = n;
-  ierr = PetscMalloc3(aug_ctx->nqts,&aug_ctx->qts,aug_ctx->nqts,&aug_ctx->updatestates,aug_ctx->nqts,&aug_ctx->rhsjaccoupling);CHKERRQ(ierr);
+  ierr = PetscMalloc3(aug_ctx->nqts,&aug_ctx->qts,aug_ctx->nqts,&aug_ctx->updatestates,aug_ctx->nqts,&aug_ctx->jaccoupling);CHKERRQ(ierr);
   for (i=0;i<aug_ctx->nqts;i++) {
 
     ierr = PetscObjectReference((PetscObject)qts[i]);CHKERRQ(ierr);
     aug_ctx->qts[i] = qts[i];
     ierr = TSGetDM(aug_ctx->qts[i],&dm);CHKERRQ(ierr);
     ierr = DMCompositeAddDM(adm,dm);CHKERRQ(ierr);
-    aug_ctx->updatestates[i]   = updatestates   ? updatestates[i]   : NULL;
-    aug_ctx->rhsjaccoupling[i] = rhsjaccoupling ? rhsjaccoupling[i] : NULL;
+    aug_ctx->updatestates[i] = updatestates ? updatestates[i] : NULL;
+    aug_ctx->jaccoupling[i]  = jaccoupling  ? jaccoupling[i]  : NULL;
     ierr = TSGetProblemType(aug_ctx->qts[i],&prtype);CHKERRQ(ierr);
     linear = (PetscBool) (linear && (prtype == TS_LINEAR ? PETSC_TRUE : PETSC_FALSE));
   }
-  /* flag only if the problem is linear */
-  /* XXX disabled, since TLM augmented jacobian is not complete (needs offdiag block) */
-#if 0
   if (linear) {
     ierr = TSSetProblemType(*ats,TS_LINEAR);CHKERRQ(ierr);
   }
-#endif
   ierr = DMSetMatType(adm,MATNEST);CHKERRQ(ierr);
   ierr = DMSetUp(adm);CHKERRQ(ierr);
 
@@ -829,7 +825,7 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
       subA = Acoupling ? Acoupling[i] : NULL;
       subB = Bcoupling ? Bcoupling[i] : NULL;
       if (A == B && subA != subB) SETERRQ(PetscObjectComm((PetscObject)*ats),PETSC_ERR_PLIB,"Incompatible IJacobian matrices");
-      if (!aug_ctx->rhsjaccoupling[i]) { /* scale the matrices once */
+      if (!aug_ctx->jaccoupling[i]) { /* scale the matrices once */
         if (subA) { ierr = MatScale(subA,-1.0);CHKERRQ(ierr); }
         if (subB && subB != subA) { ierr = MatScale(subB,-1.0);CHKERRQ(ierr); }
       }

@@ -123,13 +123,7 @@ static PetscErrorCode MatMultTranspose_Propagator(Mat A, Vec x, Vec y)
     ierr = TSSetExactFinalTime(prop->adjlts,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
   }
   ierr = TSSetMaxTime(prop->adjlts,prop->tf);CHKERRQ(ierr);
-  PetscBool new = PETSC_TRUE;
-  PetscOptionsGetBool(NULL,NULL,"-new",&new,NULL);
-  if (new) {
-    ierr = AdjointTSSolveWithQuadrature_Private(prop->adjlts);CHKERRQ(ierr);
-  } else {
-    ierr = TSSolve(prop->adjlts,NULL);CHKERRQ(ierr);
-  }
+  ierr = AdjointTSSolveWithQuadrature_Private(prop->adjlts);CHKERRQ(ierr);
   ierr = AdjointTSFinalizeQuadrature(prop->adjlts);CHKERRQ(ierr);
   prop->lts->trajectory = NULL;
   prop->tj = prop->model->trajectory;

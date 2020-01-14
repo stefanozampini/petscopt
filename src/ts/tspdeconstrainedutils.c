@@ -188,6 +188,21 @@ static PetscErrorCode QuadTSRHSJacobian(TS ts, PetscReal time, Vec U, Mat A, Mat
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode QuadTSJacCoupling(TS ts, PetscReal time, Vec Q, Vec Qdot, PetscReal s, Mat A, Mat P, void *ctx)
+{
+  TSQuadCtx      *qctx;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TSGetApplicationContext(ts,(void*)&qctx);CHKERRQ(ierr);
+  ierr = (*qctx->evaljaccoup)(qctx->U,qctx->Udot,time,s,A,P,qctx->evalquadctx);CHKERRQ(ierr);
+  if (Qdot) {
+    ierr = MatScale(A,-1.0);CHKERRQ(ierr);
+    if (A && A != P) { ierr = MatScale(P,-1.0);CHKERRQ(ierr); }
+  }
+  PetscFunctionReturn(0);
+}
+
 PetscErrorCode TSCreateQuadTS(MPI_Comm comm, Vec v, PetscBool diffrhs, TSQuadCtx *ctx, TS *qts)
 {
   Mat            A,B;
@@ -198,7 +213,10 @@ PetscErrorCode TSCreateQuadTS(MPI_Comm comm, Vec v, PetscBool diffrhs, TSQuadCtx
   ierr = TSCreate(comm,qts);CHKERRQ(ierr);
   ierr = TSSetApplicationContext(*qts,ctx);CHKERRQ(ierr);
   if (!v) {
-    n = 1;
+    PetscMPIInt rank;
+
+    ierr = MPI_Comm_rank(comm,&rank);CHKERRQ(ierr);
+    n    = !rank ? 1 : 0;
     ierr = VecCreateMPI(comm,n,PETSC_DECIDE,&v);CHKERRQ(ierr);
     ierr = TSSetSolution(*qts,v);CHKERRQ(ierr);
     ierr = VecDestroy(&v);CHKERRQ(ierr);
@@ -248,19 +266,23 @@ typedef struct {
   TSObj obj;
   Vec   design;
   Vec   work;
+  Vec   f_x;
+  Vec   swork;
 } FWDEvalQuadCtx;
 
 static PetscErrorCode EvalQuadObj_FWD(Vec U, Vec Udot, PetscReal t, Vec F, void* ctx)
 {
   FWDEvalQuadCtx *evalctx = (FWDEvalQuadCtx*)ctx;
-  PetscErrorCode ierr;
   PetscScalar    *a;
   PetscReal      f;
+  PetscInt       n;
+  PetscErrorCode ierr;
 
   PetscFunctionBegin;
   ierr = TSObjEval(evalctx->obj,U,evalctx->design,t,&f);CHKERRQ(ierr);
   ierr = VecGetArray(F,&a);CHKERRQ(ierr);
-  a[0] = f;
+  ierr = VecGetLocalSize(F,&n);CHKERRQ(ierr);
+  if (n) { a[0] = f; }
   ierr = VecRestoreArray(F,&a);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -268,14 +290,16 @@ static PetscErrorCode EvalQuadObj_FWD(Vec U, Vec Udot, PetscReal t, Vec F, void*
 static PetscErrorCode EvalQuadObjFixed_FWD(Vec U, Vec Udot, PetscReal t, Vec F, void* ctx)
 {
   FWDEvalQuadCtx *evalctx = (FWDEvalQuadCtx*)ctx;
-  PetscErrorCode ierr;
   PetscScalar    *a;
   PetscReal      f;
+  PetscInt       n;
+  PetscErrorCode ierr;
 
   PetscFunctionBegin;
   ierr = TSObjEvalFixed(evalctx->obj,U,evalctx->design,t,&f);CHKERRQ(ierr);
   ierr = VecGetArray(F,&a);CHKERRQ(ierr);
-  a[0] = f;
+  ierr = VecGetLocalSize(F,&n);CHKERRQ(ierr);
+  if (n) { a[0] = f; }
   ierr = VecRestoreArray(F,&a);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -305,17 +329,50 @@ static PetscErrorCode EvalQuadIntegrandFixed_FWD(Vec U, Vec Udot, PetscReal t, V
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode JacCoupling_FWD(Vec U, Vec Udot, PetscReal t, PetscReal s, Mat A, Mat B, void* ctx)
+{
+  FWDEvalQuadCtx *ectx = (FWDEvalQuadCtx*)ctx;
+  PetscBool      has;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TSObjEval_U(ectx->obj,U,ectx->design,t,ectx->swork,&has,ectx->f_x);CHKERRQ(ierr);
+  if (!has) { ierr = VecSet(ectx->f_x,0.);CHKERRQ(ierr); }
+  ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode JacCouplingMult_FWD(Mat A, Vec x, Vec y)
+{
+  PetscScalar    *a,v;
+  FWDEvalQuadCtx *ctx;
+  PetscInt       n;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = MatShellGetContext(A,(void**)&ctx);CHKERRQ(ierr);
+  ierr = VecTDot(ctx->f_x,x,&v);CHKERRQ(ierr);
+  ierr = VecGetArray(y,&a);CHKERRQ(ierr);
+  ierr = VecGetLocalSize(y,&n);CHKERRQ(ierr);
+  if (n) { a[0] = v; }
+  ierr = VecRestoreArray(y,&a);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
 typedef struct {
   TSObj     obj; /* TODO : access via TSGetTSObj? */
   TS        fwdts;
   TS        adjts;
-  TS        tlmts;
   PetscReal t0,tf;
   Vec       design;
   Vec       direction;
   Vec       work1;
   Vec       work2;
-  PetscBool init;
+  PetscReal jac_time;
+  PetscReal jac_shift;
 } TLMEvalQuadCtx;
 
 /* computes d^2 f / dp^2 direction + d^2 f / dp dx U + (L^T \otimes I_M)(H_MM direction + H_MU U + H_MUdot Udot) during TLM runs */
@@ -324,8 +381,7 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, Vec Udot, PetscReal t, Vec F,
   TLMEvalQuadCtx *q = (TLMEvalQuadCtx*)ctx;
   TS             fwdts = q->fwdts;
   TS             adjts = q->adjts;
-  TS             tlmts = q->tlmts;
-  TSTrajectory   tj,atj = NULL,ltj;
+  TSTrajectory   tj,atj = NULL;
   TSOpt          tsopt;
   Vec            FWDH[2],FOAH = NULL;
   PetscReal      adjt  = q->tf - t + q->t0;
@@ -336,11 +392,13 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, Vec Udot, PetscReal t, Vec F,
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  ierr = TSGetTrajectory(fwdts,&tj);CHKERRQ(ierr);
+  ierr = TSGetTSOpt(fwdts,&tsopt);CHKERRQ(ierr);
   if (adjts) { /* If not present, Gauss-Newton Hessian */
     ierr = TSGetTrajectory(adjts,&atj);CHKERRQ(ierr);
+    ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
   }
-  ierr = TSGetTrajectory(tlmts,&ltj);CHKERRQ(ierr);
+  if (!Udot) Hhas[2][1] = PETSC_FALSE;
+  ierr = TSGetTrajectory(fwdts,&tj);CHKERRQ(ierr);
   ierr = TSTrajectoryGetUpdatedHistoryVecs(tj,fwdts,t,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
   ierr = TSObjEval_MU(q->obj,FWDH[0],q->design,t,U,q->work1,&AXPY,F);CHKERRQ(ierr);
   if (!AXPY) {
@@ -353,10 +411,6 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, Vec Udot, PetscReal t, Vec F,
       ierr = VecAXPY(F,1.0,q->work2);CHKERRQ(ierr);
     }
   }
-  ierr = TSGetTSOpt(fwdts,&tsopt);CHKERRQ(ierr);
-  if (adjts) { /* not GN hessian */
-    ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
-  }
   if (Hhas[2][0] || Hhas[2][1] || Hhas[2][2]) { /* Not for GN */
     ierr = TSTrajectoryGetUpdatedHistoryVecs(atj,adjts,adjt,&FOAH,NULL);CHKERRQ(ierr);
   }
@@ -366,8 +420,8 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, Vec Udot, PetscReal t, Vec F,
       ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
     } else {
       ierr = TSOptEvalHessianDAE(tsopt,2,2,t,FWDH[0],FWDH[1],q->design,FOAH,q->direction,F);CHKERRQ(ierr);
-      AXPY = PETSC_TRUE;
     }
+    AXPY = PETSC_TRUE;
   }
   if (Hhas[2][0]) { /* (L^T \otimes I_M) H_MX \eta, \eta (=U) the TLM solution */
     if (AXPY) {
@@ -375,22 +429,24 @@ static PetscErrorCode EvalQuadIntegrand_TLM(Vec U, Vec Udot, PetscReal t, Vec F,
       ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
     } else {
       ierr = TSOptEvalHessianDAE(tsopt,2,0,t,FWDH[0],FWDH[1],q->design,FOAH,U,F);CHKERRQ(ierr);
-      AXPY = PETSC_TRUE;
     }
+    AXPY = PETSC_TRUE;
   }
   /* this is evaluated only when Udot != 0, i.e. the TLM is solved via the IFunction interface */
-  if (Hhas[2][1] && Udot) { /* (L^T \otimes I_M) H_MXdot \etadot (=Udot), \eta the TLM solution */
+  if (Hhas[2][1]) { /* (L^T \otimes I_M) H_MXdot \etadot (=Udot), \eta the TLM solution */
     if (AXPY) {
       ierr = TSOptEvalHessianDAE(tsopt,2,1,t,FWDH[0],FWDH[1],q->design,FOAH,Udot,q->work1);CHKERRQ(ierr);
       ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
     } else {
       ierr = TSOptEvalHessianDAE(tsopt,2,1,t,FWDH[0],FWDH[1],q->design,FOAH,Udot,F);CHKERRQ(ierr);
     }
+    AXPY = PETSC_TRUE;
   }
   ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
   if (FOAH) {
     ierr = TSTrajectoryRestoreUpdatedHistoryVecs(atj,&FOAH,NULL);CHKERRQ(ierr);
   }
+  if (!AXPY) { ierr = VecSet(F,0.);CHKERRQ(ierr); }
   PetscFunctionReturn(0);
 }
 
@@ -419,6 +475,80 @@ static PetscErrorCode EvalQuadIntegrandFixed_TLM(Vec U, Vec Udot, PetscReal t, V
     }
   }
   ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,&FWDH,NULL);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode JacCoupling_TLM(Vec U, Vec Udot, PetscReal t, PetscReal s, Mat A, Mat B, void* ctx)
+{
+  TLMEvalQuadCtx *q = (TLMEvalQuadCtx*)ctx;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  q->jac_shift = s;
+  q->jac_time  = t;
+  ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode JacCouplingMult_TLM(Mat A, Vec x, Vec y)
+{
+  TLMEvalQuadCtx *q;
+  TS             fwdts,adjts;
+  TSTrajectory   tj,atj = NULL;
+  TSOpt          tsopt;
+  Vec            FWDH[2],FOAH = NULL;
+  PetscBool      AXPY;
+  PetscBool      Hhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                               {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                               {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
+  PetscReal      t,s;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr  = MatShellGetContext(A,(void**)&q);CHKERRQ(ierr);
+  fwdts = q->fwdts;
+  adjts = q->adjts;
+  t     = q->jac_time;
+  s     = q->jac_shift;
+
+  ierr = TSGetTSOpt(fwdts,&tsopt);CHKERRQ(ierr);
+  if (adjts) { /* If not present, Gauss-Newton Hessian */
+    ierr = TSGetTrajectory(adjts,&atj);CHKERRQ(ierr);
+    ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
+  }
+  if (s == 0.) Hhas[2][1] = PETSC_FALSE;
+  if (!Hhas[2][0] && !Hhas[2][1]) {
+    ierr = VecSet(y,0.);CHKERRQ(ierr);
+    PetscFunctionReturn(0);
+  }
+  ierr = TSGetTrajectory(fwdts,&tj);CHKERRQ(ierr);
+  ierr = TSTrajectoryGetUpdatedHistoryVecs(tj,fwdts,t,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
+  if (Hhas[2][0] || Hhas[2][1]) { /* FOAH = 0 for Gauss-Newton */
+    PetscReal adjt = q->tf - t + q->t0;
+
+    ierr = TSTrajectoryGetUpdatedHistoryVecs(atj,adjts,adjt,&FOAH,NULL);CHKERRQ(ierr);
+  }
+  if (Hhas[2][0]) { /* (L^T \otimes I_M) H_MX */
+    ierr = TSOptEvalHessianDAE(tsopt,2,0,t,FWDH[0],FWDH[1],q->design,FOAH,x,y);CHKERRQ(ierr);
+    AXPY = PETSC_TRUE;
+  }
+  /* this is evaluated only when Udot != 0, i.e. the TLM is solved via the IFunction interface */
+  if (Hhas[2][1]) { /* s * (L^T \otimes I_M) H_MXdot */
+    if (!AXPY) {
+      ierr = TSOptEvalHessianDAE(tsopt,2,1,t,FWDH[0],FWDH[1],q->design,FOAH,x,y);CHKERRQ(ierr);
+      ierr = VecScale(y,s);CHKERRQ(ierr);
+    } else {
+      ierr = TSOptEvalHessianDAE(tsopt,2,1,t,FWDH[0],FWDH[1],q->design,FOAH,x,q->work1);CHKERRQ(ierr);
+      ierr = VecAXPY(y,s,q->work1);CHKERRQ(ierr);
+    }
+  }
+  ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
+  if (FOAH) {
+    ierr = TSTrajectoryRestoreUpdatedHistoryVecs(atj,&FOAH,NULL);CHKERRQ(ierr);
+  }
   PetscFunctionReturn(0);
 }
 
@@ -569,14 +699,34 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
   qfwd.obj    = funchead;
   qfwd.design = design;
   qfwd.work   = NULL;
+  qfwd.f_x    = NULL;
+  qfwd.swork  = NULL;
   qtlm.obj    = funchead;
   qtlm.design = design;
+  qtlm.fwdts  = NULL;
+  qtlm.adjts  = NULL;
   qtlm.work1  = NULL;
   qtlm.work2  = NULL;
+  qtlm.jac_shift = 0.0;
+  qtlm.jac_time = PETSC_MIN_REAL;
   squad_ctx   = &qfwd;
   vquad_ctx   = direction ? (void*)&qtlm : (void*)&qfwd;
 
   ierr = TSSetUp(ts);CHKERRQ(ierr);
+
+  /* XXX */
+  if (squad) {
+    PetscBool has;
+
+    ierr = TSObjHasObjectiveIntegrand(funchead,NULL,&has,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
+    if (has) {
+      DM dm;
+
+      ierr = TSGetDM(ts,&dm);CHKERRQ(ierr);
+      ierr = DMGetGlobalVector(dm,&qfwd.f_x);CHKERRQ(ierr);
+      ierr = DMGetGlobalVector(dm,&qfwd.swork);CHKERRQ(ierr);
+    }
+  }
 
   /* determine the presence of cost integrals */
   ierr = TSGetMaxTime(ts,&tf);CHKERRQ(ierr);
@@ -585,19 +735,30 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     PetscBool has;
 
     if (direction) { /* Hessian computations */
-      PetscBool has1,has2,Hhas[3][3];
-      TSOpt     tsopt;
+      TS          adjts;
+      TSOpt       tsopt;
+      TSIFunction ifunc;
+      PetscBool   has1,has2;
+      PetscBool   Hhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                                {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                                {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
 
       ierr = TSGetTSOpt(model,&tsopt);CHKERRQ(ierr);
       ierr = TSObjHasObjectiveIntegrand(funchead,NULL,NULL,NULL,NULL,&has1,&has2);CHKERRQ(ierr);
       has  = (PetscBool)(has1 || has2);
-      ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
-      if (Hhas[2][0] || Hhas[2][1] || Hhas[2][2]) has = PETSC_TRUE;
+      ierr = PetscObjectQuery((PetscObject)model,"_ts_hessian_foats",(PetscObject*)&adjts);CHKERRQ(ierr);
+      if (adjts) {
+        ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
+      }
+      ierr = TSGetIFunction(ts,NULL,&ifunc,NULL);CHKERRQ(ierr);
+      if (!ifunc) Hhas[2][1] = PETSC_FALSE;
+      has = (PetscBool)(has || Hhas[2][0] || Hhas[2][1] || Hhas[2][2]);
     } else {
       ierr = TSObjHasObjectiveIntegrand(funchead,NULL,NULL,&has,NULL,NULL,NULL);CHKERRQ(ierr);
     }
     /* cost integrands not present */
     if (!has) vquad = NULL;
+
     if (direction) { /* we use PETSC_SMALL since some of the fixed terms can be at the initial time */
       PetscBool has1,has2;
 
@@ -619,7 +780,6 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
       /* qtlm.adjts may be NULL for Gauss-Newton approximations */
       ierr = PetscObjectQuery((PetscObject)model,"_ts_hessian_foats",(PetscObject*)&qtlm.adjts);CHKERRQ(ierr);
       qtlm.fwdts     = model;
-      qtlm.tlmts     = ts;
       qtlm.t0        = t0;
       qtlm.tf        = tf;
       qtlm.design    = design;
@@ -633,16 +793,40 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
   /* SetUp quadrature TSs */
   nq = 0;
   diffrhs = (ts->Arhs != ts->Brhs) ? PETSC_TRUE : PETSC_FALSE;
+  TSIJacobian jaccoup[] = {NULL,NULL};
+  Mat Acoup[] = {NULL,NULL}, Bcoup[] = {NULL,NULL};
   if (squad) {
-    DM  dm;
-    Vec v;
+    DM        dm;
+    Vec       v;
+    PetscBool has;
+
+    ierr = TSCreateQuadTS(PetscObjectComm((PetscObject)ts),NULL,diffrhs,&qctxs[nq],&qts[nq]);CHKERRQ(ierr);
+    ierr = TSSetProblemType(qts[nq],TS_NONLINEAR);CHKERRQ(ierr);
 
     qctxs[nq].evalquad       = squad;
     qctxs[nq].evalquad_fixed = squad_fixed;
     qctxs[nq].evalquadctx    = squad_ctx;
 
-    ierr = TSCreateQuadTS(PetscObjectComm((PetscObject)ts),NULL,diffrhs,&qctxs[nq],&qts[nq]);CHKERRQ(ierr);
-    ierr = TSSetProblemType(qts[nq],TS_NONLINEAR);CHKERRQ(ierr);
+    ierr = TSObjHasObjectiveIntegrand(funchead,NULL,&has,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
+    if (has) {
+      Vec      sol;
+      PetscInt n,N;
+
+      jaccoup[nq] = QuadTSJacCoupling;
+      qctxs[nq].evaljaccoup = JacCoupling_FWD;
+
+      ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
+      ierr = VecGetSize(sol,&N);CHKERRQ(ierr);
+      ierr = VecGetLocalSize(sol,&n);CHKERRQ(ierr);
+      ierr = MatCreateShell(PetscObjectComm((PetscObject)ts),PETSC_DECIDE,n,1,N,qctxs[nq].evalquadctx,&Acoup[nq]);CHKERRQ(ierr);
+      if (diffrhs) {
+        ierr = MatCreateShell(PetscObjectComm((PetscObject)ts),PETSC_DECIDE,n,1,N,qctxs[nq].evalquadctx,&Bcoup[nq]);CHKERRQ(ierr);
+      } else {
+        ierr = PetscObjectReference((PetscObject)Acoup[nq]);CHKERRQ(ierr);
+        Bcoup[nq] = Acoup[nq];
+      }
+      ierr = MatShellSetOperation(Acoup[nq],MATOP_MULT,(void(*)(void))JacCouplingMult_FWD);CHKERRQ(ierr);
+    }
 
     /* Init */
     ierr = TSGetDM(qts[nq],&dm);CHKERRQ(ierr);
@@ -668,6 +852,40 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     ierr = TSCreateQuadTS(PetscObjectComm((PetscObject)ts),quadvec,diffrhs,&qctxs[nq],&qts[nq]);CHKERRQ(ierr);
     ierr = TSSetProblemType(qts[nq],direction ? TS_LINEAR : TS_NONLINEAR);CHKERRQ(ierr);
 
+    if (direction && qtlm.adjts) {
+      TSOpt     tsopt;
+      TSIFunction ifunc;
+      PetscBool Hhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                              {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                              {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
+
+      ierr = TSGetTSOpt(model,&tsopt);CHKERRQ(ierr);
+      ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
+      ierr = TSGetIFunction(ts,NULL,&ifunc,NULL);CHKERRQ(ierr);
+      if (!ifunc) Hhas[2][1] = PETSC_FALSE;
+      if (Hhas[2][0] || Hhas[2][1]) {
+        Vec      sol;
+        PetscInt n,N,m,M;
+
+        jaccoup[nq] = QuadTSJacCoupling;
+        qctxs[nq].evaljaccoup = JacCoupling_TLM;
+
+        ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
+        ierr = VecGetSize(sol,&N);CHKERRQ(ierr);
+        ierr = VecGetLocalSize(sol,&n);CHKERRQ(ierr);
+        ierr = VecGetSize(design,&M);CHKERRQ(ierr);
+        ierr = VecGetLocalSize(design,&m);CHKERRQ(ierr);
+        ierr = MatCreateShell(PetscObjectComm((PetscObject)ts),m,n,M,N,qctxs[nq].evalquadctx,&Acoup[nq]);CHKERRQ(ierr);
+        if (diffrhs) {
+          ierr = MatCreateShell(PetscObjectComm((PetscObject)ts),m,n,M,N,qctxs[nq].evalquadctx,&Bcoup[nq]);CHKERRQ(ierr);
+        } else {
+          ierr = PetscObjectReference((PetscObject)Acoup[nq]);CHKERRQ(ierr);
+          Bcoup[nq] = Acoup[nq];
+        }
+        ierr = MatShellSetOperation(Acoup[nq],MATOP_MULT,(void(*)(void))JacCouplingMult_TLM);CHKERRQ(ierr);
+      }
+    }
+
     /* Init (add quadvec to qvec_fixed and start from 0) */
     ierr = TSGetDM(qts[nq],&dm);CHKERRQ(ierr);
     ierr = DMGetGlobalVector(dm,&qvec_fixed[nq]);CHKERRQ(ierr);
@@ -684,7 +902,11 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
   }
 
   /* Augmented TS */
-  ierr = TSCreateAugmentedTS(ts,nq,qts,NULL,qup,NULL,NULL,NULL,PETSC_FALSE,&ats);CHKERRQ(ierr);
+  ierr = TSCreateAugmentedTS(ts,nq,qts,NULL,qup,jaccoup,Acoup,Bcoup,PETSC_FALSE,&ats);CHKERRQ(ierr);
+  ierr = MatDestroy(&Acoup[0]);CHKERRQ(ierr);
+  ierr = MatDestroy(&Acoup[1]);CHKERRQ(ierr);
+  ierr = MatDestroy(&Bcoup[0]);CHKERRQ(ierr);
+  ierr = MatDestroy(&Bcoup[1]);CHKERRQ(ierr);
   ierr = AugmentedTSInitialize(ats);CHKERRQ(ierr);
   ierr = TSSetFromOptions(ats);CHKERRQ(ierr);
 
@@ -763,10 +985,13 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
   if (quadscalar) {
     Vec         v;
     PetscScalar *a;
+    PetscInt    n;
 
     ierr = TSGetSolution(qts[0],&v);CHKERRQ(ierr);
     ierr = VecGetArray(v,&a);CHKERRQ(ierr);
-    *quadscalar = PetscRealPart(a[0]);
+    ierr = VecGetLocalSize(v,&n);CHKERRQ(ierr);
+    if (n) *quadscalar = PetscRealPart(a[0]);
+    ierr = MPI_Bcast(quadscalar,1,MPIU_REAL,0,PetscObjectComm((PetscObject)ts));CHKERRQ(ierr);
     ierr = VecRestoreArray(v,&a);CHKERRQ(ierr);
   }
   ierr = TSDestroy(&qts[0]);CHKERRQ(ierr);
@@ -774,6 +999,13 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
   ierr = TSDestroy(&ats);CHKERRQ(ierr);
 
   ierr = VecDestroy(&qfwd.work);CHKERRQ(ierr);
+  if (qfwd.f_x) {
+    DM dm;
+
+    ierr = TSGetDM(ts,&dm);CHKERRQ(ierr);
+    ierr = DMRestoreGlobalVector(dm,&qfwd.f_x);CHKERRQ(ierr);
+    ierr = DMRestoreGlobalVector(dm,&qfwd.swork);CHKERRQ(ierr);
+  }
   ierr = VecDestroy(&qtlm.work1);CHKERRQ(ierr);
   ierr = VecDestroy(&qtlm.work2);CHKERRQ(ierr);
   PetscFunctionReturn(0);
