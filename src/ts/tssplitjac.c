@@ -202,7 +202,7 @@ PetscErrorCode TSUpdateSplitJacobiansFromHistory_Private(TS ts, PetscReal time)
 
 /* This function is used in AdjointTSIJacobian and (optionally) in TLMTSIJacobian.
    The assumption here is that the IJacobian routine is called after the IFunction (called with same time, U and Udot)
-   This is why the time, U and Udot arguments are ignored */
+   This is why the time, U and Udot arguments are currently ignored (TODO: add checks?) */
 PetscErrorCode TSComputeIJacobianWithSplits_Private(TS ts, PetscReal time, Vec U, Vec Udot, PetscReal shift, Mat A, Mat B, void *ctx)
 {
   PetscObjectState Astate;

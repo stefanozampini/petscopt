@@ -550,7 +550,12 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, PetscBoo
     }
 
     if (foats) { /* if present, not a Gauss-Newton Hessian */
+      TSIFunction ifunc;
+      PetscInt    i;
+
+      ierr = TSGetIFunction(fwdts,NULL,&ifunc,NULL);CHKERRQ(ierr);
       ierr = TSOptHasHessianDAE(tsopt,HFhas);CHKERRQ(ierr);
+      if (!ifunc) for (i=0;i<3;i++) HFhas[i][1] = HFhas[1][i] = PETSC_FALSE;
     }
     if (HFhas[0][0] || HFhas[0][1] || HFhas[0][2]) {
       Vec FWDHdot,FOAH;
@@ -621,7 +626,7 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, PetscBoo
     ierr = DMGetGlobalVector(dm,&W);CHKERRQ(ierr);
     if (!U) {
       ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,fwdt,&FWDH,NULL);CHKERRQ(ierr);
-    } else FWDH = U; /* XXX DADJ */
+    } else FWDH = U;
     ierr = TSObjEval_U(adj_ctx->tsobj,FWDH,adj_ctx->design,fwdt,W,&has,F);CHKERRQ(ierr);
     if (!U) {
       ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,&FWDH,NULL);CHKERRQ(ierr);
@@ -1588,7 +1593,6 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts)
     qctx.design         = NULL;
     if (!adj_ctx->quadvec) SETERRQ(PetscObjectComm((PetscObject)adjts),PETSC_ERR_ORDER,"Missing quadrature vector. You should call AdjointTSSetQuadratureVec() first");
 
-    ierr = TSSetPostStep(adjts,AdjointTSPostStep);CHKERRQ(ierr);
     ierr = TSCreateQuadTS(PetscObjectComm((PetscObject)adjts),adj_ctx->quadvec,diffrhs,&qctx,&qts);CHKERRQ(ierr);
     ierr = TSSetProblemType(qts,TS_LINEAR);CHKERRQ(ierr);
 

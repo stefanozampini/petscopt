@@ -28,6 +28,7 @@ static PetscErrorCode TLMTSComputeSplitJacobians(TS ts, PetscReal time, Vec U, V
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
+  PetscCheckTLMTS(ts);
   if (A == B) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_USER,"A and B must be different matrices");
   if (pA == pB) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_USER,"pA and pB must be different matrices");
   ierr = TSGetApplicationContext(ts,(void*)&tlm_ctx);CHKERRQ(ierr);
@@ -50,6 +51,7 @@ static PetscErrorCode TLMTSIFunctionLinear(TS lts, PetscReal time, Vec U, Vec Ud
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
+  PetscCheckTLMTS(lts);
   ierr = TSGetApplicationContext(lts,(void*)&tlm_ctx);CHKERRQ(ierr);
   ierr = TSUpdateSplitJacobiansFromHistory_Private(tlm_ctx->model,time);CHKERRQ(ierr);
   ierr = TSGetSplitJacobians(tlm_ctx->model,&J_U,NULL,&J_Udot,NULL);CHKERRQ(ierr);
@@ -76,6 +78,7 @@ static PetscErrorCode TLMTSIJacobian(TS lts, PetscReal time, Vec U, Vec Udot, Pe
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
+  PetscCheckTLMTS(lts);
   ierr  = TSGetApplicationContext(lts,(void*)&tlm_ctx);CHKERRQ(ierr);
   model = tlm_ctx->model;
   if (tlm_ctx->userijac) {
@@ -99,6 +102,7 @@ static PetscErrorCode TLMTSRHSFunctionLinear(TS lts, PetscReal time, Vec U, Vec 
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
+  PetscCheckTLMTS(lts);
   ierr = TSGetApplicationContext(lts,(void*)&tlm_ctx);CHKERRQ(ierr);
   /* force recomputation of RHS Jacobian */
   lts->rhsjacobian.time = PETSC_MIN_REAL;
@@ -125,6 +129,7 @@ static PetscErrorCode TLMTSRHSJacobian(TS lts, PetscReal time, Vec U, Mat A, Mat
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
+  PetscCheckTLMTS(lts);
   ierr = TSGetApplicationContext(lts,(void*)&tlm_ctx);CHKERRQ(ierr);
   ierr = TSGetProblemType(tlm_ctx->model,&type);CHKERRQ(ierr);
   if (type > TS_LINEAR) {
@@ -148,6 +153,7 @@ static PetscErrorCode TLMTSOptionsHandler(PetscOptionItems *PetscOptionsObject,P
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
+  PetscCheckTLMTS(lts);
   ierr = TSGetApplicationContext(lts,(void*)&tlm_ctx);CHKERRQ(ierr);
   ierr = PetscOptionsHead(PetscOptionsObject,"TLMTS options");CHKERRQ(ierr);
   ierr = PetscOptionsBool("-userijacobian","Use the user-provided IJacobian routine, instead of the splits, to compute the Jacobian",NULL,tlm_ctx->userijac,&tlm_ctx->userijac,NULL);CHKERRQ(ierr);
