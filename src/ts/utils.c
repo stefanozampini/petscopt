@@ -63,6 +63,10 @@ PetscErrorCode TSCreateWithTS(TS ts, TS *nts)
 
     ierr = TSARKIMEXGetType(ts,&t);CHKERRQ(ierr);
     ierr = TSARKIMEXSetType(*nts,t);CHKERRQ(ierr);
+#if PETSC_VERSION_GE(3,13,0)
+    ierr = TSARKIMEXGetFullyImplicit(ts,&flg);CHKERRQ(ierr);
+    ierr = TSARKIMEXSetFullyImplicit(*nts,flg);CHKERRQ(ierr);
+#endif
   }
   PetscFunctionReturn(0);
 }
