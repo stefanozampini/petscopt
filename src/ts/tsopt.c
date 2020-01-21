@@ -86,11 +86,11 @@ PetscErrorCode TSOptEvalGradientDAE(TSOpt tsopt, PetscReal t, Vec U, Vec Udot, V
     W[0] = U;
     W[1] = Udot;
     ierr = TSGetTrajectory(tsopt->ts,&tj);CHKERRQ(ierr);
-    if (!U || !Udot) {
+    if (!U && !Udot) {
       ierr = TSTrajectoryGetUpdatedHistoryVecs(tj,tsopt->ts,t,U ? NULL : &W[0],Udot ? NULL : &W[1]);CHKERRQ(ierr);
     }
     ierr = (*tsopt->F_m_f)(tsopt->ts,t,W[0],W[1],M,tsopt->F_m,tsopt->F_m_ctx);CHKERRQ(ierr);
-    if (!U || !Udot) {
+    if (!U && !Udot) {
       ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,U ? NULL : &W[0],Udot ? NULL : &W[1]);CHKERRQ(ierr);
     }
   }
@@ -151,11 +151,11 @@ PetscErrorCode TSOptEvalHessianDAE(TSOpt tsopt, PetscInt w0, PetscInt w1, PetscR
     W[0] = U;
     W[1] = Udot;
     ierr = TSGetTrajectory(tsopt->ts,&tj);CHKERRQ(ierr);
-    if (!U || !Udot) {
+    if (!U && !Udot) {
       ierr = TSTrajectoryGetUpdatedHistoryVecs(tj,tsopt->ts,t,U ? NULL : &W[0],Udot ? NULL : &W[1]);CHKERRQ(ierr);
     }
     ierr = (*tsopt->HF[w0][w1])(tsopt->ts,t,W[0],W[1],M,L,X,Y,tsopt->HFctx);CHKERRQ(ierr);
-    if (!U || !Udot) {
+    if (!U && !Udot) {
       ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,U ? NULL : &W[0],Udot ? NULL : &W[1]);CHKERRQ(ierr);
     }
   } else {
