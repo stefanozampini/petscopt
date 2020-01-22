@@ -297,7 +297,7 @@ static PetscErrorCode EvalGradientDAE(TS ts, PetscReal time, Vec U, Vec Udot, Ve
   if (ls > 3) mm = arr[3];
   ierr = VecRestoreArrayRead(user->M,(const PetscScalar**)&arr);CHKERRQ(ierr);
   ierr = VecGetArrayRead(U,(const PetscScalar**)&arr);CHKERRQ(ierr);
-  ierr = VecGetArrayRead(Udot,(const PetscScalar**)&arrd);CHKERRQ(ierr);
+  if (ls > 3) { ierr = VecGetArrayRead(Udot,(const PetscScalar**)&arrd);CHKERRQ(ierr); }
   ierr = MatZeroEntries(J);CHKERRQ(ierr);
   ierr = MatGetOwnershipRange(J,&rst,&ren);CHKERRQ(ierr);
   for (r = rst; r < ren; r++) {
@@ -323,7 +323,7 @@ static PetscErrorCode EvalGradientDAE(TS ts, PetscReal time, Vec U, Vec Udot, Ve
   ierr = MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(J,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = VecRestoreArrayRead(U,(const PetscScalar**)&arr);CHKERRQ(ierr);
-  ierr = VecRestoreArrayRead(Udot,(const PetscScalar**)&arrd);CHKERRQ(ierr);
+  if (ls > 3) { ierr = VecRestoreArrayRead(Udot,(const PetscScalar**)&arrd);CHKERRQ(ierr); }
   PetscFunctionReturn(0);
 }
 
@@ -945,7 +945,6 @@ int main(int argc, char* argv[])
   ierr = PetscInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
   ierr = MPI_Comm_size(PETSC_COMM_WORLD,&np);CHKERRQ(ierr);
 
-  /* Command line options */
   t0             = 0.0;
   tf             = 1.0;
   a              = 0.5;
@@ -953,6 +952,8 @@ int main(int argc, char* argv[])
   p              = 1.0;
   mm             = 0.0;
   userobj.isnorm = PETSC_FALSE;
+
+  /* Command line options */
   ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"PDE-constrained options","");
   ierr = PetscOptionsScalar("-a","Initial condition","",a,&a,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsScalar("-b","Grow rate","",b,&b,NULL);CHKERRQ(ierr);
@@ -1307,10 +1308,12 @@ int main(int argc, char* argv[])
 
   /* Test the gradient code by finite differencing the objective evaluation */
   if (usefd) {
-    PetscInt    i;
-    PetscScalar oa = a, ob = b, om = mm;
-    PetscReal   op = p;
+    PetscInt          i;
+    PetscScalar       oa = a, ob = b, om = mm;
+    PetscReal         op = p;
+    const PetscScalar *g;
 
+    ierr = VecGetArrayRead(Mgrad,&g);CHKERRQ(ierr);
     for (i=0; i<dsize; i++) {
       PetscReal objdx[2];
       PetscInt  j;
@@ -1338,8 +1341,9 @@ int main(int argc, char* argv[])
         ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
         ierr = TSComputeObjectiveAndGradient(ts,t0,dt,tf,U,M,NULL,&objdx[j]);CHKERRQ(ierr);
       }
-      ierr = PetscPrintf(PETSC_COMM_WORLD,"%D-th component of gradient should be (approximated) %g (%1.16e %1.16e)\n",i,(double)((objdx[0]-objdx[1])/(2.*dx)),objdx[0],objdx[1]);CHKERRQ(ierr);
+      ierr = PetscPrintf(PETSC_COMM_WORLD,"%D-th component of gradient %1.16e, should be (approximated) %1.16e (%1.16e %1.16e)\n",i,(double)g[i],(double)((objdx[0]-objdx[1])/(2.*dx)),objdx[0],objdx[1]);CHKERRQ(ierr);
     }
+    ierr = VecRestoreArrayRead(Mgrad,&g);CHKERRQ(ierr);
   }
 
   /* Test tangent Linear Model */
@@ -1367,10 +1371,10 @@ int main(int argc, char* argv[])
     ierr = MatView(checkTLM,NULL);CHKERRQ(ierr);
   }
   ierr = MatDestroy(&checkTLM);CHKERRQ(ierr);
-  ierr = MatDestroy(&PhiExpl);CHKERRQ(ierr);
-  ierr = MatDestroy(&Phi);CHKERRQ(ierr);
   ierr = MatDestroy(&PhiTExpl);CHKERRQ(ierr);
   ierr = MatDestroy(&PhiT);CHKERRQ(ierr);
+  ierr = MatDestroy(&PhiExpl);CHKERRQ(ierr);
+  ierr = MatDestroy(&Phi);CHKERRQ(ierr);
 
   /* Test Hessian evaluation */
   ierr = MatCreate(PETSC_COMM_WORLD,&H);CHKERRQ(ierr);

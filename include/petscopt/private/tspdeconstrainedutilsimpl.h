@@ -7,13 +7,13 @@
 typedef PetscErrorCode (*QuadEval)(Vec,Vec,PetscReal,Vec,void*);
 typedef PetscErrorCode (*QuadJacEval)(Vec,Vec,PetscReal,PetscReal,Mat,Mat,void*);
 typedef struct {
-  Vec            U;
-  Vec            Udot;
-  Vec            design;
-  QuadEval       evalquad;
-  QuadEval       evalquad_fixed;
-  QuadJacEval    evaljaccoup;
-  void           *evalquadctx;
+  Vec         U;
+  Vec         Udot;
+  Vec         design;
+  QuadEval    evalquad;
+  QuadEval    evalquad_fixed;
+  QuadJacEval evaljaccoup;
+  void        *evalquadctx;
 } TSQuadCtx;
 
 PETSC_INTERN PetscErrorCode TSCreateQuadTS(MPI_Comm,Vec,PetscBool,TSQuadCtx*,TS*);

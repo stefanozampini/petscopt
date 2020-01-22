@@ -4,7 +4,8 @@ ALL: lib
 CFLAGS   =
 FFLAGS   =
 SOURCEC  = adjointts.c tlmts.c augmentedts.c tspropagator.c tssplitjac.c \
-           tsgradhess.c tsobj.c tsopt.c tspdeconstrainedutils.c utils.c
+           tsgradhess.c tsobj.c tsopt.c tspdeconstrainedutils.c utils.c \
+           discretets.c
 SOURCEF  =
 SOURCEH  =
 DIRS     = examples

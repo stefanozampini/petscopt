@@ -148,6 +148,7 @@ int main(int argc,char **argv)
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   ierr = TSCreate(PETSC_COMM_WORLD,&ts);CHKERRQ(ierr);
   ierr = TSSetType(ts,TSRK);CHKERRQ(ierr);
+  ierr = TSSetTimeStep(ts,0.001);CHKERRQ(ierr);
   ierr = TSSetRHSFunction(ts,NULL,RHSFunction,&user);CHKERRQ(ierr);
   ierr = TSSetRHSJacobian(ts,user.A,user.A,RHSJacobian,&user);CHKERRQ(ierr);
   ierr = TSSetMaxTime(ts,user.ftime);CHKERRQ(ierr);
@@ -303,11 +304,11 @@ PetscErrorCode FormFunctionGradient(Tao tao,Vec IC,PetscReal *f,Vec G,void *ctx)
   ierr = TSSolve(ts,user->x);CHKERRQ(ierr);
   ierr = TSGetSolveTime(ts,&user->ftime);CHKERRQ(ierr);
   ierr = TSGetStepNumber(ts,&user->steps);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"mu %.6f, steps %D, ftime %g\n",(double)user->mu,user->steps,(double)user->ftime);CHKERRQ(ierr);
+  /* ierr = PetscPrintf(PETSC_COMM_WORLD,"mu %.6f, steps %D, ftime %g\n",(double)user->mu,user->steps,(double)user->ftime);CHKERRQ(ierr); */
 
   ierr = VecGetArrayRead(user->x,&x_ptr);CHKERRQ(ierr);
   *f   = (x_ptr[0]-user->x_ob[0])*(x_ptr[0]-user->x_ob[0])+(x_ptr[1]-user->x_ob[1])*(x_ptr[1]-user->x_ob[1]);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"Observed value y_ob=[%f; %f], ODE solution y=[%f;%f], Cost function f=%f\n",(double)user->x_ob[0],(double)user->x_ob[1],(double)x_ptr[0],(double)x_ptr[1],(double)(*f));CHKERRQ(ierr);
+  /* ierr = PetscPrintf(PETSC_COMM_WORLD,"Observed value y_ob=[%f; %f], ODE solution y=[%f;%f], Cost function f=%f\n",(double)user->x_ob[0],(double)user->x_ob[1],(double)x_ptr[0],(double)x_ptr[1],(double)(*f));CHKERRQ(ierr); */
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Adjoint model starts here

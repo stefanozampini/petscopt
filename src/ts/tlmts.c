@@ -2,6 +2,7 @@
 #include <petscopt/private/tlmtsimpl.h>
 #include <petscopt/private/tsoptimpl.h>
 #include <petscopt/private/tssplitjacimpl.h>
+#include <petscopt/private/discretetsimpl.h>
 #include <petscopt/private/tspdeconstrainedutilsimpl.h>
 #include <petsc/private/tsimpl.h>
 #include <petscdm.h>
@@ -41,31 +42,61 @@ static PetscErrorCode TLMTSComputeSplitJacobians(TS ts, PetscReal time, Vec U, V
   PetscFunctionReturn(0);
 }
 
-/* The TLM DAE is J_Udot * U_dot + J_U * U + f = 0, with f = dH/dm * deltam */
-static PetscErrorCode TLMTSIFunctionLinear(TS lts, PetscReal time, Vec U, Vec Udot, Vec F, void *ctx)
+PetscErrorCode TLMTSComputeForcing(TS lts, PetscReal time, Vec U, Vec Udot, PetscBool *hasf, Vec F)
 {
+  PetscErrorCode (*f)(TS,PetscReal,Vec,Vec,PetscBool*,Vec);
   TLMTS_Ctx      *tlm_ctx;
   TSOpt          tsopt;
-  Mat            J_U = NULL, J_Udot = NULL;
   PetscBool      has,hasnc;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
+  PetscValidHeaderSpecific(lts,TS_CLASSID,1);
+  PetscValidLogicalCollectiveReal(lts,time,2);
+  if (U) PetscValidHeaderSpecific(U,VEC_CLASSID,3);
+  if (Udot) PetscValidHeaderSpecific(Udot,VEC_CLASSID,4);
+  PetscValidPointer(hasf,5);
+  PetscValidHeaderSpecific(F,VEC_CLASSID,6);
+  ierr = PetscObjectQueryFunction((PetscObject)lts,"TLMTSComputeForcing_C",&f);CHKERRQ(ierr);
+  if (f) {
+    ierr = (*f)(lts,time,U,Udot,hasf,F);CHKERRQ(ierr);
+    PetscFunctionReturn(0);
+  }
   PetscCheckTLMTS(lts);
   ierr = TSGetApplicationContext(lts,(void*)&tlm_ctx);CHKERRQ(ierr);
-  ierr = TSUpdateSplitJacobiansFromHistory_Private(tlm_ctx->model,time);CHKERRQ(ierr);
-  ierr = TSGetSplitJacobians(tlm_ctx->model,&J_U,NULL,&J_Udot,NULL);CHKERRQ(ierr);
-  ierr = MatMult(J_U,U,F);CHKERRQ(ierr);
-  ierr = MatMultAdd(J_Udot,Udot,F,F);CHKERRQ(ierr);
   ierr = TSGetTSOpt(tlm_ctx->model,&tsopt);CHKERRQ(ierr);
   ierr = TSOptHasGradientDAE(tsopt,&has,&hasnc);CHKERRQ(ierr);
   if (has) {
     if (hasnc) { /* non constant dependence */
       Mat F_m;
 
-      ierr = TSOptEvalGradientDAE(tsopt,time,NULL,NULL,tlm_ctx->design,&F_m,NULL);CHKERRQ(ierr);
-      ierr = MatMult(F_m,tlm_ctx->mdelta,tlm_ctx->workrhs);CHKERRQ(ierr);
+      ierr = TSOptEvalGradientDAE(tsopt,time,U,Udot,tlm_ctx->design,&F_m,NULL);CHKERRQ(ierr);
+      ierr = MatMult(F_m,tlm_ctx->mdelta,F);CHKERRQ(ierr);
+    } else {
+      ierr = VecCopy(tlm_ctx->workrhs,F);CHKERRQ(ierr);
     }
+  }
+  *hasf = has;
+  PetscFunctionReturn(0);
+}
+
+/* The TLM DAE is J_Udot * U_dot + J_U * U + f = 0, with f = dH/dm * deltam */
+static PetscErrorCode TLMTSIFunctionLinear(TS lts, PetscReal time, Vec U, Vec Udot, Vec F, void *ctx)
+{
+  TLMTS_Ctx      *tlm_ctx;
+  Mat            J_U = NULL, J_Udot = NULL;
+  PetscBool      has;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscCheckTLMTS(lts);
+  ierr = TSGetApplicationContext(lts,(void*)&tlm_ctx);CHKERRQ(ierr);
+  ierr = TLMTSComputeForcing(lts,time,NULL,NULL,&has,tlm_ctx->workrhs);CHKERRQ(ierr);
+  ierr = TSUpdateSplitJacobiansFromHistory_Private(tlm_ctx->model,time);CHKERRQ(ierr);
+  ierr = TSGetSplitJacobians(tlm_ctx->model,&J_U,NULL,&J_Udot,NULL);CHKERRQ(ierr);
+  ierr = MatMult(J_U,U,F);CHKERRQ(ierr);
+  ierr = MatMultAdd(J_Udot,Udot,F,F);CHKERRQ(ierr);
+  if (has) {
     ierr = VecAXPY(F,1.0,tlm_ctx->workrhs);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
@@ -81,14 +112,18 @@ static PetscErrorCode TLMTSIJacobian(TS lts, PetscReal time, Vec U, Vec Udot, Pe
   PetscCheckTLMTS(lts);
   ierr  = TSGetApplicationContext(lts,(void*)&tlm_ctx);CHKERRQ(ierr);
   model = tlm_ctx->model;
-  if (tlm_ctx->userijac) {
-    Vec W[2];
-
-    ierr = TSTrajectoryGetUpdatedHistoryVecs(model->trajectory,model,time,&W[0],&W[1]);CHKERRQ(ierr);
-    ierr = TSComputeIJacobian(model,time,W[0],W[1],shift,A,B,PETSC_FALSE);CHKERRQ(ierr);
-    ierr = TSTrajectoryRestoreUpdatedHistoryVecs(model->trajectory,&W[0],&W[1]);CHKERRQ(ierr);
+  if (tlm_ctx->discrete) {
+    ierr = TSComputeIJacobian(model,time,U,Udot,shift,A,B,PETSC_FALSE);CHKERRQ(ierr);
   } else {
-    ierr = TSComputeIJacobianWithSplits_Private(model,time,NULL,NULL,shift,A,B,ctx);CHKERRQ(ierr);
+    if (tlm_ctx->userijac) {
+      Vec W[2];
+
+      ierr = TSTrajectoryGetUpdatedHistoryVecs(model->trajectory,model,time,&W[0],&W[1]);CHKERRQ(ierr);
+      ierr = TSComputeIJacobian(model,time,W[0],W[1],shift,A,B,PETSC_FALSE);CHKERRQ(ierr);
+      ierr = TSTrajectoryRestoreUpdatedHistoryVecs(model->trajectory,&W[0],&W[1]);CHKERRQ(ierr);
+    } else {
+      ierr = TSComputeIJacobianWithSplits_Private(model,time,NULL,NULL,shift,A,B,ctx);CHKERRQ(ierr);
+    }
   }
   PetscFunctionReturn(0);
 }
@@ -97,26 +132,18 @@ static PetscErrorCode TLMTSIJacobian(TS lts, PetscReal time, Vec U, Vec Udot, Pe
 static PetscErrorCode TLMTSRHSFunctionLinear(TS lts, PetscReal time, Vec U, Vec F, void *ctx)
 {
   TLMTS_Ctx      *tlm_ctx;
-  TSOpt          tsopt;
-  PetscBool      has,hasnc;
+  PetscBool      has;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
   PetscCheckTLMTS(lts);
   ierr = TSGetApplicationContext(lts,(void*)&tlm_ctx);CHKERRQ(ierr);
+  ierr = TLMTSComputeForcing(lts,time,NULL,NULL,&has,tlm_ctx->workrhs);CHKERRQ(ierr);
   /* force recomputation of RHS Jacobian */
   lts->rhsjacobian.time = PETSC_MIN_REAL;
   ierr = TSComputeRHSJacobian(lts,time,U,lts->Arhs,lts->Brhs);CHKERRQ(ierr);
   ierr = MatMult(lts->Arhs,U,F);CHKERRQ(ierr);
-  ierr = TSGetTSOpt(tlm_ctx->model,&tsopt);CHKERRQ(ierr);
-  ierr = TSOptHasGradientDAE(tsopt,&has,&hasnc);CHKERRQ(ierr);
   if (has) {
-    if (hasnc) { /* non constant dependence */
-      Mat F_m;
-
-      ierr = TSOptEvalGradientDAE(tsopt,time,NULL,NULL,tlm_ctx->design,&F_m,NULL);CHKERRQ(ierr);
-      ierr = MatMult(F_m,tlm_ctx->mdelta,tlm_ctx->workrhs);CHKERRQ(ierr);
-    }
     ierr = VecAXPY(F,-1.0,tlm_ctx->workrhs);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
@@ -132,13 +159,13 @@ static PetscErrorCode TLMTSRHSJacobian(TS lts, PetscReal time, Vec U, Mat A, Mat
   PetscCheckTLMTS(lts);
   ierr = TSGetApplicationContext(lts,(void*)&tlm_ctx);CHKERRQ(ierr);
   ierr = TSGetProblemType(tlm_ctx->model,&type);CHKERRQ(ierr);
-  if (type > TS_LINEAR) {
+  if (type > TS_LINEAR && !tlm_ctx->discrete) {
     ierr = TSTrajectoryGetUpdatedHistoryVecs(tlm_ctx->model->trajectory,tlm_ctx->model,time,&U,NULL);CHKERRQ(ierr);
   }
   /* force recomputation of RHS Jacobian: this is needed because this function can be called from within an adjoint solver */
   if (lts->rhsjacobian.time == PETSC_MIN_REAL) tlm_ctx->model->rhsjacobian.time = PETSC_MIN_REAL;
   ierr = TSComputeRHSJacobian(tlm_ctx->model,time,U,A,P);CHKERRQ(ierr);
-  if (type > TS_LINEAR) {
+  if (type > TS_LINEAR && !tlm_ctx->discrete) {
     ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tlm_ctx->model->trajectory,&U,NULL);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
@@ -149,7 +176,7 @@ static PetscErrorCode TLMTSOptionsHandler(PetscOptionItems *PetscOptionsObject,P
   TS             lts = (TS)obj;
   TLMTS_Ctx      *tlm_ctx;
   PetscContainer container;
-  PetscBool      jcon,rksp;
+  PetscBool      jcon,rksp,flg;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -161,6 +188,10 @@ static PetscErrorCode TLMTSOptionsHandler(PetscOptionItems *PetscOptionsObject,P
   ierr = PetscOptionsBool("-constjacobians","Whether or not the DAE Jacobians are constant",NULL,jcon,&jcon,NULL);CHKERRQ(ierr);
   rksp = PETSC_FALSE;
   ierr = PetscOptionsBool("-reuseksp","Reuse the KSP solver from the nonlinear model",NULL,rksp,&rksp,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-discrete","Use discrete tangent linear models (not available for all methods)",NULL,tlm_ctx->discrete,&tlm_ctx->discrete,&flg);CHKERRQ(ierr);
+  if (flg) {
+    ierr = TLMTSSetUpStep(lts);CHKERRQ(ierr);
+  }
   ierr = PetscOptionsTail();CHKERRQ(ierr);
   ierr = PetscObjectQuery((PetscObject)tlm_ctx->model,"_ts_splitJac",(PetscObject*)&container);CHKERRQ(ierr);
   if (container) {
@@ -195,6 +226,22 @@ static PetscErrorCode TLMTSOptionsHandler(PetscOptionItems *PetscOptionsObject,P
     ierr = TSGetSNES(lts,&snes);CHKERRQ(ierr);
     ierr = SNESSetKSP(snes,ksp);CHKERRQ(ierr);
   }
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TLMTSIsDiscrete(TS lts, PetscBool *flg)
+{
+  PetscContainer c;
+  TLMTS_Ctx      *tlm;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(lts,TS_CLASSID,1);
+  PetscValidPointer(flg,2);
+  ierr = TLMTSSetUpStep(lts);CHKERRQ(ierr);
+  ierr = PetscObjectQuery((PetscObject)lts,"_ts_tlm_ctx",(PetscObject*)&c);CHKERRQ(ierr);
+  ierr = PetscContainerGetPointer(c,(void**)&tlm);CHKERRQ(ierr);
+  *flg = tlm->discrete;
   PetscFunctionReturn(0);
 }
 
@@ -368,12 +415,18 @@ PetscErrorCode TLMTSGetModelTS(TS lts, TS* ts)
 {
   PetscContainer c;
   TLMTS_Ctx      *tlm;
+  PetscErrorCode (*f)(TS,TS*);
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
   PetscValidHeaderSpecific(lts,TS_CLASSID,1);
-  PetscCheckTLMTS(lts);
   PetscValidPointer(ts,2);
+  ierr = PetscObjectQueryFunction((PetscObject)lts,"TLMTSGetModelTS_C",&f);CHKERRQ(ierr);
+  if (f) {
+    ierr = (*f)(lts,ts);CHKERRQ(ierr);
+    PetscFunctionReturn(0);
+  }
+  PetscCheckTLMTS(lts);
   ierr = PetscObjectQuery((PetscObject)lts,"_ts_tlm_ctx",(PetscObject*)&c);CHKERRQ(ierr);
   ierr = PetscContainerGetPointer(c,(void**)&tlm);CHKERRQ(ierr);
   *ts  = tlm->model;
@@ -410,6 +463,7 @@ PetscErrorCode TLMTSComputeInitialConditions(TS lts, PetscReal t0, Vec x0)
   PetscContainer c;
   TLMTS_Ctx      *tlm;
   TSOpt          tsopt;
+  TSRHSFunction  rhsfunc;
   PetscBool      has,hasnc;
   PetscErrorCode ierr;
 
@@ -449,10 +503,68 @@ PetscErrorCode TLMTSComputeInitialConditions(TS lts, PetscReal t0, Vec x0)
     Mat F_m;
 
     ierr = TSOptEvalGradientDAE(tsopt,t0,NULL,NULL,NULL,&F_m,NULL);CHKERRQ(ierr);
-    /* ierr = MatMult(F_m,x0,tlm->workrhs);CHKERRQ(ierr); */
     ierr = MatMult(F_m,tlm->mdelta,tlm->workrhs);CHKERRQ(ierr);
   }
+
+  /* XXX make sure we have a correct Jacobian */
+  ierr = TSGetRHSFunction(lts,NULL,&rhsfunc,NULL);CHKERRQ(ierr);
+  if (rhsfunc) {
+    TSRHSJacobian rhsjacfunc;
+
+    ierr = TSGetRHSJacobian(lts,NULL,NULL,&rhsjacfunc,NULL);CHKERRQ(ierr);
+    if (rhsjacfunc == TSComputeRHSJacobianConstant) {
+      DM  dm;
+      Mat A,B;
+      Vec U;
+
+      ierr = TSGetRHSMats_Private(tlm->model,&A,&B);CHKERRQ(ierr);
+      ierr = TSGetDM(tlm->model,&dm);CHKERRQ(ierr);
+      ierr = DMGetGlobalVector(dm,&U);CHKERRQ(ierr);
+      ierr = TSComputeRHSJacobian(tlm->model,PETSC_MIN_REAL,U,A,B);CHKERRQ(ierr);
+      ierr = DMRestoreGlobalVector(dm,&U);CHKERRQ(ierr);
+    }
+  }
+
   ierr = VecLockReadPop(x0);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TLMTSSetUpStep(TS lts)
+{
+  TLMTS_Ctx      *tlm;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(lts,TS_CLASSID,1);
+  PetscCheckTLMTS(lts);
+  ierr = TSGetApplicationContext(lts,(void*)&tlm);CHKERRQ(ierr);
+  if (!tlm->cstep) tlm->cstep = lts->ops->step;
+  if (tlm->discrete) {
+    PetscBool flg;
+
+    ierr = PetscObjectTypeCompare((PetscObject)lts,TSRK,&flg);CHKERRQ(ierr);
+    if (flg) {
+      lts->ops->step = TSStep_TLM_RK;
+    } else {
+      TSType tstype;
+
+      ierr = TSGetType(lts,&tstype);CHKERRQ(ierr);
+      SETERRQ1(PetscObjectComm((PetscObject)lts),PETSC_ERR_SUP,"Discrete TLM not available for type %s\n",tstype);
+    }
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode TLMTSSetUp(TS lts)
+{
+  TLMTS_Ctx      *tlm;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TLMTSSetUpStep(lts);CHKERRQ(ierr);
+  PetscCheckTLMTS(lts);
+  ierr = TSGetApplicationContext(lts,(void*)&tlm);CHKERRQ(ierr);
+  if (tlm->setup) { ierr = (*tlm->setup)(lts);CHKERRQ(ierr); }
   PetscFunctionReturn(0);
 }
 
@@ -528,6 +640,8 @@ PetscErrorCode TSCreateTLMTS(TS ts, TS* lts)
   ierr = TSSetApplicationContext(*lts,(void *)tlm_ctx);CHKERRQ(ierr);
   ierr = PetscObjectReference((PetscObject)ts);CHKERRQ(ierr);
   tlm_ctx->model = ts;
+  tlm_ctx->setup = (*lts)->ops->setup;
+  (*lts)->ops->setup = TLMTSSetUp;
 
   /* wrap application context in a container, so that it will be destroyed when calling TSDestroy on lts */
   ierr = PetscContainerCreate(PetscObjectComm((PetscObject)(*lts)),&container);CHKERRQ(ierr);

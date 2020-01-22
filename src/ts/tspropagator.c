@@ -67,6 +67,7 @@ static PetscErrorCode MatMultTranspose_Propagator(Mat A, Vec x, Vec y)
   PetscFunctionBegin;
   ierr = VecSet(y,0.0);CHKERRQ(ierr);
   ierr = MatShellGetContext(A,(void **)&prop);CHKERRQ(ierr);
+  ierr = TSSetUp(prop->lts);CHKERRQ(ierr);
   if (!prop->adjlts) {
     Vec L;
 
@@ -90,7 +91,6 @@ static PetscErrorCode MatMultTranspose_Propagator(Mat A, Vec x, Vec y)
   ierr = VecLockReadPop(prop->x0);CHKERRQ(ierr);
   ierr = TSSetUpFromDesign(prop->model,prop->x0,tlmdesign);CHKERRQ(ierr);
   ierr = VecLockReadPush(prop->x0);CHKERRQ(ierr);
-
   ierr = AdjointTSSetDesignVec(prop->adjlts,tlmdesign);CHKERRQ(ierr);
   ierr = AdjointTSSetTimeLimits(prop->adjlts,prop->t0,prop->tf);CHKERRQ(ierr);
   ierr = AdjointTSSetQuadratureVec(prop->adjlts,y);CHKERRQ(ierr);
@@ -195,6 +195,7 @@ static PetscErrorCode MatPropagatorUpdate_Propagator(Mat A, PetscReal t0, PetscR
   Vec               osol;
   TSTrajectory      otrj;
   MatPropagator_Ctx *prop;
+  PetscBool         flg;
   PetscErrorCode    ierr;
 
   PetscFunctionBegin;
@@ -223,7 +224,8 @@ static PetscErrorCode MatPropagatorUpdate_Propagator(Mat A, PetscReal t0, PetscR
   otrj = prop->model->trajectory;
   ierr = TSTrajectoryCreate(PetscObjectComm((PetscObject)prop->model),&prop->model->trajectory);CHKERRQ(ierr);
   ierr = TSTrajectorySetType(prop->model->trajectory,prop->model,TSTRAJECTORYMEMORY);CHKERRQ(ierr);
-  ierr = TSTrajectorySetSolutionOnly(prop->model->trajectory,PETSC_TRUE);CHKERRQ(ierr);
+  ierr = TLMTSIsDiscrete(prop->lts,&flg);CHKERRQ(ierr);
+  ierr = TSTrajectorySetSolutionOnly(prop->model->trajectory,flg ? PETSC_FALSE : PETSC_TRUE);CHKERRQ(ierr);
   ierr = TSTrajectorySetFromOptions(prop->model->trajectory,prop->model);CHKERRQ(ierr);
   /* we don't have an API for this right now */
   prop->model->trajectory->adjoint_solve_mode = PETSC_FALSE;
@@ -298,14 +300,8 @@ static PetscErrorCode TSCreatePropagatorMat_Private(TS ts, PetscReal t0, PetscRe
   ierr = MatShellSetOperation(*A,MATOP_MULT,(void (*)())MatMult_Propagator);CHKERRQ(ierr);
   ierr = MatShellSetOperation(*A,MATOP_MULT_TRANSPOSE,(void (*)())MatMultTranspose_Propagator);CHKERRQ(ierr);
   ierr = MatShellSetOperation(*A,MATOP_DESTROY,(void (*)())MatDestroy_Propagator);CHKERRQ(ierr);
-  ierr = VecDuplicate(x0,&prop->x0);CHKERRQ(ierr);
-  ierr = VecLockReadPush(prop->x0);CHKERRQ(ierr); /* this vector is locked since it stores the initial conditions */
-  ierr = MatPropagatorUpdate_Propagator(*A,t0,dt,tf,x0,design);CHKERRQ(ierr);
-  ierr = MatSetUp(*A);CHKERRQ(ierr);
-  /* model sampling can terminate before tf due to events */
-  ierr = TSGetTime(prop->model,&prop->tf);CHKERRQ(ierr);
 
-  /* creates the tangent linear model solver and its adjoint */
+  /* create the tangent linear model solver */
   ierr = TSCreateTLMTS(prop->model,&prop->lts);CHKERRQ(ierr);
   ierr = TSGetAdapt(prop->lts,&adapt);CHKERRQ(ierr);
   ierr = TSAdaptSetType(adapt,TSADAPTHISTORY);CHKERRQ(ierr);
@@ -313,6 +309,15 @@ static PetscErrorCode TSCreatePropagatorMat_Private(TS ts, PetscReal t0, PetscRe
   ierr = PetscObjectDereference((PetscObject)design);CHKERRQ(ierr);
   ierr = TSSetFromOptions(prop->lts);CHKERRQ(ierr);
   ierr = TSResetObjective(prop->lts);CHKERRQ(ierr);
+  ierr = TLMTSSetUpStep(prop->lts);CHKERRQ(ierr);
+
+  ierr = VecDuplicate(x0,&prop->x0);CHKERRQ(ierr);
+  ierr = VecLockReadPush(prop->x0);CHKERRQ(ierr); /* this vector is locked since it stores the initial conditions */
+  ierr = MatPropagatorUpdate_Propagator(*A,t0,dt,tf,x0,design);CHKERRQ(ierr);
+  ierr = MatSetUp(*A);CHKERRQ(ierr);
+  /* model sampling can terminate before tf due to events */
+  ierr = TSGetTime(prop->model,&prop->tf);CHKERRQ(ierr);
+
   ierr = TSAddObjective(prop->lts,prop->tf,TLMTS_dummyOBJ,TLMTS_dummyRHS,NULL,
                         NULL,NULL,NULL,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
   /* we need to call this since we will then compute the adjoint of the TLM */

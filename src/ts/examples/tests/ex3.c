@@ -711,7 +711,7 @@ int main(int argc,char **argv)
       requires: !complex
       timeoutfactor: 3
       suffix: 1
-      filter: sed -e "s/-nan/nan/g" -e "s/coded Hessian/coded Gradient/g"
+      filter: sed -e "s/-nan/nan/g" -e "s/coded Hessian/coded Gradient/g" -e "s/||_F//g"
       nsize: 2
       args: -ts_max_steps 4 -da_grid_x 20 -da_grid_y 20 -ts_trajectory_type memory -ic_snes {{0 1}separate output} -test {{0,0 1,0 0,1 1,1}separate output} -tao_test_gradient -taylor_ts_hessian  -tshessian_mffd
 

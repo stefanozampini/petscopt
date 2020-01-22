@@ -14,6 +14,7 @@ static const char help[] = "Tests second order initial condition dependence.";
       G(u(0),m) = | e^m1 * x1 - e^m2 * x2^2 |
                   | x2 - e^m3               |
 
+  This code tests second order dependence of initial conditions wrt parameters.
 */
 #include <petscopt.h>
 #include <petsctao.h>
@@ -57,7 +58,6 @@ static PetscErrorCode EvalObjectiveHessian_UU(Vec U, Vec M, PetscReal time, Mat 
 typedef struct {
   PetscScalar k[5];
 } UserDAE;
-
 
 static PetscErrorCode EvalHessianDAE_UU(TS ts, PetscReal time, Vec U, Vec Udot, Vec M, Vec L, Vec X, Vec Y, void *ctx)
 {
@@ -389,10 +389,10 @@ int main(int argc, char* argv[])
   TS             ts;
   UserDAE        userdae;
   Mat            J,H,G_M,G_U0;
-  Vec            U,Uobj,M;
+  Vec            U,Uobj,M,Tsol;
   PetscScalar    k[5];
   PetscReal      t0,tf,dt;
-  PetscBool      flg, testmffdic = PETSC_FALSE, testtao = PETSC_FALSE, testtlm = PETSC_FALSE, testtaylor = PETSC_FALSE;
+  PetscBool      flg, testmffdic = PETSC_FALSE, testtao = PETSC_FALSE, testtlm = PETSC_FALSE, testtaylor = PETSC_FALSE, testtaylorgn = PETSC_FALSE;
   PetscErrorCode ierr;
 
   ierr = PetscInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
@@ -419,7 +419,10 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsBool("-test_tlm","Test Tangent Linear Model to compute the gradient","",testtlm,&testtlm,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_mffd_ic","Run MFFD tests on IC callbacks","",testmffdic,&testmffdic,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_taylor","Run Taylor test","",testtaylor,&testtaylor,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-test_taylor_gn","Run Taylor test (use tao solution)","",testtaylorgn,&testtaylorgn,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsEnd();CHKERRQ(ierr);
+
+  if (testtaylorgn) { testtaylor = PETSC_TRUE; testtao = PETSC_TRUE; }
 
   /* context for residual callbacks */
   userdae.k[0] = k[0];
@@ -561,6 +564,7 @@ int main(int argc, char* argv[])
   ierr = MatDestroy(&G_U0);CHKERRQ(ierr);
 
   /* Reconstruct solution */
+  Tsol = NULL;
   if (testtao) {
     Tao    tao;
     TaoCtx taoctx;
@@ -588,12 +592,12 @@ int main(int argc, char* argv[])
     ierr = PetscPrintf(PETSC_COMM_SELF,"\nInitial state solution\n");CHKERRQ(ierr);
     ierr = VecView(U,NULL);CHKERRQ(ierr);
 
-    ierr = FormFunctionHessian(tao,X,H,H,(void *)&taoctx);CHKERRQ(ierr);
-    ierr = TaoTestHessian(tao);CHKERRQ(ierr);
-
     ierr = TaoDestroy(&tao);CHKERRQ(ierr);
     ierr = MatDestroy(&H);CHKERRQ(ierr);
-    ierr = VecCopy(X,M);CHKERRQ(ierr);
+    if (testtaylorgn) {
+      ierr = VecDuplicate(X,&Tsol);CHKERRQ(ierr);
+      ierr = VecCopy(X,Tsol);CHKERRQ(ierr);
+    }
     ierr = VecDestroy(&X);CHKERRQ(ierr);
   }
 
@@ -606,7 +610,7 @@ int main(int argc, char* argv[])
      Phi the propagator matrix (i.e. du/dm, the solution of the Tangent linear model)
   */
   if (testtlm) {
-    Mat       Phi,Phie,PhiT,PhiTe;
+    Mat       Phi,Phie,PhiT,PhiTe,TLMe;
     Vec       UU,T;
     PetscReal obj;
 
@@ -630,17 +634,26 @@ int main(int argc, char* argv[])
     ierr = VecView(T,NULL);CHKERRQ(ierr);
 
     ierr = MatComputeOperator(Phi,NULL,&Phie);CHKERRQ(ierr);
-    ierr = PetscPrintf(PETSC_COMM_SELF,"\nTLM matrix\n");
+    ierr = PetscPrintf(PETSC_COMM_SELF,"\nTLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)\n");
     ierr = MatView(Phie,NULL);CHKERRQ(ierr);
 
     ierr = MatCreateTranspose(Phi,&PhiT);CHKERRQ(ierr);
     ierr = MatComputeOperator(PhiT,NULL,&PhiTe);CHKERRQ(ierr);
     ierr = MatView(PhiTe,NULL);CHKERRQ(ierr);
 
+    ierr = MatTranspose(PhiTe,MAT_INITIAL_MATRIX,&TLMe);CHKERRQ(ierr);
+    ierr = MatAXPY(TLMe,-1.0,Phie,DIFFERENT_NONZERO_PATTERN);CHKERRQ(ierr);
+    ierr = MatView(TLMe,NULL);CHKERRQ(ierr);
+
     ierr = MatMultTranspose(Phie,UU,T);CHKERRQ(ierr);
-    ierr = PetscPrintf(PETSC_COMM_SELF,"\nGradient via TLM (explicit)\n");
+    ierr = PetscPrintf(PETSC_COMM_SELF,"\nGradient via TLM (explicit fwd via multtrans)\n");
     ierr = VecView(T,NULL);CHKERRQ(ierr);
 
+    ierr = MatMult(PhiTe,UU,T);CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_SELF,"\nGradient via TLM (explicit adj via mult)\n");
+    ierr = VecView(T,NULL);CHKERRQ(ierr);
+
+    ierr = MatDestroy(&TLMe);CHKERRQ(ierr);
     ierr = MatDestroy(&Phie);CHKERRQ(ierr);
     ierr = MatDestroy(&Phi);CHKERRQ(ierr);
     ierr = MatDestroy(&PhiTe);CHKERRQ(ierr);
@@ -651,7 +664,11 @@ int main(int argc, char* argv[])
 
   /* Run taylor test */
   if (testtaylor) {
-    ierr = VecSetRandom(M,NULL);CHKERRQ(ierr);
+    if (Tsol) {
+      ierr = VecCopy(Tsol,M);CHKERRQ(ierr);
+    } else {
+      ierr = VecSetRandom(M,NULL);CHKERRQ(ierr);
+    }
     ierr = PetscOptionsHasName(NULL,NULL,"-tshessian_view",&flg);CHKERRQ(ierr);
     if (flg) {
       Mat He,H;
@@ -668,6 +685,7 @@ int main(int argc, char* argv[])
     ierr = TSTaylorTest(ts,t0,dt,tf,NULL,M,NULL);CHKERRQ(ierr);
   }
 
+  ierr = VecDestroy(&Tsol);CHKERRQ(ierr);
   ierr = VecDestroy(&M);CHKERRQ(ierr);
   ierr = VecDestroy(&Uobj);CHKERRQ(ierr);
 
@@ -681,16 +699,26 @@ int main(int argc, char* argv[])
 test:
     requires: !complex !single
     suffix: 1
-    args: -ts_rk_type 3bs -ts_adapt_type dsp -ts_atol 1.e-8 -ts_rtol 1.e-8  -ts_trajectory_type memory -tao_monitor -test_tao  -tao_test_hessian -tf 1 -test_tlm -tsgradient_adjoint_ts_adapt_type history -test_taylor -taylor_ts_hessian
+    args: -ts_rk_type 3bs -ts_adapt_type dsp -ts_atol 1.e-8 -ts_rtol 1.e-8 -ts_trajectory_type memory -tao_monitor -test_tao -tf 1 -test_tlm -tsgradient_adjoint_ts_adapt_type history -test_taylor -taylor_ts_hessian
 
 test:
     requires: !complex !single
     suffix: 2
-    args: -test_mffd_ic -ts_type cn -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao  -tao_test_hessian -test_tlm -tf 1 -tshessian_view -tshessian_mffd {{0 1}separate output} -test_taylor -taylor_ts_hessian
-test:
+    args: -test_mffd_ic -ts_type cn -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tf 1 -tshessian_view -tshessian_mffd {{0 1}separate output} -test_taylor -taylor_ts_hessian
 
+test:
     requires: !complex !single
     suffix: 3
-    args: -ts_type cn -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao  -tao_test_hessian -tf 1 -tshessian_gn {{0 1}separate output}
+    args: -ts_type alpha -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -tao_type nls -tao_nls_pc_type none  -test_tlm 0 -tf 1 -tshessian_gn {{0 1}separate output} -test_taylor_gn -test_taylor -taylor_ts_hessian -tshessian_view
+
+test:
+    requires: !complex !single
+    suffix: discrete
+    args: -ts_type rk -ts_rk_type {{1fe 2a 3 3bs 4 5f 5dp 5bs 6vr 7vr 8vr}separate output} -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_foadjoint_discrete -jactsic_pc_type lu -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tao_test_gradient
+
+test:
+    requires: !complex !single
+    suffix: discrete_adapt
+    args: -ts_type rk -ts_rk_type {{2a 3bs 5f 5dp 5bs 6vr 7vr 8vr}separate output} -ts_adapt_type {{dsp basic}separate output} -ts_atol 1.e-6 -ts_rtol 1.e-6 -ts_trajectory_type memory -tao_monitor -test_tao -tao_type nls -tao_nls_pc_type none -test_tlm -t0 0 -tf 0.1 -dt 1.e-2  -tsgradient_adjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_foadjoint_discrete -jactsic_pc_type lu -test_taylor -taylor_ts_hessian -taylor_ts_steps 6 -tshessian_view -tao_test_hessian
 
 TEST*/

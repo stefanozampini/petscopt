@@ -1,0 +1,187 @@
+
+Initial state
+Vec Object: 1 MPI processes
+  type: seq
+0.5
+0.5
+
+Final state
+Vec Object: 1 MPI processes
+  type: seq
+0.526271
+0.47623
+  ---------- Testing Gradient -------------
+  Run with -tao_test_gradient_view and optionally -tao_test_gradient <threshold> to show difference
+    of hand-coded and finite difference gradient entries greater than <threshold>.
+  Testing hand-coded Gradient, if (for double precision runs) ||G - Gfd||/||G|| is
+    O(1.e-8), the hand-coded Gradient is probably correct.
+  ||Gfd|| 1.69185, ||G|| = 1.69185, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 3.18284e-08, ||G - Gfd|| = 5.3849e-08
+  max-norm ||G - Gfd||/||G|| = 2.49219e-08, ||G - Gfd|| = 3.79103e-08
+  0 TAO,  Function value: 0.249377,  Residual: 1.69185 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.0746792, ||G|| = 0.0746792, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 1.00201e-07, ||G - Gfd|| = 7.48294e-09
+  max-norm ||G - Gfd||/||G|| = 8.37686e-08, ||G - Gfd|| = 6.15785e-09
+  1 TAO,  Function value: 0.167808,  Residual: 0.0746792 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.0789477, ||G|| = 0.0789477, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 3.61963e-08, ||G - Gfd|| = 2.85762e-09
+  max-norm ||G - Gfd||/||G|| = 2.39226e-08, ||G - Gfd|| = 1.8528e-09
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.0972437, ||G|| = 0.0972437, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 4.22619e-08, ||G - Gfd|| = 4.1097e-09
+  max-norm ||G - Gfd||/||G|| = 3.07863e-08, ||G - Gfd|| = 2.87066e-09
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.372789, ||G|| = 0.372789, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 1.73758e-08, ||G - Gfd|| = 6.47752e-09
+  max-norm ||G - Gfd||/||G|| = 1.10663e-08, ||G - Gfd|| = 4.12339e-09
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.11946, ||G|| = 0.11946, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 6.53764e-08, ||G - Gfd|| = 7.80984e-09
+  max-norm ||G - Gfd||/||G|| = 5.96336e-08, ||G - Gfd|| = 5.52201e-09
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.0931945, ||G|| = 0.0931945, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 7.70665e-08, ||G - Gfd|| = 7.18217e-09
+  max-norm ||G - Gfd||/||G|| = 7.6993e-08, ||G - Gfd|| = 5.07313e-09
+  2 TAO,  Function value: 0.0551862,  Residual: 0.0931945 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 11.5168, ||G|| = 11.5168, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 7.42325e-08, ||G - Gfd|| = 8.5492e-07
+  max-norm ||G - Gfd||/||G|| = 5.90834e-08, ||G - Gfd|| = 5.86394e-07
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.203746, ||G|| = 0.203746, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 5.40808e-08, ||G - Gfd|| = 1.10187e-08
+  max-norm ||G - Gfd||/||G|| = 3.66785e-08, ||G - Gfd|| = 7.23998e-09
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.101566, ||G|| = 0.101566, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 2.21429e-07, ||G - Gfd|| = 2.24897e-08
+  max-norm ||G - Gfd||/||G|| = 2.30583e-07, ||G - Gfd|| = 1.43854e-08
+  3 TAO,  Function value: 0.0530891,  Residual: 0.101566 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.13751, ||G|| = 0.13751, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 1.02826e-07, ||G - Gfd|| = 1.41396e-08
+  max-norm ||G - Gfd||/||G|| = 6.22415e-08, ||G - Gfd|| = 8.47435e-09
+  4 TAO,  Function value: 0.0273629,  Residual: 0.13751 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.104765, ||G|| = 0.104765, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 6.60738e-08, ||G - Gfd|| = 6.92221e-09
+  max-norm ||G - Gfd||/||G|| = 5.13975e-08, ||G - Gfd|| = 4.89468e-09
+  5 TAO,  Function value: 0.00336799,  Residual: 0.104765 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.090087, ||G|| = 0.090087, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 2.85875e-08, ||G - Gfd|| = 2.57536e-09
+  max-norm ||G - Gfd||/||G|| = 2.69273e-08, ||G - Gfd|| = 1.98379e-09
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.0106617, ||G|| = 0.0106617, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 2.81628e-08, ||G - Gfd|| = 3.00262e-10
+  max-norm ||G - Gfd||/||G|| = 2.81127e-08, ||G - Gfd|| = 2.10749e-10
+  6 TAO,  Function value: 0.000611826,  Residual: 0.0106617 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.00401931, ||G|| = 0.00401931, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 5.10355e-08, ||G - Gfd|| = 2.05128e-10
+  max-norm ||G - Gfd||/||G|| = 6.00184e-08, ||G - Gfd|| = 1.70122e-10
+  7 TAO,  Function value: 8.9045e-05,  Residual: 0.00401931 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.000821619, ||G|| = 0.000821619, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 1.01945e-08, ||G - Gfd|| = 8.37603e-12
+  max-norm ||G - Gfd||/||G|| = 9.5252e-09, ||G - Gfd|| = 7.56606e-12
+  8 TAO,  Function value: 5.84611e-07,  Residual: 0.000821619 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.000138032, ||G|| = 0.000138032, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 2.68329e-08, ||G - Gfd|| = 3.7038e-12
+  max-norm ||G - Gfd||/||G|| = 2.98791e-08, ||G - Gfd|| = 3.70379e-12
+  9 TAO,  Function value: 6.57332e-09,  Residual: 0.000138032 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 5.13977e-06, ||G|| = 5.13977e-06, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 3.79981e-08, ||G - Gfd|| = 1.95301e-13
+  max-norm ||G - Gfd||/||G|| = 3.24656e-08, ||G - Gfd|| = 1.33014e-13
+ 10 TAO,  Function value: 8.86529e-12,  Residual: 5.13977e-06 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 1.17643e-07, ||G|| = 1.17643e-07, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 1.80149e-08, ||G - Gfd|| = 2.11932e-15
+  max-norm ||G - Gfd||/||G|| = 1.67827e-08, ||G - Gfd|| = 1.23589e-15
+ 11 TAO,  Function value: 1.44289e-14,  Residual: 1.17643e-07 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 1.48329e-11, ||G|| = 0., angle cosine = (Gfd'G)/||Gfd||||G|| = -nan.
+  2-norm ||G - Gfd||/||G|| = 1., ||G - Gfd|| = 1.48329e-11
+  max-norm ||G - Gfd||/||G|| = 1., ||G - Gfd|| = 1.4532e-11
+ 12 TAO,  Function value: 2.43718e-22,  Residual: 0. 
+
+Tao solution
+Vec Object: 1 MPI processes
+  type: seq
+-0.346574
+0.346574
+-0.693147
+
+Initial state solution
+Vec Object: 1 MPI processes
+  type: seq
+0.5
+0.5
+
+Gradient via adjoint
+Vec Object: 1 MPI processes
+  type: seq
+-0.026204
+0.026204
+0.520582
+
+Gradient of objective function
+Vec Object: 1 MPI processes
+  type: seq
+0.00268189
+0.487313
+
+Gradient via adjoint (TLM)
+Vec Object: 1 MPI processes
+  type: seq
+-0.026204
+0.026204
+0.520582
+
+TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
+Mat Object: 1 MPI processes
+  type: seqdense
+-5.2758618987379224e-01 5.2758618987379224e-01 1.0030301563234141e+00 
+-5.0868857961164277e-02 5.0868857961164277e-02 1.0627498834502775e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+-5.2758618987379169e-01 -5.0868857961164360e-02 
+5.2758618987379169e-01 5.0868857961164360e-02 
+1.0030301563234134e+00 1.0627498834502771e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+5.5511151231257827e-16 -5.5511151231257827e-16 -6.6613381477509392e-16 
+-8.3266726846886741e-17 8.3266726846886741e-17 -4.4408920985006262e-16 
+
+Gradient via TLM (explicit fwd via multtrans)
+Vec Object: 1 MPI processes
+  type: seq
+-0.026204
+0.026204
+0.520582
+
+Gradient via TLM (explicit adj via mult)
+Vec Object: 1 MPI processes
+  type: seq
+-0.026204
+0.026204
+0.520582
+Mat Object: H 1 MPI processes
+  type: seqaij
+row 0: (0, 0.308396)  (1, -0.308396)  (2, -0.661497) 
+row 1: (0, -0.308396)  (1, 0.308396)  (2, 0.661497) 
+row 2: (0, -0.661497)  (1, 0.661497)  (2, 2.80447) 
+-------------------------- Taylor test results ---------------------------
+		Gradient				Hessian
+--------------------------------------------------------------------------
+0.000907633	0.00000 	0	7.02960e-05	0.00000 	0
+0.000235496	1.94641 	2	8.98604e-06	2.96769 	3
+5.99846e-05	1.97304 	2	1.13601e-06	2.98371 	3
+1.51373e-05	1.98648 	2	1.42808e-07	2.99182 	3
+3.80214e-06	1.99323 	2	1.79018e-08	2.99590 	3
+9.52768e-07	1.99661 	2	2.24092e-09	2.99795 	3
+2.38472e-07	1.99831 	2	2.80314e-10	2.99897 	3
+5.96530e-08	1.99915 	2	3.50519e-11	2.99948 	3

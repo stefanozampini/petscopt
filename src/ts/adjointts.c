@@ -1,6 +1,8 @@
 #include <petscopt/tlmts.h>
 #include <petscopt/tsutils.h>
+#include <petscopt/private/augmentedtsimpl.h>
 #include <petscopt/private/adjointtsimpl.h>
+#include <petscopt/private/discretetsimpl.h>
 #include <petscopt/private/tsobjimpl.h>
 #include <petscopt/private/tsoptimpl.h>
 #include <petscopt/private/tspdeconstrainedutilsimpl.h>
@@ -25,6 +27,11 @@ typedef struct {
   TSOpt     tsopt;
   Vec       design;
   PetscReal t0,tf;
+  PetscBool discrete;
+  TSObj     tsobj;
+  Vec       direction;
+  Vec       work1;
+  Vec       work2;
 } AdjEvalQuadCtx;
 
 static PetscErrorCode EvalQuadIntegrand_ADJ(Vec L, Vec Ldot, PetscReal t, Vec F, void* ctx)
@@ -36,8 +43,52 @@ static PetscErrorCode EvalQuadIntegrand_ADJ(Vec L, Vec Ldot, PetscReal t, Vec F,
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  ierr = TSOptEvalGradientDAE(tsopt,fwdt,NULL,NULL,q->design,NULL,&adjF_m);CHKERRQ(ierr);
-  ierr = MatMult(adjF_m,L,F);CHKERRQ(ierr);
+  if (q->discrete) {
+    Vec U,Udot;
+
+    ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_U",(PetscObject*)&U);CHKERRQ(ierr);
+    ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_Udot",(PetscObject*)&Udot);CHKERRQ(ierr);
+    if (!U) SETERRQ(PetscObjectComm((PetscObject)L),PETSC_ERR_PLIB,"Missing sampling vector");
+    ierr = TSOptEvalGradientDAE(tsopt,fwdt,U,Udot,q->design,NULL,&adjF_m);CHKERRQ(ierr);
+    ierr = MatMult(adjF_m,L,F);CHKERRQ(ierr);
+    if (q->direction) { /* second order */
+      Vec       TLMU,TLMUdot;
+      Vec       FOAL;
+      TSObj     tsobj = q->tsobj;
+      PetscBool flg;
+
+      ierr = TSObjEval_MU(tsobj,U,q->design,fwdt,U,q->work1,&flg,q->work2);CHKERRQ(ierr);
+      if (flg) { ierr = VecAXPY(F,1.0,q->work2);CHKERRQ(ierr); }
+      ierr = TSObjEval_MM(tsobj,U,q->design,fwdt,q->direction,q->work1,&flg,q->work2);CHKERRQ(ierr);
+      if (flg) { ierr = VecAXPY(F,1.0,q->work2);CHKERRQ(ierr); }
+      ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_FOAL",(PetscObject*)&FOAL);CHKERRQ(ierr);
+      if (FOAL) { /* Full hessian */
+        PetscBool Hhas[3][3];
+
+        ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
+        ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_TLMU",(PetscObject*)&TLMU);CHKERRQ(ierr);
+        ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_TLMUdot",(PetscObject*)&TLMUdot);CHKERRQ(ierr);
+        if (Hhas[2][2]) { /* (L^T \otimes I_M) H_MM direction */
+          ierr = TSOptEvalHessianDAE(tsopt,2,2,fwdt,U,Udot,q->design,FOAL,q->direction,q->work1);CHKERRQ(ierr);
+          ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
+        }
+        if (Hhas[2][0]) { /* (L^T \otimes I_M) H_MX \eta, \eta the TLM solution */
+          if (!TLMU) SETERRQ(PetscObjectComm((PetscObject)L),PETSC_ERR_PLIB,"Missing TLM sampling vector");
+          ierr = TSOptEvalHessianDAE(tsopt,2,0,fwdt,U,Udot,q->design,FOAL,TLMU,q->work1);CHKERRQ(ierr);
+          ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
+        }
+        /* this is evaluated only via the IFunction interface */
+        if (Hhas[2][1] && Udot) { /* (L^T \otimes I_M) H_MXdot \etadot */
+          if (!TLMUdot) SETERRQ(PetscObjectComm((PetscObject)L),PETSC_ERR_PLIB,"Missing TLM sampling vector");
+          ierr = TSOptEvalHessianDAE(tsopt,2,1,t,U,Udot,q->design,FOAL,TLMUdot,q->work1);CHKERRQ(ierr);
+          ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
+        }
+      }
+    }
+  } else {
+    ierr = TSOptEvalGradientDAE(tsopt,fwdt,NULL,NULL,q->design,NULL,&adjF_m);CHKERRQ(ierr);
+    ierr = MatMult(adjF_m,L,F);CHKERRQ(ierr);
+  }
   PetscFunctionReturn(0);
 }
 
@@ -72,11 +123,11 @@ static PetscErrorCode AdjointTSRHSJacobian(TS adjts, PetscReal time, Vec U, Mat 
   ft   = adj_ctx->tf - time + adj_ctx->t0;
   /* force recomputation of RHS Jacobian XXX CHECK WITH RK FOR CACHING */
   if (adjts->rhsjacobian.time == PETSC_MIN_REAL) adj_ctx->fwdts->rhsjacobian.time = PETSC_MIN_REAL;
-  if (type > TS_LINEAR) {
+  if (type > TS_LINEAR && !adj_ctx->discrete) {
     ierr = TSTrajectoryGetUpdatedHistoryVecs(adj_ctx->fwdts->trajectory,adj_ctx->fwdts,ft,&U,NULL);CHKERRQ(ierr);
   }
   ierr = TSComputeRHSJacobian(adj_ctx->fwdts,ft,U,A,P);CHKERRQ(ierr);
-  if (type > TS_LINEAR) {
+  if (type > TS_LINEAR && !adj_ctx->discrete) {
     ierr = TSTrajectoryRestoreUpdatedHistoryVecs(adj_ctx->fwdts->trajectory,&U,NULL);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
@@ -98,7 +149,7 @@ static PetscErrorCode AdjointTSRHSFunctionLinear(TS adjts, PetscReal time, Vec U
 
   PetscFunctionBegin;
   PetscCheckAdjointTS(adjts);
-  ierr = AdjointTSComputeForcing(adjts,time,NULL,&has,F);CHKERRQ(ierr);
+  ierr = AdjointTSComputeForcing(adjts,time,NULL,NULL,NULL,NULL,NULL,NULL,&has,F);CHKERRQ(ierr);
   /* force recomputation of RHS Jacobian XXX CHECK WITH RK FOR CACHING */
   adjts->rhsjacobian.time = PETSC_MIN_REAL;
   ierr = TSComputeRHSJacobian(adjts,time,U,adjts->Arhs,adjts->Brhs);CHKERRQ(ierr);
@@ -133,7 +184,7 @@ static PetscErrorCode AdjointTSIFunctionLinear(TS adjts, PetscReal time, Vec U, 
 
   PetscFunctionBegin;
   PetscCheckAdjointTS(adjts);
-  ierr = AdjointTSComputeForcing(adjts,time,NULL,&has,F);CHKERRQ(ierr);
+  ierr = AdjointTSComputeForcing(adjts,time,NULL,NULL,NULL,NULL,NULL,NULL,&has,F);CHKERRQ(ierr);
   ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
   fwdt = adj_ctx->tf - time + adj_ctx->t0;
   ierr = TSUpdateSplitJacobiansFromHistory_Private(adj_ctx->fwdts,fwdt);CHKERRQ(ierr);
@@ -155,7 +206,11 @@ static PetscErrorCode AdjointTSIJacobian(TS adjts, PetscReal time, Vec U, Vec Ud
   PetscFunctionBegin;
   PetscCheckAdjointTS(adjts);
   ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
-  ierr = TSComputeIJacobianWithSplits_Private(adj_ctx->fwdts,time,U,Udot,shift,A,B,ctx);CHKERRQ(ierr);
+  if (!adj_ctx->discrete) {
+    ierr = TSComputeIJacobianWithSplits_Private(adj_ctx->fwdts,time,U,Udot,shift,A,B,ctx);CHKERRQ(ierr);
+  } else {
+    ierr = TSComputeIJacobian(adj_ctx->fwdts,time,U,Udot,shift,A,B,PETSC_FALSE);CHKERRQ(ierr);
+  }
   PetscFunctionReturn(0);
 }
 
@@ -220,7 +275,7 @@ static PetscErrorCode AdjointTSPostStep(TS adjts)
     ierr = VecAXPY(lambda,1.0,adj_ctx->workinit);CHKERRQ(ierr);
   }
   adj_ctx->dirac_delta = PETSC_FALSE;
-  /* sanity checks compare the exact floating point */
+  /* the sanity checks comparisons need the exact floating point value */
   if (adjts->reason == TS_CONVERGED_TIME) {
     PetscReal time;
 
@@ -230,21 +285,65 @@ static PetscErrorCode AdjointTSPostStep(TS adjts)
   PetscFunctionReturn(0);
 }
 
+PetscErrorCode AdjointTSSetUpStep(TS adjts)
+{
+  AdjointCtx     *adj_ctx;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(adjts,TS_CLASSID,1);
+  PetscCheckAdjointTS(adjts);
+  ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
+  if (!adj_ctx->cstep) adj_ctx->cstep = adjts->ops->step;
+  if (adj_ctx->discrete) {
+    PetscBool flg;
+
+    ierr = PetscObjectTypeCompare((PetscObject)adjts,TSRK,&flg);CHKERRQ(ierr);
+    if (flg) {
+      adjts->ops->step = TSStep_Adjoint_RK;
+    } else {
+      TSType tstype;
+
+      ierr = TSGetType(adjts,&tstype);CHKERRQ(ierr);
+      SETERRQ1(PetscObjectComm((PetscObject)adjts),PETSC_ERR_SUP,"Discrete adjoint not available for type %s\n",tstype);
+    }
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode AdjointTSSetUp(TS adjts)
+{
+  AdjointCtx     *adj_ctx;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = AdjointTSSetUpStep(adjts);CHKERRQ(ierr);
+  PetscCheckAdjointTS(adjts);
+  ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
+  if (adj_ctx->setup) { ierr = (*adj_ctx->setup)(adjts);CHKERRQ(ierr); }
+  PetscFunctionReturn(0);
+}
+
 static PetscErrorCode AdjointTSOptionsHandler(PetscOptionItems *PetscOptionsObject,PetscObject obj,void *ctx)
 {
   TS             adjts = (TS)obj;
   AdjointCtx     *adj_ctx;
   PetscContainer container;
-  PetscBool      jcon,rksp;
+  PetscBool      jcon,rksp,flg;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
+  PetscCheckAdjointTS(adjts);
   ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
   ierr = PetscOptionsHead(PetscOptionsObject,"AdjointTS options");CHKERRQ(ierr);
   jcon = PETSC_FALSE;
   ierr = PetscOptionsBool("-constjacobians","Whether or not the DAE Jacobians are constant",NULL,jcon,&jcon,NULL);CHKERRQ(ierr);
   rksp = PETSC_FALSE;
   ierr = PetscOptionsBool("-reuseksp","Reuse the KSP solver from the nonlinear model",NULL,rksp,&rksp,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-discrete","Use discrete adjoints (not available for all methods)",NULL,adj_ctx->discrete,&adj_ctx->discrete,&flg);CHKERRQ(ierr);
+  if (flg) {
+    ierr = AdjointTSSetUpStep(adjts);CHKERRQ(ierr);
+  }
   ierr = PetscOptionsTail();CHKERRQ(ierr);
   ierr = PetscObjectQuery((PetscObject)adj_ctx->fwdts,"_ts_splitJac",(PetscObject*)&container);CHKERRQ(ierr);
   if (container) {
@@ -279,6 +378,22 @@ static PetscErrorCode AdjointTSOptionsHandler(PetscOptionItems *PetscOptionsObje
     ierr = TSGetSNES(adjts,&snes);CHKERRQ(ierr);
     ierr = SNESSetKSP(snes,ksp);CHKERRQ(ierr);
   }
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode AdjointTSIsDiscrete(TS adjts, PetscBool *flg)
+{
+  PetscContainer c;
+  AdjointCtx     *adj;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(adjts,TS_CLASSID,1);
+  PetscValidPointer(flg,2);
+  ierr = AdjointTSSetUpStep(adjts);CHKERRQ(ierr);
+  ierr = PetscObjectQuery((PetscObject)adjts,"_ts_adjctx",(PetscObject*)&c);CHKERRQ(ierr);
+  ierr = PetscContainerGetPointer(c,(void**)&adj);CHKERRQ(ierr);
+  *flg = adj->discrete;
   PetscFunctionReturn(0);
 }
 
@@ -372,6 +487,8 @@ PetscErrorCode TSCreateAdjointTS(TS ts, TS* adjts)
   ierr = TSSetApplicationContext(*adjts,(void *)adj);CHKERRQ(ierr);
   ierr = PetscObjectReference((PetscObject)ts);CHKERRQ(ierr);
   adj->fwdts = ts;
+  adj->setup = (*adjts)->ops->setup;
+  (*adjts)->ops->setup = AdjointTSSetUp;
 
   /* TODO: this needs a better sharing mechanism */
   ierr = TSGetTSObj(ts,&adj->tsobj);CHKERRQ(ierr);
@@ -450,7 +567,7 @@ PetscErrorCode TSCreateAdjointTS(TS ts, TS* adjts)
 }
 
 /*@C
-   AdjointTSGetTS - Gets the forward model TS.
+   AdjointTSGetModelTS - Gets the forward model TS.
 
    Synopsis:
    #include <petsc/private/tsadjointtsimpl.h>
@@ -467,12 +584,20 @@ PetscErrorCode TSCreateAdjointTS(TS ts, TS* adjts)
 
 .seealso: TSCreateAdjointTS()
 @*/
-PetscErrorCode AdjointTSGetTS(TS ats, TS* fts)
+PetscErrorCode AdjointTSGetModelTS(TS ats, TS* fts)
 {
   AdjointCtx     *adj_ctx;
+  PetscErrorCode (*f)(TS,TS*);
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
+  PetscValidHeaderSpecific(ats,TS_CLASSID,1);
+  PetscValidPointer(fts,2);
+  ierr = PetscObjectQueryFunction((PetscObject)ats,"AdjointTSGetModelTS_C",&f);CHKERRQ(ierr);
+  if (f) {
+    ierr = (*f)(ats,fts);CHKERRQ(ierr);
+    PetscFunctionReturn(0);
+  }
   PetscCheckAdjointTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&adj_ctx);CHKERRQ(ierr);
   *fts = adj_ctx->fwdts;
@@ -490,7 +615,12 @@ PetscErrorCode AdjointTSGetTS(TS ats, TS* fts)
    Input Parameters:
 +  adjts - the adjoint TS context obtained from TSCreateAdjointTS()
 .  time - the current backward time
--  U - vector used to sample the forcing term (can be NULL)
+.  U - state vector used to sample the forcing term (can be NULL)
+.  Udot - state vector used to sample the forcing term (can be NULL)
+.  L - adjoint vector used to sample the forcing term (can be NULL, only used for second order adjoints)
+.  Ldot - adjoint vector used to sample the forcing term (can be NULL, only used for second order adjoints)
+.  lU - TLM vector used to sample the forcing term (can be NULL, only used for second order adjoints)
+-  lUdot - TLM vector used to sample the forcing term (can be NULL, only used for second order adjoints)
 
    Output Parameters:
 +  hasf - PETSC_TRUE if F contains valid data
@@ -498,14 +628,14 @@ PetscErrorCode AdjointTSGetTS(TS ats, TS* fts)
 
    Level: developer
 
-   Notes: If U is NULL, AdjointTS computes the sampling data from the forward trajectory.
-          U is present when solving the discrete adjoint.
+   Notes: If any of the vectors are NULL, AdjointTS computes the sampling data from the relative trajectory.
 
 .seealso: TSCreateAdjointTS()
 @*/
-PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, PetscBool* hasf, Vec F)
+PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, Vec Udot, Vec L, Vec Ldot, Vec lU, Vec lUdot, PetscBool* hasf, Vec F)
 {
   AdjointCtx     *adj_ctx;
+  PetscErrorCode (*f)(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,Vec,PetscBool*,Vec);
   TSOpt          tsopt;
   PetscReal      fwdt;
   PetscBool      has = PETSC_FALSE;
@@ -517,6 +647,11 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, PetscBoo
   if (U) PetscValidHeaderSpecific(U,VEC_CLASSID,3);
   PetscValidPointer(hasf,4);
   PetscValidHeaderSpecific(F,VEC_CLASSID,5);
+  ierr = PetscObjectQueryFunction((PetscObject)adjts,"AdjointTSComputeForcing_C",&f);CHKERRQ(ierr);
+  if (f) {
+    ierr = (*f)(adjts,time,U,Udot,L,Ldot,lU,lUdot,hasf,F);CHKERRQ(ierr);
+    PetscFunctionReturn(0);
+  }
   PetscCheckAdjointTS(adjts);
   ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
   fwdt = adj_ctx->tf - time + adj_ctx->t0;
@@ -532,13 +667,14 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, PetscBoo
                                   {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
                                   {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
 
-    if (U) SETERRQ(PetscObjectComm((PetscObject)adjts),PETSC_ERR_SUP,"Not implemented");
     ierr = VecSet(F,0.0);CHKERRQ(ierr);
     ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
     ierr = DMGetGlobalVector(dm,&soawork0);CHKERRQ(ierr);
     ierr = DMGetGlobalVector(dm,&soawork1);CHKERRQ(ierr);
-    ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,fwdt,&FWDH,NULL);CHKERRQ(ierr);
-    ierr = TSTrajectoryGetUpdatedHistoryVecs(tlmts->trajectory,tlmts,fwdt,&TLMH,NULL);CHKERRQ(ierr);
+    if (!U) { ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,fwdt,&FWDH,NULL);CHKERRQ(ierr); }
+    else FWDH = U;
+    if (!lU) { ierr = TSTrajectoryGetUpdatedHistoryVecs(tlmts->trajectory,tlmts,fwdt,&TLMH,NULL);CHKERRQ(ierr); }
+    else TLMH = lU;
     ierr = TSObjEval_UU(adj_ctx->tsobj,FWDH,adj_ctx->design,fwdt,TLMH,soawork0,&has,soawork1);CHKERRQ(ierr);
     if (has) {
       ierr = VecAXPY(F,1.0,soawork1);CHKERRQ(ierr);
@@ -560,8 +696,10 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, PetscBoo
     if (HFhas[0][0] || HFhas[0][1] || HFhas[0][2]) {
       Vec FWDHdot,FOAH;
 
-      ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,fwdt,NULL,&FWDHdot);CHKERRQ(ierr);
-      ierr = TSTrajectoryGetUpdatedHistoryVecs(foats->trajectory,foats,time,&FOAH,NULL);CHKERRQ(ierr);
+      if (!Udot && !U) { ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,fwdt,NULL,&FWDHdot);CHKERRQ(ierr); }
+      else FWDHdot = Udot;
+      if (!L) { ierr = TSTrajectoryGetUpdatedHistoryVecs(foats->trajectory,foats,time,&FOAH,NULL);CHKERRQ(ierr); }
+      else FOAH = L;
       if (HFhas[0][0]) { /* (L^T \otimes I_N) H_XX \eta, \eta the TLM solution */
         ierr = TSOptEvalHessianDAE(tsopt,0,0,fwdt,FWDH,FWDHdot,adj_ctx->design,FOAH,TLMH,soawork1);CHKERRQ(ierr);
         ierr = VecAXPY(F,1.0,soawork1);CHKERRQ(ierr);
@@ -581,16 +719,18 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, PetscBoo
         ierr = VecAXPY(F,1.0,soawork1);CHKERRQ(ierr);
         has  = PETSC_TRUE;
       }
-      ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,NULL,&FWDHdot);CHKERRQ(ierr);
-      ierr = TSTrajectoryRestoreUpdatedHistoryVecs(foats->trajectory,&FOAH,NULL);CHKERRQ(ierr);
+      if (!Udot && !U) { ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,NULL,&FWDHdot);CHKERRQ(ierr); }
+      if (!L) { ierr = TSTrajectoryRestoreUpdatedHistoryVecs(foats->trajectory,&FOAH,NULL);CHKERRQ(ierr); }
     }
     /* these terms are computed against Ldot ->
        The formulas have a minus sign in front of them, but this cancels with time inversion of Ldot */
     if (HFhas[1][0] || HFhas[1][1] || HFhas[1][2]) {
       Vec FOAHdot,FWDHdot;
 
-      ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,fwdt,NULL,&FWDHdot);CHKERRQ(ierr);
-      ierr = TSTrajectoryGetUpdatedHistoryVecs(foats->trajectory,foats,time,NULL,&FOAHdot);CHKERRQ(ierr);
+      if (!Udot && !U) { ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,fwdt,NULL,&FWDHdot);CHKERRQ(ierr); }
+      else FWDHdot = Udot;
+      if (!Ldot && !L) { ierr = TSTrajectoryGetUpdatedHistoryVecs(foats->trajectory,foats,time,NULL,&FOAHdot);CHKERRQ(ierr); }
+      else FOAHdot = Ldot;
       if (HFhas[1][0]) { /* (Ldot^T \otimes I_N) H_XdotX \eta, \eta the TLM solution */
         ierr = TSOptEvalHessianDAE(tsopt,1,0,fwdt,FWDH,FWDHdot,adj_ctx->design,FOAHdot,TLMH,soawork1);CHKERRQ(ierr);
         ierr = VecAXPY(F,1.0,soawork1);CHKERRQ(ierr);
@@ -610,11 +750,11 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, PetscBoo
         ierr = VecAXPY(F,1.0,soawork1);CHKERRQ(ierr);
         has  = PETSC_TRUE;
       }
-      ierr = TSTrajectoryRestoreUpdatedHistoryVecs(foats->trajectory,NULL,&FOAHdot);CHKERRQ(ierr);
-      ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,NULL,&FWDHdot);CHKERRQ(ierr);
+      if (!Udot && !U) { ierr = TSTrajectoryRestoreUpdatedHistoryVecs(foats->trajectory,NULL,&FOAHdot);CHKERRQ(ierr); }
+      if (!Ldot && !L) { ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,NULL,&FWDHdot);CHKERRQ(ierr); }
     }
-    ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,&FWDH,NULL);CHKERRQ(ierr);
-    ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tlmts->trajectory,&TLMH,NULL);CHKERRQ(ierr);
+    if (!U)  { ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,&FWDH,NULL);CHKERRQ(ierr); }
+    if (!lU) { ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tlmts->trajectory,&TLMH,NULL);CHKERRQ(ierr); }
     ierr = DMRestoreGlobalVector(dm,&soawork0);CHKERRQ(ierr);
     ierr = DMRestoreGlobalVector(dm,&soawork1);CHKERRQ(ierr);
   } else if (adj_ctx->design) { /* gradient computations */
@@ -1187,6 +1327,27 @@ PetscErrorCode AdjointTSSetDirectionVec(TS adjts, Vec direction)
   PetscFunctionReturn(0);
 }
 
+PetscErrorCode AdjointTSGetDirectionVec(TS adjts, Vec *direction)
+{
+  PetscContainer c;
+  PetscErrorCode (*f)(TS,Vec*);
+  AdjointCtx     *adj_ctx;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(adjts,TS_CLASSID,1);
+  PetscValidPointer(direction,2);
+  ierr = PetscObjectQueryFunction((PetscObject)adjts,"AdjointTSGetDirectionVec_C",&f);CHKERRQ(ierr);
+  if (f) {
+    ierr = (*f)(adjts,direction);CHKERRQ(ierr);
+    PetscFunctionReturn(0);
+  }
+  ierr = PetscObjectQuery((PetscObject)adjts,"_ts_adjctx",(PetscObject*)&c);CHKERRQ(ierr);
+  ierr = PetscContainerGetPointer(c,(void**)&adj_ctx);CHKERRQ(ierr);
+  *direction = adj_ctx->direction;
+  PetscFunctionReturn(0);
+}
+
 /*@C
    AdjointTSSetTLMTSAndFOATS - Sets the Tangent Linear Model TS and the first-order adjoint TS, needed for Hessian matrix-vector products.
 
@@ -1200,7 +1361,7 @@ PetscErrorCode AdjointTSSetDirectionVec(TS adjts, Vec direction)
 .  tlmts - the TS context obtained from TSCreateTLMTS()
 -  foats - the TS context obtained from TSCreateAdjointTS() (can be NULL)
 
-   Notes: You should call AdjointTSSetDirectionVec() first.
+   Notes: To activate second order adjoints, you should call AdjointTSSetDirectionVec() first.
 
    Level: developer
 
@@ -1237,6 +1398,26 @@ PetscErrorCode AdjointTSSetTLMTSAndFOATS(TS soats, TS tlmts, TS foats)
   PetscFunctionReturn(0);
 }
 
+PetscErrorCode AdjointTSGetTLMTSAndFOATS(TS adjts, TS *tlmts, TS *foats)
+{
+  PetscContainer c;
+  PetscErrorCode (*f)(TS,TS*,TS*);
+  AdjointCtx     *adj_ctx;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(adjts,TS_CLASSID,1);
+  ierr = PetscObjectQueryFunction((PetscObject)adjts,"AdjointTSGetTLMTSAndFOATS_C",&f);CHKERRQ(ierr);
+  if (f) {
+    ierr = (*f)(adjts,tlmts,foats);CHKERRQ(ierr);
+    PetscFunctionReturn(0);
+  }
+  ierr = PetscObjectQuery((PetscObject)adjts,"_ts_adjctx",(PetscObject*)&c);CHKERRQ(ierr);
+  ierr = PetscContainerGetPointer(c,(void**)&adj_ctx);CHKERRQ(ierr);
+  if (tlmts) *tlmts = adj_ctx->tlmts;
+  if (foats) *foats = adj_ctx->foats;
+  PetscFunctionReturn(0);
+}
 /*@C
    AdjointTSSetTimeLimits - Sets the forward time interval where to perform the adjoint simulation.
 
@@ -1470,9 +1651,14 @@ PetscErrorCode AdjointTSFinalizeQuadrature(TS adjts)
 
 static PetscErrorCode JacCoupling(TS qts, PetscReal t, Vec L, Vec Ldot, PetscReal s, Mat A, Mat B, void* ctx)
 {
+  AdjEvalQuadCtx *adjq;
+  TSQuadCtx      *qctx;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
+  ierr = TSGetApplicationContext(qts,(void*)&qctx);CHKERRQ(ierr);
+  adjq = qctx->evalquadctx;
+  if (adjq->discrete) SETERRQ(PetscObjectComm((PetscObject)qts),PETSC_ERR_PLIB,"This should not happen");
   ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
@@ -1481,17 +1667,6 @@ static PetscErrorCode JacCoupling(TS qts, PetscReal t, Vec L, Vec Ldot, PetscRea
     ierr = MatScale(A,-1.0);CHKERRQ(ierr);
     if (A && A != B) { ierr = MatScale(B,-1.0);CHKERRQ(ierr); }
   }
-#if 0
-  {
-    AdjEvalQuadCtx *adjq;
-    TSQuadCtx      *qctx;
-    PetscReal      fwdt;
-    ierr = TSGetApplicationContext(qts,(void*)&qctx);CHKERRQ(ierr);
-    adjq = qctx->evalquadctx;
-    fwdt = adjq->tf - t + adjq->t0;
-    ierr = TSOptEvalGradientDAE(adjq->tsopt,fwdt,NULL,NULL,adjq->design,NULL,NULL);CHKERRQ(ierr);
-  }
-#endif
   PetscFunctionReturn(0);
 }
 
@@ -1556,6 +1731,30 @@ PetscErrorCode MatCreateShellWithMat(Mat A, PetscBool trans, Mat *B)
     ierr = MatShellSetOperation(*B,ops[i],trans ? t[i] : f[i]);CHKERRQ(ierr);
   }
   ierr = MatSetUp(*B);CHKERRQ(ierr);
+  ierr = MatAssemblyBegin(*B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyEnd(*B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode AdjointTSComputeQuadrature(TS ts, PetscReal t, Vec U, Vec Udot, Vec L, Vec Ldot, Vec FOAL, Vec FOALdot, Vec TLMU, Vec TLMUdot, PetscBool* has, Vec F)
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(ts,TS_CLASSID,1);
+  PetscValidHeaderSpecific(U,VEC_CLASSID,3);
+  if (Udot) PetscValidHeaderSpecific(Udot,VEC_CLASSID,4);
+  PetscValidHeaderSpecific(L,VEC_CLASSID,5);
+  if (Ldot) PetscValidHeaderSpecific(Ldot,VEC_CLASSID,6);
+  if (FOAL) PetscValidHeaderSpecific(FOAL,VEC_CLASSID,7);
+  if (FOALdot) PetscValidHeaderSpecific(FOALdot,VEC_CLASSID,8);
+  if (TLMU) PetscValidHeaderSpecific(TLMU,VEC_CLASSID,9);
+  if (TLMUdot) PetscValidHeaderSpecific(TLMUdot,VEC_CLASSID,10);
+  PetscValidPointer(has,11);
+  PetscValidHeaderSpecific(F,VEC_CLASSID,12);
+  *has = PETSC_FALSE;
+  ierr = PetscTryMethod(ts,"AdjointTSComputeQuadrature_C",(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,Vec,Vec,Vec,PetscBool*,Vec),
+                                                          (ts,t,U,Udot,L,Ldot,FOAL,FOALdot,TLMU,TLMUdot,has,F));CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -1563,27 +1762,57 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts)
 {
   AdjointCtx     *adj_ctx;
   TSOpt          tsopt;
+  TSObj          tsobj = NULL;
   PetscBool      flg;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
   PetscCheckAdjointTS(adjts);
+  ierr = TSSetUp(adjts);CHKERRQ(ierr);
   ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
   ierr = TSGetTSOpt(adj_ctx->fwdts,&tsopt);CHKERRQ(ierr);
+  ierr = TSGetTSObj(adj_ctx->fwdts,&tsobj);CHKERRQ(ierr);
   ierr = TSOptHasGradientDAE(tsopt,&flg,NULL);CHKERRQ(ierr);
+  if (!flg && adj_ctx->direction && adj_ctx->discrete) {
+    TSIFunction ifunc;
+    PetscBool   Hhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                              {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                              {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
+    PetscBool   has1,has2;
+
+    ierr = TSObjHasObjectiveIntegrand(tsobj,NULL,NULL,NULL,NULL,&has1,&has2);CHKERRQ(ierr);
+    flg  = (PetscBool)(has1 || has2);
+    if (adj_ctx->foats) {
+      ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
+    }
+    ierr = TSGetIFunction(adj_ctx->fwdts,NULL,&ifunc,NULL);CHKERRQ(ierr);
+    if (!ifunc) Hhas[2][1] = PETSC_FALSE;
+    flg = (PetscBool)(flg || Hhas[2][0] || Hhas[2][1] || Hhas[2][2]);
+  }
   if (flg) {
     TS             ats,qts;
     AdjEvalQuadCtx adjq;
     TSQuadCtx      qctx;
     Mat            Ac = NULL,Bc = NULL;
     PetscErrorCode (*qup)(TS,Vec,Vec) = QuadTSUpdateStates;
-    TSIJacobian    coup = JacCoupling;
+    TSIJacobian    coup = adj_ctx->discrete ? NULL : JacCoupling;
     PetscBool      diffrhs = (adjts->Arhs != adjts->Brhs) ? PETSC_TRUE : PETSC_FALSE;
 
-    adjq.tsopt   = tsopt;
-    adjq.t0      = adj_ctx->t0;
-    adjq.tf      = adj_ctx->tf;
-    adjq.design  = adj_ctx->design;
+    if (!adj_ctx->quadvec) SETERRQ(PetscObjectComm((PetscObject)adjts),PETSC_ERR_ORDER,"Missing quadrature vector. You should call AdjointTSSetQuadratureVec() first");
+    adjq.tsopt     = tsopt;
+    adjq.t0        = adj_ctx->t0;
+    adjq.tf        = adj_ctx->tf;
+    adjq.design    = adj_ctx->design;
+    adjq.discrete  = adj_ctx->discrete;
+    adjq.direction = adj_ctx->direction;
+    adjq.tsobj     = tsobj;
+    adjq.work1     = NULL;
+    adjq.work2     = NULL;
+
+    if (adjq.direction) {
+      ierr = VecDuplicate(adj_ctx->quadvec,&adjq.work1);CHKERRQ(ierr);
+      ierr = VecDuplicate(adj_ctx->quadvec,&adjq.work2);CHKERRQ(ierr);
+    }
 
     qctx.evalquad       = EvalQuadIntegrand_ADJ;
     qctx.evalquad_fixed = NULL;
@@ -1591,19 +1820,19 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts)
     qctx.U              = NULL;
     qctx.Udot           = NULL;
     qctx.design         = NULL;
-    if (!adj_ctx->quadvec) SETERRQ(PetscObjectComm((PetscObject)adjts),PETSC_ERR_ORDER,"Missing quadrature vector. You should call AdjointTSSetQuadratureVec() first");
 
     ierr = TSCreateQuadTS(PetscObjectComm((PetscObject)adjts),adj_ctx->quadvec,diffrhs,&qctx,&qts);CHKERRQ(ierr);
     ierr = TSSetProblemType(qts,TS_LINEAR);CHKERRQ(ierr);
 
-    ierr = MatCreateShellWithMat(tsopt->adjF_m,PETSC_TRUE,&Ac);CHKERRQ(ierr);
-    if (diffrhs) {
-      ierr = MatCreateShellWithMat(tsopt->adjF_m,PETSC_TRUE,&Bc);CHKERRQ(ierr);
-    } else {
-      ierr = PetscObjectReference((PetscObject)Ac);CHKERRQ(ierr);
-      Bc   = Ac;
+    if (!adj_ctx->discrete) {
+      ierr = MatCreateShellWithMat(tsopt->adjF_m,PETSC_TRUE,&Ac);CHKERRQ(ierr);
+      if (diffrhs) {
+        ierr = MatCreateShellWithMat(tsopt->adjF_m,PETSC_TRUE,&Bc);CHKERRQ(ierr);
+      } else {
+        ierr = PetscObjectReference((PetscObject)Ac);CHKERRQ(ierr);
+        Bc   = Ac;
+      }
     }
-
     ierr = TSCreateAugmentedTS(adjts,1,&qts,NULL,&qup,&coup,&Ac,&Bc,PETSC_TRUE,&ats);CHKERRQ(ierr);
     ierr = MatDestroy(&Ac);CHKERRQ(ierr);
     ierr = MatDestroy(&Bc);CHKERRQ(ierr);
@@ -1616,6 +1845,8 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts)
     ierr = TSSolve(ats,NULL);CHKERRQ(ierr);
     ierr = AugmentedTSFinalize(ats);CHKERRQ(ierr);
     ierr = TSDestroy(&ats);CHKERRQ(ierr);
+    ierr = VecDestroy(&adjq.work1);CHKERRQ(ierr);
+    ierr = VecDestroy(&adjq.work2);CHKERRQ(ierr);
   } else {
     ierr = TSSolve(adjts,NULL);CHKERRQ(ierr);
   }

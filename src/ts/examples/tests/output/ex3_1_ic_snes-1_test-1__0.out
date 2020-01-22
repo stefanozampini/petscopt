@@ -1,7 +1,7 @@
   ---------- Testing Gradient -------------
   Run with -tao_test_gradient_view and optionally -tao_test_gradient <threshold> to show difference
     of hand-coded and finite difference gradient entries greater than <threshold>.
-  Testing hand-coded Gradient, if (for double precision runs) ||G - Gfd||_F/||G||_F is
+  Testing hand-coded Gradient, if (for double precision runs) ||G - Gfd||/||G|| is
     O(1.e-8), the hand-coded Gradient is probably correct.
   ||Gfd|| 119687., ||G|| = 119689., angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
   2-norm ||G - Gfd||/||G|| = 1.72752e-05, ||G - Gfd|| = 2.06765
