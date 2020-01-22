@@ -2129,4 +2129,17 @@ int main(int argc, char *argv[])
       nsize: 1
       args: -newton_snes_max_it 4 -signal_scale 1.0 -scratch ./ -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad_testem.mesh -dt 0.01 -tf 1 -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -state_fec_type HCURL -test_progress 0 -test_misfit_internal -test_misfit 1,0,0 -ls_scale 1.e12 -tv_alpha 1.e-12 -tv_beta 1.e-6 -test_newton -test_newton_noise 0.0 -newton_pc_type none -newton_snes_atol 1.e-6 -newton_snes_converged_reason -test_null 0 -mu_const_val 0.9 -mu_exclude_fn_bb 3000,7000,4000,8000 -mu_exclude_fn  -grid_src_n 1 -grid_src_bb 5000,7000,5000,7000 -grid_rcv_n 4,1 -grid_rcv_bb 5500,6500,5800,5800 -glvis 0
 
+   test:
+      filter: sed -e "s/-nan/nan/g"
+      suffix: em_test_discrete
+      timeoutfactor: 3
+      nsize: 1
+      args: -newton_snes_max_it 1 -signal_scale 1.0 -scratch ./ -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad_testem.mesh -dt 0.125 -tf 1.0 -ts_trajectory_type memory -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -state_fec_type HCURL -test_progress 0 -ls_scale 1.e12 -tv_alpha 1.e-12 -tv_beta 1.e-6 -test_newton -test_newton_noise 0.0 -newton_pc_type none -test_null 0 -mu_const_val 0.9 -mu_exclude_fn_bb 3000,7000,4000,8000 -mu_exclude_fn  -grid_src_n 1 -grid_src_bb 5000,7000,5000,7000 -grid_rcv_n 4,1 -grid_rcv_bb 5500,6500,5800,5800 -glvis 0 -tsgradient_adjoint_worker_discrete  -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -test_misfit_reg 0,0,1 -newton_snes_test_jacobian -tsgradient_adjoint_worker_discrete  -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -test_misfit_reg 0,0,1 -newton_snes_test_jacobian
+
+   test:
+      filter: sed -e "s/-nan/nan/g"
+      suffix: em_test_discrete_gn
+      timeoutfactor: 3
+      nsize: 1
+      args: -newton_snes_max_it 1 -signal_scale 1.0 -scratch ./ -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad_testem.mesh -dt 0.125 -tf 1.0 -ts_trajectory_type memory -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -state_fec_type HCURL -test_progress 0 -ls_scale 1.e12 -tv_alpha 1.e-12 -tv_beta 1.e-6 -test_newton -test_newton_noise 0.0 -newton_pc_type none -test_null 0 -mu_const_val 0.9 -mu_exclude_fn_bb 3000,7000,4000,8000 -mu_exclude_fn  -grid_src_n 1 -grid_src_bb 5000,7000,5000,7000 -grid_rcv_n 4,1 -grid_rcv_bb 5500,6500,5800,5800 -glvis 0 -tsgradient_adjoint_worker_discrete  -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -test_misfit_reg 0,0,1 -newton_snes_test_jacobian -tsgradient_adjoint_worker_discrete  -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -test_misfit_reg 0,0,1 -newton_snes_test_jacobian -test_null -worker_tshessian_gn
 TEST*/

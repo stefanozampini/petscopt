@@ -4,12 +4,15 @@
 #include <petscopt/tlmts.h>
 
 typedef struct {
-  TS        model;
-  PetscBool userijac;
-  Vec       workrhs;
-  Vec       design;
-  Vec       mdelta;
-  Mat       P;
+  TS             model;
+  PetscBool      userijac;
+  Vec            workrhs;
+  Vec            design;
+  Vec            mdelta;
+  Mat            P;
+  PetscBool      discrete;
+  PetscErrorCode (*setup)(TS);
+  PetscErrorCode (*cstep)(TS);
 } TLMTS_Ctx;
 
 #endif

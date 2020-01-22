@@ -1,0 +1,101 @@
+
+Initial state
+Vec Object: 1 MPI processes
+  type: seq
+0.5
+0.5
+
+Final state
+Vec Object: 1 MPI processes
+  type: seq
+0.526263
+0.476222
+  0 TAO,  Function value: 0.249385,  Residual: 1.69194 
+  0 TAO,  Function value: 0.0251338,  Residual: 0.0734818 
+  1 TAO,  Function value: 0.00051148,  Residual: 0.038833 
+  2 TAO,  Function value: 2.50542e-07,  Residual: 0.000723184 
+  3 TAO,  Function value: 8.88385e-14,  Residual: 3.12938e-07 
+  4 TAO,  Function value: 1.58444e-26,  Residual: 0. 
+
+Tao solution
+Vec Object: 1 MPI processes
+  type: seq
+-0.346574
+0.346574
+-0.693147
+
+Initial state solution
+Vec Object: 1 MPI processes
+  type: seq
+0.5
+0.5
+
+Gradient via adjoint
+Vec Object: 1 MPI processes
+  type: seq
+-0.0262119
+0.0262119
+0.520602
+
+Gradient of objective function
+Vec Object: 1 MPI processes
+  type: seq
+0.00268243
+0.487314
+
+Gradient via adjoint (TLM)
+Vec Object: 1 MPI processes
+  type: seq
+-0.0262119
+0.0262119
+0.520602
+
+TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
+Mat Object: 1 MPI processes
+  type: seqdense
+-5.2758676304137064e-01 5.2758676304137064e-01 1.0030237518318184e+00 
+-5.0884538076697940e-02 5.0884538076697940e-02 1.0627890008901799e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+-5.2758676304137042e-01 -5.0884538076697947e-02 
+5.2758676304137042e-01 5.0884538076697947e-02 
+1.0030237518318184e+00 1.0627890008901768e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+2.2204460492503131e-16 -2.2204460492503131e-16 0.0000000000000000e+00 
+-6.9388939039072284e-18 6.9388939039072284e-18 -3.1086244689504383e-15 
+
+Gradient via TLM (explicit fwd via multtrans)
+Vec Object: 1 MPI processes
+  type: seq
+-0.0262119
+0.0262119
+0.520602
+
+Gradient via TLM (explicit adj via mult)
+Vec Object: 1 MPI processes
+  type: seq
+-0.0262119
+0.0262119
+0.520602
+Mat Object: H 1 MPI processes
+  type: seqdense
+2.7687253905504244e-01 -2.7687253905504244e-01 -5.5187140305117011e-01 
+-2.7687253905504244e-01 2.7687253905504244e-01 5.5187140305117011e-01 
+-5.5187140305117000e-01 5.5187140305117000e-01 1.3268682667171521e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+0.0000000000000000e+00 0.0000000000000000e+00 1.1102230246251565e-16 
+0.0000000000000000e+00 0.0000000000000000e+00 -1.1102230246251565e-16 
+-1.1102230246251565e-16 1.1102230246251565e-16 0.0000000000000000e+00 
+-------------------------- Taylor test results ---------------------------
+		Gradient				Hessian
+--------------------------------------------------------------------------
+0.000814288	0.00000 	0	6.70747e-05	0.00000 	0
+0.000211763	1.94309 	2	8.57795e-06	2.96706 	3
+5.40005e-05	1.97140 	2	1.08465e-06	2.98340 	3
+1.36349e-05	1.98567 	2	1.36367e-07	2.99167 	3
+3.42573e-06	1.99282 	2	1.70953e-08	2.99582 	3
+8.58565e-07	1.99641 	2	2.14001e-09	2.99791 	3
+2.14909e-07	1.99820 	2	2.67696e-10	2.99895 	3
+5.37606e-08	1.99910 	2	3.34741e-11	2.99948 	3

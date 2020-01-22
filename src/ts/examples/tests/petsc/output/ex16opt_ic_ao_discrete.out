@@ -1,0 +1,201 @@
+mu 1., steps 100, ftime 0.1
+  ---------- Testing Gradient -------------
+  Testing hand-coded Gradient, if (for double precision runs) ||G - Gfd||/||G|| is
+    O(1.e-8), the hand-coded Gradient is probably correct.
+  ||Gfd|| 0.201053, ||G|| = 0.201053, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 5.30996e-07, ||G - Gfd|| = 1.06758e-07
+  max-norm ||G - Gfd||/||G|| = 5.07056e-07, ||G - Gfd|| = 1.01671e-07
+  Hand-coded gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+0.200513
+0.0147235
+  Finite difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+0.200513
+0.0147235
+  Hand-coded minus finite-difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+1.01671e-07
+-3.25613e-08
+  0 TAO,  Function value: 0.0102758,  Residual: 0.201053 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.0291924, ||G|| = 0.0291924, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 8.39015e-08, ||G - Gfd|| = 2.44929e-09
+  max-norm ||G - Gfd||/||G|| = 8.27672e-08, ||G - Gfd|| = 2.29228e-09
+  Hand-coded gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-0.00922787
+0.0276956
+  Finite difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-0.00922787
+0.0276956
+  Hand-coded minus finite-difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-2.29228e-09
+8.62813e-10
+  1 TAO,  Function value: 0.000366799,  Residual: 0.0291924 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.0157492, ||G|| = 0.0157492, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 5.07177e-07, ||G - Gfd|| = 7.98762e-09
+  max-norm ||G - Gfd||/||G|| = 5.18836e-07, ||G - Gfd|| = 7.9876e-09
+  Hand-coded gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+0.0153952
+-0.00332012
+  Finite difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+0.0153952
+-0.00332012
+  Hand-coded minus finite-difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-7.9876e-09
+1.76394e-11
+  2 TAO,  Function value: 5.91402e-05,  Residual: 0.0157492 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.0173325, ||G|| = 0.0173325, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 2.70535e-07, ||G - Gfd|| = 4.68904e-09
+  max-norm ||G - Gfd||/||G|| = 2.5399e-07, ||G - Gfd|| = 4.33049e-09
+  Hand-coded gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-0.0170498
+0.00311738
+  Finite difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-0.0170498
+0.00311738
+  Hand-coded minus finite-difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+4.33049e-09
+-1.79832e-09
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.000277204, ||G|| = 0.000277204, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 2.14622e-07, ||G - Gfd|| = 5.9494e-11
+  max-norm ||G - Gfd||/||G|| = 1.7862e-07, ||G - Gfd|| = 4.84649e-11
+  Hand-coded gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-5.67687e-05
+-0.000271329
+  Finite difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-5.67687e-05
+-0.000271329
+  Hand-coded minus finite-difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+4.84649e-11
+-3.45064e-11
+  3 TAO,  Function value: 3.75621e-08,  Residual: 0.000277204 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 1.01308e-05, ||G|| = 1.01308e-05, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 2.35173e-07, ||G - Gfd|| = 2.3825e-12
+  max-norm ||G - Gfd||/||G|| = 2.03035e-07, ||G - Gfd|| = 1.82232e-12
+  Hand-coded gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+8.97539e-06
+4.69847e-06
+  Finite difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+8.97539e-06
+4.69847e-06
+  Hand-coded minus finite-difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-1.53474e-12
+1.82232e-12
+  4 TAO,  Function value: 3.41701e-11,  Residual: 1.01308e-05 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 8.79734e-06, ||G|| = 8.79734e-06, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 5.0651e-07, ||G - Gfd|| = 4.45594e-12
+  max-norm ||G - Gfd||/||G|| = 4.6103e-07, ||G - Gfd|| = 4.00123e-12
+  Hand-coded gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-8.67889e-06
+1.43873e-06
+  Finite difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-8.67889e-06
+1.43873e-06
+  Hand-coded minus finite-difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+1.961e-12
+-4.00123e-12
+  5 TAO,  Function value: 1.84218e-11,  Residual: 8.79734e-06 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 9.6859e-06, ||G|| = 9.6859e-06, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 4.10274e-07, ||G - Gfd|| = 3.97387e-12
+  max-norm ||G - Gfd||/||G|| = 3.98418e-07, ||G - Gfd|| = 3.79681e-12
+  Hand-coded gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+9.52971e-06
+-1.73242e-06
+  Finite difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+9.52971e-06
+-1.73242e-06
+  Hand-coded minus finite-difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-1.17298e-12
+3.79681e-12
+  ---------- Testing Gradient -------------
+  ||Gfd|| 7.16862e-08, ||G|| = 7.16862e-08, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 3.70213e-08, ||G - Gfd|| = 2.65391e-15
+  max-norm ||G - Gfd||/||G|| = 3.42528e-08, ||G - Gfd|| = 2.42239e-15
+  Hand-coded gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-1.17237e-08
+-7.0721e-08
+  Finite difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-1.17237e-08
+-7.0721e-08
+  Hand-coded minus finite-difference gradient ----------
+Vec Object: 1 MPI processes
+  type: seq
+-2.42239e-15
+1.08411e-15
+  6 TAO,  Function value: 2.5128e-15,  Residual: 7.16862e-08 
+Tao Object: 1 MPI processes
+  type: cg
+    CG Type: prp
+    Gradient steps: 0
+    Reset steps: 0
+  TaoLineSearch Object: 1 MPI processes
+    type: more-thuente
+    maximum function evaluations=30
+    tolerances: ftol=0.0001, rtol=1e-10, gtol=0.9
+    total number of function evaluations=0
+    total number of gradient evaluations=0
+    total number of function/gradient evaluations=2
+    Termination reason: 1
+  convergence tolerances: gatol=1e-10,   steptol=0.,   gttol=1e-05
+  Residual in Function/Gradient:=7.16862e-08
+  Objective value=2.5128e-15
+  total number of iterations=6,                          (max: 2000)
+  total number of function evaluations=36,                  max: 4000
+  total number of function/gradient evaluations=9,      (max: 4000)
+  Solution converged:    ||g(X)||/||g(X0)|| <= gttol

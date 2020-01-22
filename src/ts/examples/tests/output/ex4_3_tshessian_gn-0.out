@@ -8,21 +8,15 @@ Vec Object: 1 MPI processes
 Final state
 Vec Object: 1 MPI processes
   type: seq
-0.899589
-0.36043
+0.899587
+0.360431
   0 TAO,  Function value: 0.209566,  Residual: 1.67113 
-  1 TAO,  Function value: 0.0811036,  Residual: 0.390565 
-  2 TAO,  Function value: 0.0476931,  Residual: 0.299952 
-  3 TAO,  Function value: 0.0204895,  Residual: 0.0700549 
-  4 TAO,  Function value: 0.0169144,  Residual: 0.0840586 
-  5 TAO,  Function value: 0.00844382,  Residual: 0.120574 
-  6 TAO,  Function value: 0.00184382,  Residual: 0.0676114 
-  7 TAO,  Function value: 0.000167295,  Residual: 0.00958927 
-  8 TAO,  Function value: 7.32804e-06,  Residual: 0.000956865 
-  9 TAO,  Function value: 7.70909e-08,  Residual: 0.00065908 
- 10 TAO,  Function value: 7.41529e-09,  Residual: 4.14073e-05 
- 11 TAO,  Function value: 1.5461e-12,  Residual: 5.83156e-07 
- 12 TAO,  Function value: 3.33351e-19,  Residual: 4.24945e-10 
+  0 TAO,  Function value: 0.0445759,  Residual: 0.273092 
+  1 TAO,  Function value: 0.00262218,  Residual: 0.0222301 
+  2 TAO,  Function value: 9.05623e-05,  Residual: 0.00819306 
+  3 TAO,  Function value: 2.32071e-07,  Residual: 0.000276059 
+  4 TAO,  Function value: 1.86492e-12,  Residual: 7.7885e-07 
+  5 TAO,  Function value: 1.21648e-22,  Residual: 0. 
 
 Tao solution
 Vec Object: 1 MPI processes
@@ -36,9 +30,20 @@ Vec Object: 1 MPI processes
   type: seq
 0.5
 0.5
-  ---------- Testing Hessian -------------
-  Run with -tao_test_hessian_view and optionally -tao_test_hessian <threshold> to show difference
-    of hand-coded and finite difference Hessian entries greater than <threshold>.
-  Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
-    O(1.e-8), the hand-coded Hessian is probably correct.
-  ||H - Hfd||_F/||H||_F = 5.66948e-05, ||H - Hfd||_F = 0.000194772
+Mat Object: H 1 MPI processes
+  type: seqdense
+6.8753798888717099e-01 -6.8753798888717099e-01 -1.1632545316937826e+00 
+-6.8753798888717110e-01 6.8753798888717110e-01 1.1632545316937826e+00 
+-1.1632545316937843e+00 1.1632545316937843e+00 2.1210338751177269e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+0.0000000000000000e+00 -1.1102230246251565e-16 -1.7763568394002505e-15 
+1.1102230246251565e-16 0.0000000000000000e+00 1.7763568394002505e-15 
+1.7763568394002505e-15 -1.7763568394002505e-15 0.0000000000000000e+00 
+-------------------------- Taylor test results ---------------------------
+		Gradient				Hessian
+--------------------------------------------------------------------------
+0.00207493	0.00000 	0	0.000134132	0.00000 	0
+0.000535274	1.95471 	2	1.69909e-05	2.98082 	3
+0.000135928	1.97743 	2	2.13785e-06	2.99053 	3
+3.42484e-05	1.98874 	2	2.68105e-07	2.99530 	3

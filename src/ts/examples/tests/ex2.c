@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
   PetscBool      ifunc = PETSC_FALSE;
   PetscReal      t0 = 0.0, tf = 0.1, dt = 0.001;
   PetscInt       N = 3;
-  PetscReal      err,params[3],normPhi,omega = 0.1,gamma = 0.0;
+  PetscReal      err,params[3],normPhi,omega = 3,gamma = 2;
   PetscBool      use_lorentz = PETSC_FALSE, testP = PETSC_FALSE;
   TSProblemType  ptype;
   PetscErrorCode ierr;
@@ -332,31 +332,43 @@ int main(int argc, char* argv[])
 /*TEST
     test:
       suffix: lorentz
-      args: -ts_type rk -tf 3  -lorentz -ts_rtol 1.e-6 -ts_atol 1.e-6 -ts_trajectory_type memory -testp
+      args: -ts_type rk -tf 3 -lorentz -ts_rtol 1.e-6 -ts_atol 1.e-6 -ts_trajectory_type memory -testp -prop_view -propT_view
 
     test:
       suffix: lorentz_i_noifunc
-      args: -ts_type bdf -ts_bdf_order 3 -tlm_ts_bdf_order 3 -adjoint_tlm_ts_bdf_order 3 -tf 0.5  -lorentz -ts_rtol 1.e-6 -ts_atol 1.e-6 -ts_trajectory_type memory
-      output_file: output/ex2_lorentz.out
+      args: -ts_type bdf -ts_bdf_order 3 -tlm_ts_bdf_order 3 -adjoint_tlm_ts_bdf_order 3 -tf 0.5  -lorentz -ts_rtol 1.e-6 -ts_atol 1.e-6 -ts_trajectory_type memory -prop_view -propT_view
+      output_file: output/ex2_lorentz_out.out
 
     test:
       suffix: lorentz_i
-      args: -ts_type bdf -ts_bdf_order 3 -tlm_ts_bdf_order 3 -adjoint_tlm_ts_bdf_order 3 -tf 0.5  -lorentz -ts_rtol 1.e-6 -ts_atol 1.e-6 -ts_trajectory_type memory -ifunc
-      output_file: output/ex2_lorentz.out
+      args: -ts_type bdf -ts_bdf_order 3 -tlm_ts_bdf_order 3 -adjoint_tlm_ts_bdf_order 3 -tf 0.5  -lorentz -ts_rtol 1.e-6 -ts_atol 1.e-6 -ts_trajectory_type memory -ifunc -prop_view -propT_view
+      output_file: output/ex2_lorentz_out_i.out
 
     test:
       suffix: oscillator
-      args: -ts_type rk -ts_rk_type 5dp -tlm_ts_rk_type 5dp -adjoint_tlm_ts_rk_type 5dp -tf 10  -omega 3 -gamma 2 -ts_trajectory_type memory -testp  -adjoint_tlm_constjacobians
+      args: -ts_type rk -ts_rk_type 5dp -tlm_ts_rk_type 5dp -adjoint_tlm_ts_rk_type 5dp -tf 10 -ts_trajectory_type memory -testp  -adjoint_tlm_constjacobians -prop_view -propT_view
       output_file: output/ex2_oscillator.out
 
     test:
       suffix: oscillator_i_noifunc
-      args: -ts_type cn -tf 10 -dt 0.1 -omega 3 -gamma 2 -ts_trajectory_type memory -tlm_ts_adapt_type none -tlm_constjacobians -adjoint_tlm_reuseksp -prop_view -propT_view
+      args: -ts_type cn -tf 10 -dt 0.1 -ts_trajectory_type memory -tlm_ts_adapt_type none -tlm_constjacobians -adjoint_tlm_reuseksp -prop_view -propT_view
       output_file: output/ex2_oscillator_out.out
 
     test:
       suffix: oscillator_i
-      args: -ts_type cn -tf 10 -dt 0.1 -omega 3 -gamma 2 -ts_trajectory_type memory -ifunc -tlm_userijacobian -tlm_reuseksp -tlm_constjacobians -adjoint_tlm_constjacobians -prop_view -propT_view
+      args: -ts_type cn -tf 10 -dt 0.1 -ts_trajectory_type memory -ifunc -tlm_userijacobian -tlm_reuseksp -tlm_constjacobians -adjoint_tlm_constjacobians -prop_view -propT_view
       output_file: output/ex2_oscillator_out_i.out
+
+    test:
+      suffix: propagator_rk_discrete
+      args: -ts_type rk -tf 3 -ts_rk_type 5bs -lorentz {{0 1}separate output} -ts_adapt_type basic -ts_rtol 1.e-6 -ts_atol 1.e-6 -ts_trajectory_type memory -testp -prop_view -propT_view -err_view -tlm_discrete -adjoint_tlm_discrete
+
+    test:
+      suffix: propagator_cn_discrete
+      args: -ts_type cn -tf 0.1 -dt 1.e-2 -lorentz {{0 1}separate output} -ifunc {{0 1}separate output} -ts_adapt_type basic -ts_trajectory_type memory -prop_view -propT_view -err_view -tlm_discrete -adjoint_tlm_discrete
+
+    test:
+      suffix: propagator_theta_discrete
+      args: -ts_type theta -ts_theta_theta {{0.31 0.5 0.84 1.0}separate output} -tf 0.1 -dt 1.e-2 -lorentz {{0 1}separate output} -ifunc {{0 1}separate output} -ts_adapt_type basic -ts_trajectory_type memory -prop_view -propT_view -err_view -tlm_discrete -adjoint_tlm_discrete
 
 TEST*/

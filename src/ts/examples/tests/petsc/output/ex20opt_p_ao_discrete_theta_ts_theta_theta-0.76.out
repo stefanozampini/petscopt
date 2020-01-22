@@ -1,0 +1,75 @@
+  ---------- Testing Gradient -------------
+  Run with -tao_test_gradient_view and optionally -tao_test_gradient <threshold> to show difference
+    of hand-coded and finite difference gradient entries greater than <threshold>.
+  Testing hand-coded Gradient, if (for double precision runs) ||G - Gfd||/||G|| is
+    O(1.e-8), the hand-coded Gradient is probably correct.
+  ||Gfd|| 0.345227, ||G|| = 0.345227, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 1.56105e-07, ||G - Gfd|| = 5.38915e-08
+  max-norm ||G - Gfd||/||G|| = 1.56105e-07, ||G - Gfd|| = 5.38915e-08
+  0 TAO,  Function value: 0.0354256,  Residual: 0.345227 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.00980571, ||G|| = 0.00980571, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 3.91939e-07, ||G - Gfd|| = 3.84324e-09
+  max-norm ||G - Gfd||/||G|| = 3.91939e-07, ||G - Gfd|| = 3.84324e-09
+  1 TAO,  Function value: 2.56262e-05,  Residual: 0.00980571 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 0.000818162, ||G|| = 0.000818162, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 7.18296e-11, ||G - Gfd|| = 5.87682e-14
+  max-norm ||G - Gfd||/||G|| = 7.18296e-11, ||G - Gfd|| = 5.87682e-14
+  2 TAO,  Function value: 1.78994e-07,  Residual: 0.000818162 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 1.86543e-06, ||G|| = 1.86543e-06, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 2.54486e-07, ||G - Gfd|| = 4.74725e-13
+  max-norm ||G - Gfd||/||G|| = 2.54486e-07, ||G - Gfd|| = 4.74725e-13
+  3 TAO,  Function value: 9.30262e-13,  Residual: 1.86543e-06 
+  ---------- Testing Gradient -------------
+  ||Gfd|| 3.55316e-10, ||G|| = 3.55326e-10, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 2.91904e-05, ||G - Gfd|| = 1.03721e-14
+  max-norm ||G - Gfd||/||G|| = 2.91904e-05, ||G - Gfd|| = 1.03721e-14
+  4 TAO,  Function value: 3.37522e-20,  Residual: 3.55326e-10 
+Tao Object: 1 MPI processes
+  type: blmvm
+  Gradient steps: 0
+  Mat Object: (tao_blmvm_) 1 MPI processes
+    type: lmvmbfgs
+    rows=1, cols=1
+      Scale type: diagonal
+      Scale history: 1
+      Scale params: alpha=1., beta=0.5, rho=1.
+      Convex factors: phi=0., theta=0.125
+      Max. storage: 5
+      Used storage: 3
+      Number of updates: 3
+      Number of rejects: 0
+      Number of resets: 1
+      Mat Object: (J0_) 1 MPI processes
+        type: lmvmdiagbrdn
+        rows=1, cols=1
+          Scale history: 1
+          Scale params: alpha=1., beta=0.5, rho=1.
+          Convex factor: theta=0.125
+          Max. storage: 1
+          Used storage: 1
+          Number of updates: 3
+          Number of rejects: 0
+          Number of resets: 1
+  TaoLineSearch Object: 1 MPI processes
+    type: more-thuente
+    maximum function evaluations=30
+    tolerances: ftol=0.0001, rtol=1e-10, gtol=0.9
+    total number of function evaluations=0
+    total number of gradient evaluations=0
+    total number of function/gradient evaluations=1
+    using variable bounds
+    Termination reason: 1
+  Active Set subset type: subvec
+  convergence tolerances: gatol=1e-08,   steptol=0.,   gttol=0.
+  Residual in Function/Gradient:=3.55326e-10
+  Objective value=3.37522e-20
+  total number of iterations=4,                          (max: 2000)
+  total number of function evaluations=10,                  max: 4000
+  total number of function/gradient evaluations=5,      (max: 4000)
+  Solution converged:    ||g(X)|| <= gatol
+Vec Object: 1 MPI processes
+  type: seq
+1.

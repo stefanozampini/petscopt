@@ -1,1 +1,9 @@
 Using Oscillator with Omega and Gamma: 3. 2.
+Mat Object: Phi 1 MPI processes
+  type: seqdense
+-4.4260046381094020e-05 1.5886216565094684e-06 
+-1.4297594908585099e-05 -5.0614533007131094e-05 
+Mat Object: PhiT 1 MPI processes
+  type: seqdense
+-4.4260046381094657e-05 -1.4297594908583139e-05 
+1.5886216565091989e-06 -5.0614533007130884e-05 

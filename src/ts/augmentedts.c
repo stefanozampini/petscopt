@@ -1,4 +1,6 @@
 #include <petscopt/augmentedts.h>
+#include <petscopt/adjointts.h>
+#include <petscopt/tlmts.h>
 #include <petscopt/tsutils.h>
 #include <petscopt/private/augmentedtsimpl.h>
 #include <petsc/private/tsimpl.h>
@@ -73,7 +75,7 @@ static PetscErrorCode PCSetUp_AugTriangular(PC pc)
 
   PetscFunctionBegin;
   ierr = PCShellGetContext(pc,(void**)&ats);CHKERRQ(ierr);
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   ierr = TSGetSNES(actx->model,&snes);CHKERRQ(ierr);
   ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
@@ -94,7 +96,7 @@ static PetscErrorCode PCApply_AugTriangular(PC pc, Vec x, Vec y)
 
   PetscFunctionBegin;
   ierr = PCShellGetContext(pc,(void**)&ats);CHKERRQ(ierr);
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   if (actx->adjoint) SETERRQ(PetscObjectComm((PetscObject)pc),PETSC_ERR_SUP,"Not implemented");
   ierr = TSGetSNES(actx->model,&snes);CHKERRQ(ierr);
@@ -144,7 +146,7 @@ static PetscErrorCode PCApplyTranspose_AugTriangular(PC pc, Vec x, Vec y)
 
   PetscFunctionBegin;
   ierr = PCShellGetContext(pc,(void**)&ats);CHKERRQ(ierr);
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   if (!actx->adjoint) SETERRQ(PetscObjectComm((PetscObject)pc),PETSC_ERR_SUP,"Not implemented");
   ierr = TSGetSNES(actx->model,&snes);CHKERRQ(ierr);
@@ -181,6 +183,176 @@ static PetscErrorCode PCApplyTranspose_AugTriangular(PC pc, Vec x, Vec y)
   PetscFunctionReturn(0);
 }
 
+PetscErrorCode AdjointTSGetModelTS_Aug(TS ats, TS *fwdts)
+{
+  TSAugCtx       *actx;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscCheckAugmentedTS(ats);
+  ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
+  ierr = AdjointTSGetModelTS(actx->model,fwdts);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode AdjointTSGetTLMTSAndFOATS_Aug(TS ats, TS *tlmts, TS *foats)
+{
+  TSAugCtx       *actx;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscCheckAugmentedTS(ats);
+  ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
+  ierr = AdjointTSGetTLMTSAndFOATS(actx->model,tlmts,foats);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode AdjointTSGetDirectionVec_Aug(TS ats, Vec *d)
+{
+  TSAugCtx       *actx;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscCheckAugmentedTS(ats);
+  ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
+  ierr = AdjointTSGetDirectionVec(actx->model,d);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+/* input vectors are defined on the model only */
+/* forcing term, by convention, assumes the implicit interface */
+PetscErrorCode AdjointTSComputeForcing_Aug(TS ats, PetscReal time, Vec U, Vec Udot, Vec FOAL, Vec FOALdot, Vec lU, Vec lUdot, PetscBool* hasf, Vec F)
+{
+  TSAugCtx       *actx;
+  DM             dm;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscCheckAugmentedTS(ats);
+  ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
+  ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
+  ierr = DMCompositeGetAccessArray(dm,F,actx->nqts + 1,NULL,actx->F);CHKERRQ(ierr);
+  ierr = AdjointTSComputeForcing(actx->model,time,U,Udot,FOAL,FOALdot,lU,lUdot,hasf,actx->F[0]);CHKERRQ(ierr);
+  if (*hasf) {
+    PetscInt i;
+
+    for (i=0;i<actx->nqts;i++) {
+      ierr = VecSet(actx->F[i+1],0.0);CHKERRQ(ierr);
+    }
+  }
+  ierr = DMCompositeRestoreAccessArray(dm,F,actx->nqts + 1,NULL,actx->F);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+/* U,FOA,TLM on the state only, aL on state and quadrature */
+PetscErrorCode AdjointTSComputeQuadrature_Aug(TS ats, PetscReal time, Vec U, Vec Udot, Vec aL, Vec FOAL, Vec FOALdot, Vec TLMU, Vec TLMUdot, PetscBool *has, Vec F)
+{
+  TSAugCtx       *actx;
+  DM             dm,qdm;
+  Vec            dummy,Q,L;
+  PetscInt       s = 0, q = 1;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscCheckAugmentedTS(ats);
+  ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
+  if (actx->nqts != 1) SETERRQ1(PetscObjectComm((PetscObject)ats),PETSC_ERR_PLIB,"Unexpected number of quadratures %D != 1",actx->nqts);
+  if (!actx->updatestates[0]) SETERRQ(PetscObjectComm((PetscObject)ats),PETSC_ERR_PLIB,"Missing update function");
+  *has = PETSC_TRUE;
+  ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
+  ierr = DMCompositeGetAccessArray(dm,aL,1,&s,&L);CHKERRQ(ierr);
+  ierr = DMCompositeGetAccessArray(dm,F,1,&q,&Q);CHKERRQ(ierr);
+  ierr = (*actx->updatestates[0])(actx->qts[0],L,NULL);CHKERRQ(ierr);
+  ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_U",(PetscObject)U);CHKERRQ(ierr);
+  ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_Udot",(PetscObject)Udot);CHKERRQ(ierr);
+  ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_FOAL",(PetscObject)FOAL);CHKERRQ(ierr);
+  ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_FOALdot",(PetscObject)FOALdot);CHKERRQ(ierr);
+  ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_TLMU",(PetscObject)TLMU);CHKERRQ(ierr);
+  ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_TLMUdot",(PetscObject)TLMUdot);CHKERRQ(ierr);
+  ierr = TSGetDM(actx->qts[0],&qdm);CHKERRQ(ierr);
+  ierr = DMGetGlobalVector(qdm,&dummy);CHKERRQ(ierr);
+  ierr = TSComputeRHSFunction(actx->qts[0],time,dummy,Q);CHKERRQ(ierr);
+  ierr = DMRestoreGlobalVector(qdm,&dummy);CHKERRQ(ierr);
+  ierr = (*actx->updatestates[0])(actx->qts[0],NULL,NULL);CHKERRQ(ierr);
+  ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_U",NULL);CHKERRQ(ierr);
+  ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_Udot",NULL);CHKERRQ(ierr);
+  ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_FOAL",NULL);CHKERRQ(ierr);
+  ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_FOALdot",NULL);CHKERRQ(ierr);
+  ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_TLMU",NULL);CHKERRQ(ierr);
+  ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_TLMUdot",NULL);CHKERRQ(ierr);
+  ierr = DMCompositeRestoreAccessArray(dm,aL,1,&s,&L);CHKERRQ(ierr);
+  ierr = DMCompositeRestoreAccessArray(dm,F,1,&q,&Q);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TLMTSGetModelTS_Aug(TS ats, TS *fwdts)
+{
+  TSAugCtx       *actx;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscCheckAugmentedTS(ats);
+  ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
+  ierr = TLMTSGetModelTS(actx->model,fwdts);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+/* U and Udot is on model only */
+PetscErrorCode TLMTSComputeForcing_Aug(TS ats, PetscReal time, Vec U, Vec Udot, PetscBool* hasf, Vec F)
+{
+  TSAugCtx       *actx;
+  DM             dm;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscCheckAugmentedTS(ats);
+  ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
+  ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
+  ierr = DMCompositeGetAccessArray(dm,F,actx->nqts + 1,NULL,actx->F);CHKERRQ(ierr);
+  ierr = TLMTSComputeForcing(actx->model,time,U,Udot,hasf,actx->F[0]);CHKERRQ(ierr);
+  if (*hasf) {
+    PetscInt i;
+
+    for (i=0;i<actx->nqts;i++) {
+      ierr = VecSet(actx->F[i+1],0.0);CHKERRQ(ierr);
+    }
+  }
+  ierr = DMCompositeRestoreAccessArray(dm,F,actx->nqts + 1,NULL,actx->F);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode AugmentedTSSetUp(TS ats)
+{
+  TSAugCtx       *actx;
+  PetscErrorCode ierr;
+  PetscInt       i;
+
+  PetscFunctionBegin;
+  PetscCheckAugmentedTS(ats);
+  ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
+  ierr = TSSetUp(actx->model);CHKERRQ(ierr);
+  for (i=0;i<actx->nqts;i++) {
+    ierr = TSSetUp(actx->qts[i]);CHKERRQ(ierr);
+  }
+  if (actx->setup) { ierr = (*actx->setup)(ats);CHKERRQ(ierr); }
+  ats->ops->step = actx->model->ops->step;
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode AugmentedTSTrajectorySetUp(TSTrajectory tj,TS ats)
+{
+  TSAugCtx       *actx;
+  TSTrajectory   mtj;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscCheckAugmentedTS(ats);
+  ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
+  ierr = TSGetTrajectory(actx->model,&mtj);CHKERRQ(ierr);
+  ierr = TSTrajectorySetUp(mtj,actx->model);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
 static PetscErrorCode AugmentedTSTrajectorySet(TSTrajectory tj,TS ats,PetscInt stepnum,PetscReal time,Vec X)
 {
   TSAugCtx         *actx;
@@ -188,15 +360,33 @@ static PetscErrorCode AugmentedTSTrajectorySet(TSTrajectory tj,TS ats,PetscInt s
   DM               dm;
   PetscInt         z=0;
   PetscObjectState st;
+  PetscBool        flg;
   PetscErrorCode   ierr;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
+  ierr = TSGetTrajectory(actx->model,&mtj);CHKERRQ(ierr);
+  ierr = TSTrajectoryGetSolutionOnly(mtj,&flg);CHKERRQ(ierr);
+  if (!flg) {
+    Vec      *Y,*aY;
+    PetscInt i,ns,ans;
+
+    ierr = TSGetStages(ats,&ans,&aY);CHKERRQ(ierr);
+    ierr = TSGetStages(actx->model,&ns,&Y);CHKERRQ(ierr);
+    if (ns != ans) SETERRQ2(PetscObjectComm((PetscObject)ats),PETSC_ERR_SUP,"Mismatch stages %D != %D\n",ans,ns);
+    for (i=0;i<ns;i++) {
+
+      ierr = PetscObjectStateGet((PetscObject)aY[i],&st);CHKERRQ(ierr);
+      ierr = DMCompositeGetAccessArray(dm,aY[i],1,&z,actx->U);CHKERRQ(ierr);
+      ierr = VecCopy(actx->U[0],Y[i]);CHKERRQ(ierr);
+      ierr = DMCompositeRestoreAccessArray(dm,aY[i],1,&z,actx->U);CHKERRQ(ierr);
+      ierr = PetscObjectStateSet((PetscObject)aY[i],st);CHKERRQ(ierr);
+    }
+  }
   ierr = PetscObjectStateGet((PetscObject)X,&st);CHKERRQ(ierr);
   ierr = DMCompositeGetAccessArray(dm,X,1,&z,actx->U);CHKERRQ(ierr);
-  ierr = TSGetTrajectory(actx->model,&mtj);CHKERRQ(ierr);
   ierr = TSTrajectorySet(mtj,actx->model,stepnum,time,actx->U[0]);CHKERRQ(ierr);
   ierr = DMCompositeRestoreAccessArray(dm,X,1,&z,actx->U);CHKERRQ(ierr);
   ierr = PetscObjectStateSet((PetscObject)X,st);CHKERRQ(ierr);
@@ -212,7 +402,7 @@ static PetscErrorCode AugmentedTSUpdateSolution(TS ats)
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
   ierr = TSGetSolution(ats,&U);CHKERRQ(ierr);
@@ -239,7 +429,7 @@ PetscErrorCode AugmentedTSUpdateModelSolution(TS ats)
   PetscErrorCode   ierr;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
   ierr = TSGetSolution(ats,&U);CHKERRQ(ierr);
@@ -260,7 +450,7 @@ static PetscErrorCode AugmentedTSUpdateModelTS(TS ats)
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   actx->model->ptime               = ats->ptime;
   actx->model->time_step           = ats->time_step;
@@ -278,7 +468,7 @@ static PetscErrorCode AugmentedTSPostStep(TS ats)
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = AugmentedTSUpdateModelTS(ats);CHKERRQ(ierr);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   if (actx->model->poststep) {
@@ -311,7 +501,7 @@ static PetscErrorCode AugmentedTSPreStep(TS ats)
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = AugmentedTSUpdateModelTS(ats);CHKERRQ(ierr);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   if (actx->model->prestep) {
@@ -344,7 +534,7 @@ static PetscErrorCode AugmentedTSPostEvaluate(TS ats)
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   if (actx->model->postevaluate) {
     Vec              mU;
@@ -372,7 +562,7 @@ static PetscErrorCode AugmentedTSEventHandler(TS ats,PetscReal t,Vec U,PetscScal
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   mevent = actx->model->event;
   if (!mevent || !mevent->eventhandler) PetscFunctionReturn(0);
@@ -392,7 +582,7 @@ static PetscErrorCode AugmentedTSPostEvent(TS ats, PetscInt nevents_zero, PetscI
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   mevent = actx->model->event;
   if (!mevent || !mevent->eventhandler) PetscFunctionReturn(0);
@@ -427,7 +617,7 @@ static PetscErrorCode AugmentedTSOptionsHandler(PetscOptionItems *PetscOptionsOb
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   ierr = TSSetFromOptions(actx->model);CHKERRQ(ierr);
   ierr = PetscOptionsHead(PetscOptionsObject,"Augmented TS options");CHKERRQ(ierr);
@@ -443,7 +633,7 @@ static PetscErrorCode AugmentedTSRHSFunction(TS ats, PetscReal time, Vec U, Vec 
   PetscInt       i;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
   ierr = DMCompositeGetAccessArray(dm,U,actx->nqts + 1,NULL,actx->U);CHKERRQ(ierr);
@@ -468,7 +658,7 @@ static PetscErrorCode AugmentedTSRHSJacobian(TS ats, PetscReal time, Vec U, Mat 
   PetscInt       i;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
   ierr = DMCompositeGetAccessArray(dm,U,actx->nqts + 1,NULL,actx->U);CHKERRQ(ierr);
@@ -502,7 +692,7 @@ static PetscErrorCode AugmentedTSIFunction(TS ats, PetscReal time, Vec U, Vec Ud
   PetscInt       i;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
   ierr = DMCompositeGetAccessArray(dm,U   ,actx->nqts + 1,NULL,actx->U);CHKERRQ(ierr);
@@ -529,7 +719,7 @@ static PetscErrorCode AugmentedTSIJacobian(TS ats, PetscReal time, Vec U, Vec Ud
   PetscInt       i;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
   ierr = DMCompositeGetAccessArray(dm,U   ,actx->nqts + 1,NULL,actx->U);CHKERRQ(ierr);
@@ -568,7 +758,7 @@ PetscErrorCode AugmentedTSInitialize(TS ats)
   TSExactFinalTimeOption eftopt;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   ierr = TSGetMaxTime(actx->model,&tf);CHKERRQ(ierr);
   ierr = TSGetMaxSteps(actx->model,&st);CHKERRQ(ierr);
@@ -602,11 +792,15 @@ PetscErrorCode AugmentedTSInitialize(TS ats)
   /* wrap TSTrajectory */
   ierr = TSTrajectoryDestroy(&ats->trajectory);CHKERRQ(ierr);
   if (actx->model->trajectory) {
+    PetscBool flg;
+
     ierr = TSTrajectoryCreate(PetscObjectComm((PetscObject)ats),&ats->trajectory);CHKERRQ(ierr);
-    ierr = TSTrajectorySetType(ats->trajectory,ats,TSTRAJECTORYMEMORY);CHKERRQ(ierr);
-    ierr = TSTrajectorySetSolutionOnly(ats->trajectory,PETSC_TRUE);CHKERRQ(ierr);
+    ierr = TSTrajectorySetType(ats->trajectory,ats,((PetscObject)actx->model->trajectory)->type_name);CHKERRQ(ierr);
+    ierr = TSTrajectoryGetSolutionOnly(actx->model->trajectory,&flg);CHKERRQ(ierr);
+    ierr = TSTrajectorySetSolutionOnly(ats->trajectory,flg);CHKERRQ(ierr);
     ats->trajectory->adjoint_solve_mode = PETSC_FALSE;
     ats->trajectory->ops->set = AugmentedTSTrajectorySet;
+    ats->trajectory->ops->setup = AugmentedTSTrajectorySetUp;
   }
 
   /* wrap the event handler */
@@ -617,6 +811,15 @@ PetscErrorCode AugmentedTSInitialize(TS ats)
     ierr = TSSetEventHandler(ats,mevent->nevents,mevent->direction,mevent->terminate,AugmentedTSEventHandler,AugmentedTSPostEvent,NULL);CHKERRQ(ierr);
   }
 
+  /* compose callbacks for discrete adjoint */
+  ierr = PetscObjectComposeFunction((PetscObject)ats,"AdjointTSComputeForcing_C",AdjointTSComputeForcing_Aug);CHKERRQ(ierr);
+  ierr = PetscObjectComposeFunction((PetscObject)ats,"AdjointTSGetModelTS_C",AdjointTSGetModelTS_Aug);CHKERRQ(ierr);
+  ierr = PetscObjectComposeFunction((PetscObject)ats,"AdjointTSGetTLMTSAndFOATS_C",AdjointTSGetTLMTSAndFOATS_Aug);CHKERRQ(ierr);
+  ierr = PetscObjectComposeFunction((PetscObject)ats,"AdjointTSGetDirectionVec_C",AdjointTSGetDirectionVec_Aug);CHKERRQ(ierr);
+  ierr = PetscObjectComposeFunction((PetscObject)ats,"AdjointTSComputeQuadrature_C",AdjointTSComputeQuadrature_Aug);CHKERRQ(ierr);
+  ierr = PetscObjectComposeFunction((PetscObject)ats,"TLMTSComputeForcing_C",TLMTSComputeForcing_Aug);CHKERRQ(ierr);
+  ierr = PetscObjectComposeFunction((PetscObject)ats,"TLMTSGetModelTS_C",TLMTSGetModelTS_Aug);CHKERRQ(ierr);
+
   /* mimick initialization in TSSolve for model TS */
   actx->model->ksp_its           = 0;
   actx->model->snes_its          = 0;
@@ -624,8 +827,11 @@ PetscErrorCode AugmentedTSInitialize(TS ats)
   actx->model->reject            = 0;
   actx->model->steprestart       = PETSC_TRUE;
   actx->model->steprollback      = PETSC_FALSE;
+  actx->model->rhsjacobian.time  = PETSC_MIN_REAL;
+  for (i=0;i<actx->nqts;i++) {
+    actx->qts[i]->rhsjacobian.time = PETSC_MIN_REAL;
+  }
   ierr = TSSetUp(actx->model);CHKERRQ(ierr);
-  ierr = TSTrajectorySetUp(actx->model->trajectory,actx->model);CHKERRQ(ierr);
   ierr = TSEventInitialize(actx->model->event,actx->model,t0,actx->model->vec_sol);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -635,10 +841,17 @@ PetscErrorCode AugmentedTSFinalize(TS ats)
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  PetscCheckAugumentedTS(ats);
+  PetscCheckAugmentedTS(ats);
   ierr = AugmentedTSUpdateModelTS(ats);CHKERRQ(ierr);
   ierr = AugmentedTSUpdateSolution(ats);CHKERRQ(ierr);
   ierr = TSTrajectoryDestroy(&ats->trajectory);CHKERRQ(ierr);
+  ierr = PetscObjectComposeFunction((PetscObject)ats,"AdjointTSComputeForcing_C",NULL);CHKERRQ(ierr);
+  ierr = PetscObjectComposeFunction((PetscObject)ats,"AdjointTSGetModelTS_C",NULL);CHKERRQ(ierr);
+  ierr = PetscObjectComposeFunction((PetscObject)ats,"AdjointTSGetTLMTSAndFOATS_C",NULL);CHKERRQ(ierr);
+  ierr = PetscObjectComposeFunction((PetscObject)ats,"AdjointTSGetDirectionVec_C",NULL);CHKERRQ(ierr);
+  ierr = PetscObjectComposeFunction((PetscObject)ats,"AdjointTSComputeQuadrature_C",NULL);CHKERRQ(ierr);
+  ierr = PetscObjectComposeFunction((PetscObject)ats,"TLMTSComputeForcing_C",NULL);CHKERRQ(ierr);
+  ierr = PetscObjectComposeFunction((PetscObject)ats,"TLMTSGetModelTS_C",NULL);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -715,6 +928,8 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
 
   ierr = PetscObjectReference((PetscObject)ts);CHKERRQ(ierr);
   aug_ctx->model = ts;
+  aug_ctx->setup = (*ats)->ops->setup;
+  (*ats)->ops->setup = AugmentedTSSetUp;
 
   /* Augmented TS prefix: i.e. options called as -augmented_ts_monitor or -augmented_modelprefix_ts_monitor */
   ierr = TSGetOptionsPrefix(aug_ctx->model,&prefix);CHKERRQ(ierr);
@@ -747,13 +962,15 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
   aug_ctx->nqts = n;
   ierr = PetscMalloc3(aug_ctx->nqts,&aug_ctx->qts,aug_ctx->nqts,&aug_ctx->updatestates,aug_ctx->nqts,&aug_ctx->jaccoupling);CHKERRQ(ierr);
   for (i=0;i<aug_ctx->nqts;i++) {
+    PetscBool has = PETSC_FALSE;
 
+    if (Acoupling && Acoupling[i] && Bcoupling && Bcoupling[i]) has = PETSC_TRUE;
     ierr = PetscObjectReference((PetscObject)qts[i]);CHKERRQ(ierr);
     aug_ctx->qts[i] = qts[i];
     ierr = TSGetDM(aug_ctx->qts[i],&dm);CHKERRQ(ierr);
     ierr = DMCompositeAddDM(adm,dm);CHKERRQ(ierr);
     aug_ctx->updatestates[i] = updatestates ? updatestates[i] : NULL;
-    aug_ctx->jaccoupling[i]  = jaccoupling  ? jaccoupling[i]  : NULL;
+    aug_ctx->jaccoupling[i]  = (jaccoupling && has) ? jaccoupling[i] : NULL;
     ierr = TSGetProblemType(aug_ctx->qts[i],&prtype);CHKERRQ(ierr);
     linear = (PetscBool) (linear && (prtype == TS_LINEAR ? PETSC_TRUE : PETSC_FALSE));
   }

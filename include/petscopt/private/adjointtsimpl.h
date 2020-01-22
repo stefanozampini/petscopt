@@ -5,17 +5,20 @@
 #include <petscopt/private/tsobjimpl.h>
 
 typedef struct {
-  Vec       design;      /* design vector (fixed) */
-  TS        fwdts;       /* forward solver */
-  TSObj     tsobj;       /* Objective functions linked list */
-  PetscReal t0,tf;       /* time limits, for forward time recovery */
-  Vec       workinit;    /* work vector, used to initialize the adjoint variables and for Dirac's delta terms */
-  Vec       quadvec;     /* vector to store the quadrature (gradient or Hessian matvec) */
-  Vec       wquad;       /* work vector */
-  PetscBool dirac_delta; /* If true, means that a delta contribution needs to be added to lambda during the post step method */
-  Vec       direction;   /* If present, it is a second-order adjoint */
-  TS        tlmts;       /* Tangent Linear Model TS, used for Hessian matvecs */
-  TS        foats;       /* First order adjoint TS, used for Hessian matvecs when solving for the second order adjoint */
+  Vec            design;      /* design vector (fixed) */
+  TS             fwdts;       /* forward solver */
+  TSObj          tsobj;       /* Objective functions linked list */
+  PetscReal      t0,tf;       /* time limits, for forward time recovery */
+  Vec            workinit;    /* work vector, used to initialize the adjoint variables and for Dirac's delta terms */
+  Vec            quadvec;     /* vector to store the quadrature (gradient or Hessian matvec) */
+  Vec            wquad;       /* work vector */
+  PetscBool      dirac_delta; /* If true, means that a delta contribution needs to be added to lambda during the post step method */
+  Vec            direction;   /* If present, it is a second-order adjoint */
+  TS             tlmts;       /* Tangent Linear Model TS, used for Hessian matvecs */
+  TS             foats;       /* First order adjoint TS, used for Hessian matvecs when solving for the second order adjoint */
+  PetscBool      discrete;
+  PetscErrorCode (*setup)(TS);
+  PetscErrorCode (*cstep)(TS);
 } AdjointCtx;
 
 /* Check sanity of the AdjointTS */

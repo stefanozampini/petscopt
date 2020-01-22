@@ -13,13 +13,14 @@ typedef struct {
   Vec            *U;
   Vec            *Udot;
   Vec            *F;
+  PetscErrorCode (*setup)(TS);
 } TSAugCtx;
 
 /* Check sanity of the AugmentedTS */
 #if !defined(PETSC_USE_DEBUG)
-#define PetscCheckAugumentedTS(a) do {} while (0)
+#define PetscCheckAugmentedTS(a) do {} while (0)
 #else
-#define PetscCheckAugumentedTS(a)                                                                                                                \
+#define PetscCheckAugmentedTS(a)                                                                                                                \
   do {                                                                                                                                           \
     PetscErrorCode __ierr;                                                                                                                       \
     PetscContainer __c;                                                                                                                          \
@@ -32,5 +33,8 @@ typedef struct {
     if (__cc != __ac) SETERRQ(PetscObjectComm((PetscObject)(a)),PETSC_ERR_USER,"You cannot change the application context for the AugmentedTS"); \
   } while (0)
 #endif
+
+PETSC_INTERN PetscErrorCode AdjointTSGetModelTS_Aug(TS,TS*);
+PETSC_INTERN PetscErrorCode AdjointTSComputeForcing_Aug(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,Vec,PetscBool*,Vec);
 
 #endif

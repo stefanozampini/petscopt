@@ -57,7 +57,7 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   TSTrajectory   otrj;
   TSAdapt        adapt;
   PetscReal      dt;
-  PetscBool      istr;
+  PetscBool      istr,soadisc;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -75,10 +75,11 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   ierr = TSSetUpFromDesign(tshess->model,tshess->x0,tshess->design);CHKERRQ(ierr);
 
   /* solve tangent linear model */
+  ierr = AdjointTSIsDiscrete(tshess->soats,&soadisc);CHKERRQ(ierr);
   ierr = TSTrajectoryDestroy(&tshess->tlmts->trajectory);CHKERRQ(ierr); /* XXX add Reset method to TSTrajectory */
   ierr = TSTrajectoryCreate(PetscObjectComm((PetscObject)tshess->tlmts),&tshess->tlmts->trajectory);CHKERRQ(ierr);
   ierr = TSTrajectorySetType(tshess->tlmts->trajectory,tshess->tlmts,TSTRAJECTORYMEMORY);CHKERRQ(ierr);
-  ierr = TSTrajectorySetSolutionOnly(tshess->tlmts->trajectory,PETSC_TRUE);CHKERRQ(ierr);
+  ierr = TSTrajectorySetSolutionOnly(tshess->tlmts->trajectory,soadisc ? PETSC_FALSE : PETSC_TRUE);CHKERRQ(ierr);
   ierr = TSTrajectorySetFromOptions(tshess->tlmts->trajectory,tshess->tlmts);CHKERRQ(ierr);
   tshess->tlmts->trajectory->adjoint_solve_mode = PETSC_FALSE;
 
@@ -152,6 +153,7 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
 /* private functions for objective, gradient and Hessian evaluation */
 static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec design, Vec gradient, PetscReal *val)
 {
+  TS             adjts = NULL;
   TSTrajectory   otrj = NULL;
   PetscReal      t0,tf,dt;
   PetscContainer c;
@@ -172,10 +174,23 @@ static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec de
   otrj = ts->trajectory;
   ts->trajectory = NULL;
   if (gradient) {
+    const char* prefix;
+    char        *prefix_cp;
+    PetscBool   flg;
+
+    ierr = TSCreateAdjointTS(ts,&adjts);CHKERRQ(ierr);
+    ierr = TSGetOptionsPrefix(adjts,&prefix);CHKERRQ(ierr);
+    ierr = PetscStrallocpy(prefix,&prefix_cp);CHKERRQ(ierr);
+    ierr = TSSetOptionsPrefix(adjts,"tsgradient_");CHKERRQ(ierr);
+    ierr = TSAppendOptionsPrefix(adjts,prefix_cp);CHKERRQ(ierr);
+    ierr = PetscFree(prefix_cp);CHKERRQ(ierr);
+    ierr = TSSetFromOptions(adjts);CHKERRQ(ierr);
+    ierr = AdjointTSSetUpStep(adjts);CHKERRQ(ierr);
     ierr = TSTrajectoryCreate(PetscObjectComm((PetscObject)ts),&ts->trajectory);CHKERRQ(ierr);
     ierr = TSTrajectorySetType(ts->trajectory,ts,TSTRAJECTORYBASIC);CHKERRQ(ierr);
-    ierr = TSTrajectorySetSolutionOnly(ts->trajectory,PETSC_TRUE);CHKERRQ(ierr);
     ierr = TSTrajectorySetFromOptions(ts->trajectory,ts);CHKERRQ(ierr);
+    ierr = AdjointTSIsDiscrete(adjts,&flg);CHKERRQ(ierr);
+    ierr = TSTrajectorySetSolutionOnly(ts->trajectory,flg ? PETSC_FALSE : PETSC_TRUE);CHKERRQ(ierr);
     /* we don't have an API for this right now */
     ts->trajectory->adjoint_solve_mode = PETSC_FALSE;
   }
@@ -186,16 +201,6 @@ static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec de
 
   /* adjoint */
   if (gradient) {
-    TS          adjts;
-    const char* prefix;
-    char        *prefix_cp;
-
-    ierr = TSCreateAdjointTS(ts,&adjts);CHKERRQ(ierr);
-    ierr = TSGetOptionsPrefix(adjts,&prefix);CHKERRQ(ierr);
-    ierr = PetscStrallocpy(prefix,&prefix_cp);CHKERRQ(ierr);
-    ierr = TSSetOptionsPrefix(adjts,"tsgradient_");CHKERRQ(ierr);
-    ierr = TSAppendOptionsPrefix(adjts,prefix_cp);CHKERRQ(ierr);
-    ierr = PetscFree(prefix_cp);CHKERRQ(ierr);
     ierr = TSHistoryGetTimeStep(ts->trajectory->tsh,PETSC_TRUE,0,&dt);CHKERRQ(ierr);
     ierr = TSGetTime(ts,&tf);CHKERRQ(ierr);
     ierr = TSSetTimeStep(adjts,dt);CHKERRQ(ierr);
@@ -204,7 +209,6 @@ static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec de
     ierr = AdjointTSSetQuadratureVec(adjts,gradient);CHKERRQ(ierr);
     ierr = AdjointTSComputeInitialConditions(adjts,NULL,PETSC_TRUE);CHKERRQ(ierr);
     ierr = AdjointTSEventHandler(adjts);CHKERRQ(ierr);
-    ierr = TSSetFromOptions(adjts);CHKERRQ(ierr);
     ierr = AdjointTSSetTimeLimits(adjts,t0,tf);CHKERRQ(ierr);
     if (adjts->adapt) {
       PetscBool istr;
@@ -224,11 +228,10 @@ static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec de
     }
     ierr = AdjointTSSolveWithQuadrature_Private(adjts);CHKERRQ(ierr);
     ierr = AdjointTSFinalizeQuadrature(adjts);CHKERRQ(ierr);
-    ierr = TSDestroy(&adjts);CHKERRQ(ierr);
-
-    /* restore TS to its original state */
-    ierr = TSTrajectoryDestroy(&ts->trajectory);CHKERRQ(ierr);
   }
+  ierr = TSDestroy(&adjts);CHKERRQ(ierr);
+  /* restore TS to its original state */
+  ierr = TSTrajectoryDestroy(&ts->trajectory);CHKERRQ(ierr);
   ts->trajectory = otrj;
   PetscFunctionReturn(0);
 }
@@ -311,6 +314,7 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
   TSTrajectory   otrj;
   TSAdapt        adapt;
   PetscBool      has,istr;
+  PetscBool      tlmdisc,foadisc,soadisc;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -381,6 +385,8 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
     ierr = TSSetMaxSteps(tshess->tlmts,PETSC_MAX_INT);CHKERRQ(ierr);
     ierr = TSSetExactFinalTime(tshess->tlmts,TS_EXACTFINALTIME_MATCHSTEP);CHKERRQ(ierr);
   }
+  ierr = TLMTSSetUpStep(tshess->tlmts);CHKERRQ(ierr);
+  ierr = TLMTSIsDiscrete(tshess->tlmts,&tlmdisc);CHKERRQ(ierr);
   ierr = TLMTSSetDesignVec(tshess->tlmts,design);CHKERRQ(ierr);
 
   /* first-order adjoint solver */
@@ -394,10 +400,12 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
     ierr = TSSetOptionsPrefix(tshess->foats,"tshessian_fo");CHKERRQ(ierr);
     ierr = TSAppendOptionsPrefix(tshess->foats,prefix_cp);CHKERRQ(ierr);
     ierr = PetscFree(prefix_cp);CHKERRQ(ierr);
+    ierr = TSSetFromOptions(tshess->foats);CHKERRQ(ierr);
     ierr = AdjointTSSetTimeLimits(tshess->foats,tshess->t0,tshess->tf);CHKERRQ(ierr);
     ierr = AdjointTSEventHandler(tshess->foats);CHKERRQ(ierr);
-    ierr = TSSetFromOptions(tshess->foats);CHKERRQ(ierr);
   }
+  ierr = AdjointTSSetUpStep(tshess->foats);CHKERRQ(ierr);
+  ierr = AdjointTSIsDiscrete(tshess->foats,&foadisc);CHKERRQ(ierr);
   ierr = AdjointTSSetDesignVec(tshess->foats,design);CHKERRQ(ierr);
   ierr = AdjointTSSetQuadratureVec(tshess->foats,NULL);CHKERRQ(ierr);
 
@@ -412,18 +420,23 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
     ierr = TSSetOptionsPrefix(tshess->soats,"tshessian_so");CHKERRQ(ierr);
     ierr = TSAppendOptionsPrefix(tshess->soats,prefix_cp);CHKERRQ(ierr);
     ierr = PetscFree(prefix_cp);CHKERRQ(ierr);
+    ierr = TSSetFromOptions(tshess->soats);CHKERRQ(ierr);
     ierr = AdjointTSSetTimeLimits(tshess->soats,tshess->t0,tshess->tf);CHKERRQ(ierr);
     ierr = AdjointTSEventHandler(tshess->soats);CHKERRQ(ierr);
-    ierr = TSSetFromOptions(tshess->soats);CHKERRQ(ierr);
   }
+  ierr = AdjointTSSetUpStep(tshess->soats);CHKERRQ(ierr);
+  ierr = AdjointTSIsDiscrete(tshess->soats,&soadisc);CHKERRQ(ierr);
   ierr = AdjointTSSetDesignVec(tshess->soats,design);CHKERRQ(ierr);
   ierr = AdjointTSSetQuadratureVec(tshess->soats,NULL);CHKERRQ(ierr);
+
+  /* sanity check XXX */
+  if (tlmdisc != foadisc || (!tshess->GN && soadisc != foadisc)) SETERRQ3(PetscObjectComm((PetscObject)ts),PETSC_ERR_SUP,"Cannot mix discrete and continuous adjoints! TLM %d, FOA %d, SOA %d",tlmdisc,foadisc,soadisc);
 
   /* sample nonlinear model */
   otrj = ts->trajectory;
   ierr = TSTrajectoryCreate(PetscObjectComm((PetscObject)ts),&ts->trajectory);CHKERRQ(ierr);
   ierr = TSTrajectorySetType(ts->trajectory,ts,TSTRAJECTORYMEMORY);CHKERRQ(ierr);
-  ierr = TSTrajectorySetSolutionOnly(ts->trajectory,PETSC_TRUE);CHKERRQ(ierr);
+  ierr = TSTrajectorySetSolutionOnly(ts->trajectory,foadisc ? PETSC_FALSE : PETSC_TRUE);CHKERRQ(ierr);
   ierr = TSTrajectorySetFromOptions(ts->trajectory,ts);CHKERRQ(ierr);
   ts->trajectory->adjoint_solve_mode = PETSC_FALSE;
   ierr = TSSetStepNumber(ts,0);CHKERRQ(ierr);
@@ -449,11 +462,11 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
   /* model sampling can terminate before tf due to events */
   ierr = TSGetTime(ts,&tshess->tf);CHKERRQ(ierr);
 
-  /* sample first-order adjoint */
+  /* sample first-order adjoint (not needed for Gauss-Newton approximation) */
   ierr = TSTrajectoryDestroy(&tshess->foats->trajectory);CHKERRQ(ierr); /* XXX add Reset method to TSTrajectory */
   ierr = TSTrajectoryCreate(PetscObjectComm((PetscObject)tshess->foats),&tshess->foats->trajectory);CHKERRQ(ierr);
   ierr = TSTrajectorySetType(tshess->foats->trajectory,tshess->foats,TSTRAJECTORYMEMORY);CHKERRQ(ierr);
-  ierr = TSTrajectorySetSolutionOnly(tshess->foats->trajectory,PETSC_TRUE);CHKERRQ(ierr);
+  ierr = TSTrajectorySetSolutionOnly(tshess->foats->trajectory,foadisc ? PETSC_FALSE : PETSC_TRUE);CHKERRQ(ierr);
   ierr = TSTrajectorySetFromOptions(tshess->foats->trajectory,tshess->foats);CHKERRQ(ierr);
   tshess->foats->trajectory->adjoint_solve_mode = PETSC_FALSE;
   ierr = TSSetStepNumber(tshess->foats,0);CHKERRQ(ierr);
@@ -461,7 +474,7 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
   ierr = TSHistoryGetTimeStep(tshess->modeltj->tsh,PETSC_TRUE,0,&dt);CHKERRQ(ierr);
   ierr = TSSetTimeStep(tshess->foats,dt);CHKERRQ(ierr);
   ierr = AdjointTSSetTimeLimits(tshess->foats,tshess->t0,tshess->tf);CHKERRQ(ierr);
-  if (!tshess->GN) { /* not needed for Gauss-Newton approximation */
+  if (!tshess->GN) {
     ierr = AdjointTSComputeInitialConditions(tshess->foats,NULL,PETSC_TRUE);CHKERRQ(ierr);
     ierr = TSGetAdapt(tshess->foats,&adapt);CHKERRQ(ierr);
     ierr = PetscObjectTypeCompare((PetscObject)adapt,TSADAPTHISTORY,&istr);CHKERRQ(ierr);

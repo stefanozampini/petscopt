@@ -209,6 +209,7 @@ int main(int argc,char **argv)
      Set runtime options
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
+  ierr = TSGetMaxTime(ts,&user.ftime);CHKERRQ(ierr);
 
   ierr = TSSolve(ts,user.x);CHKERRQ(ierr);
 
@@ -315,7 +316,7 @@ PetscErrorCode FormFunctionGradient(Tao tao,Vec P,PetscReal *f,Vec G,void *ctx)
      Set time
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   ierr = TSSetTime(ts,0.0);CHKERRQ(ierr);
-  ierr = TSSetMaxTime(ts,user_ptr->ftime);CHKERRQ(ierr);
+  ierr = TSSetTimeStep(ts,0.03125);CHKERRQ(ierr);
   ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_MATCHSTEP);CHKERRQ(ierr);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -334,6 +335,7 @@ PetscErrorCode FormFunctionGradient(Tao tao,Vec P,PetscReal *f,Vec G,void *ctx)
      Set runtime options
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
+  ierr = TSSetMaxTime(ts,user_ptr->ftime);CHKERRQ(ierr);
 
   ierr = TSSolve(ts,user_ptr->x);CHKERRQ(ierr);
   ierr = VecGetArrayRead(user_ptr->x,&y_ptr);CHKERRQ(ierr);
@@ -556,6 +558,7 @@ PetscErrorCode FormFunctionGradient_AO(Tao tao,Vec P,PetscReal *f,Vec G,void *ct
   ierr = TSSetIFunction(ts,NULL,IFunction,user_ptr);CHKERRQ(ierr);
   ierr = TSSetIJacobian(ts,user_ptr->A,user_ptr->A,IJacobian,user_ptr);CHKERRQ(ierr);
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
+  ierr = TSSetMaxTime(ts,user_ptr->ftime);CHKERRQ(ierr);
   ierr = TSAddObjective(ts,user_ptr->ftime,EvalObjective_AO,EvalCostGradient_U_AO,NULL,
                         NULL,NULL,NULL,NULL,NULL,NULL,user_ptr);CHKERRQ(ierr);
   ierr = TSSetGradientDAE(ts,user_ptr->Jacp,EvalGradientDAE_P,user_ptr);CHKERRQ(ierr);
@@ -586,6 +589,7 @@ static PetscErrorCode TSSetUpFromDesign_Private(TS ts, Vec X0, Vec P, void *ctx)
   x_ptr[1] = -0.66666654321;
   ierr = VecRestoreArray(X0,&x_ptr);CHKERRQ(ierr);
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
+  ierr = TSSetMaxTime(ts,user_ptr->ftime);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -609,6 +613,7 @@ PetscErrorCode FormHessian_AO(Tao tao,Vec P,Mat H,Mat Hp,void *ctx)
   ierr = TSSetIFunction(ts,NULL,IFunction,user_ptr);CHKERRQ(ierr);
   ierr = TSSetIJacobian(ts,user_ptr->A,user_ptr->A,IJacobian,user_ptr);CHKERRQ(ierr);
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
+  ierr = TSSetMaxTime(ts,user_ptr->ftime);CHKERRQ(ierr);
   /* Hessian (wrt the state) of objective function (all other Hessian terms of the objective are zero) */
   ierr = MatDuplicate(user_ptr->A,MAT_DO_NOT_COPY_VALUES,&H_UU);CHKERRQ(ierr);
   ierr = MatAssemblyBegin(H_UU,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
@@ -647,16 +652,30 @@ PetscErrorCode FormHessian_AO(Tao tao,Vec P,Mat H,Mat Hp,void *ctx)
 /*TEST
     build:
       requires: !complex !single
+
     test:
       args:  -monitor 0 -ts_type theta -ts_theta_endpoint -ts_theta_theta 0.5 -viewer_binary_skip_info -tao_view  -ts_trajectory_dirname ex20opt_pdir -tao_blmvm_mat_lmvm_scale_type none
       output_file: output/ex20opt_p_1.out
+
     test:
       suffix: ao
       args: -adjointode -tao_monitor -monitor 0 -ts_trajectory_type memory -tao_view
 
     test:
+      suffix: ao_discrete
+      args: -adjointode -tsgradient_adjoint_discrete -tao_monitor -monitor 0 -ts_trajectory_type memory -tao_view -tao_test_gradient
+
+    test:
+      suffix: ao_discrete_theta
+      args: -adjointode -tsgradient_adjoint_discrete -tao_monitor -monitor 0 -ts_trajectory_type memory -tao_view -tao_test_gradient -ts_type theta -ts_theta_endpoint 0 -ts_theta_theta {{0.2 0.5 0.76 1.0}separate output}
+
+    test:
       suffix: ao_hessian
       args: -adjointode -tao_monitor -monitor 0 -tao_view -tao_type tron -ts_trajectory_type memory
+
+    test:
+      suffix: ao_hessian_discrete
+      args: -adjointode -tao_monitor -monitor 0 -tao_view -tao_type tron -ts_trajectory_type memory -tsgradient_adjoint_discrete  -tshessian_foadjoint_discrete -tshessian_tlm_discrete  -tshessian_soadjoint_discrete -tao_test_hessian
 
     test:
       suffix: ao_hessian_mf

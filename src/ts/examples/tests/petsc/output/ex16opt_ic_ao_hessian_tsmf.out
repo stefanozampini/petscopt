@@ -1,8 +1,7 @@
-mu 1., steps 0, ftime 0.5
-mu 1., steps 7, ftime 0.5
-  0 TAO,  Function value: 0.00926185,  Residual: 0.176584 
-  1 TAO,  Function value: 3.68021e-08,  Residual: 0.00014882 
-  2 TAO,  Function value: 2.61957e-14,  Residual: 6.03932e-08 
+mu 1., steps 9, ftime 0.5
+  0 TAO,  Function value: 0.00926269,  Residual: 0.176592 
+  1 TAO,  Function value: 3.69087e-08,  Residual: 0.000148869 
+  2 TAO,  Function value: 2.50314e-14,  Residual: 6.34674e-08 
 Tao Object: 1 MPI processes
   type: tron
   Total PG its: 6,  PG tolerance: 0.001 
@@ -30,8 +29,8 @@ Tao Object: 1 MPI processes
   total KSP iterations: 4
   Active Set subset type: subvec
   convergence tolerances: gatol=1e-10,   steptol=0.,   gttol=1e-05
-  Residual in Function/Gradient:=6.03932e-08
-  Objective value=2.61957e-14
+  Residual in Function/Gradient:=6.34674e-08
+  Objective value=2.50314e-14
   total number of iterations=2,                          (max: 50)
   total number of function/gradient evaluations=9,      (max: 4000)
   total number of Hessian evaluations=2

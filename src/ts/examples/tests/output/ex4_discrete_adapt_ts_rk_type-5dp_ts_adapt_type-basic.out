@@ -1,0 +1,116 @@
+
+Initial state
+Vec Object: 1 MPI processes
+  type: seq
+0.5
+0.5
+
+Final state
+Vec Object: 1 MPI processes
+  type: seq
+0.529041
+0.473986
+  0 TAO,  Function value: 0.249247,  Residual: 1.69473 
+  ---------- Testing Hessian -------------
+  Run with -tao_test_hessian_view and optionally -tao_test_hessian <threshold> to show difference
+    of hand-coded and finite difference Hessian entries greater than <threshold>.
+  Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
+    O(1.e-8), the hand-coded Hessian is probably correct.
+  ||H - Hfd||_F/||H||_F = 6.11047e-07, ||H - Hfd||_F = 6.23035e-06
+  0 TAO,  Function value: 0.0250293,  Residual: 0.0729005 
+  ---------- Testing Hessian -------------
+  ||H - Hfd||_F/||H||_F = 7.5697e-08, ||H - Hfd||_F = 9.25688e-08
+  1 TAO,  Function value: 0.00597856,  Residual: 0.168877 
+  ---------- Testing Hessian -------------
+  ||H - Hfd||_F/||H||_F = 3.19179e-08, ||H - Hfd||_F = 9.14691e-08
+  2 TAO,  Function value: 0.000179535,  Residual: 0.026293 
+  ---------- Testing Hessian -------------
+  ||H - Hfd||_F/||H||_F = 5.03055e-08, ||H - Hfd||_F = 1.00578e-07
+  3 TAO,  Function value: 3.24319e-07,  Residual: 0.00108316 
+  ---------- Testing Hessian -------------
+  ||H - Hfd||_F/||H||_F = 5.39167e-08, ||H - Hfd||_F = 9.88929e-08
+  4 TAO,  Function value: 1.51847e-12,  Residual: 2.26739e-06 
+  ---------- Testing Hessian -------------
+  ||H - Hfd||_F/||H||_F = 5.34671e-08, ||H - Hfd||_F = 9.76698e-08
+  5 TAO,  Function value: 3.67504e-23,  Residual: 0. 
+
+Tao solution
+Vec Object: 1 MPI processes
+  type: seq
+-0.346574
+0.346574
+-0.693147
+
+Initial state solution
+Vec Object: 1 MPI processes
+  type: seq
+0.5
+0.5
+
+Gradient via adjoint
+Vec Object: 1 MPI processes
+  type: seq
+-0.0270727
+0.0270727
+0.517814
+
+Gradient of objective function
+Vec Object: 1 MPI processes
+  type: seq
+0.000117127
+0.48503
+
+Gradient via adjoint (TLM)
+Vec Object: 1 MPI processes
+  type: seq
+-0.0270775
+0.0270775
+0.517833
+
+TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
+Mat Object: 1 MPI processes
+  type: seqdense
+-5.2749764041900005e-01 5.2749764041900005e-01 9.9774095426724041e-01 
+-5.5699020961700645e-02 5.5699020961700645e-02 1.0673885388279705e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+-5.2749764042189107e-01 -5.5699020961979130e-02 
+5.2749764042189107e-01 5.5699020961979130e-02 
+9.9774095427845755e-01 1.0673885388305049e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+-2.8910207561239076e-12 2.8910207561239076e-12 1.1217138329300269e-11 
+-2.7848556793941270e-13 2.7848556793941270e-13 2.5344171206143074e-12 
+
+Gradient via TLM (explicit fwd via multtrans)
+Vec Object: 1 MPI processes
+  type: seq
+-0.0270775
+0.0270775
+0.517833
+
+Gradient via TLM (explicit adj via mult)
+Vec Object: 1 MPI processes
+  type: seq
+-0.0270775
+0.0270775
+0.517833
+Mat Object: H 1 MPI processes
+  type: seqdense
+3.0994993376558816e-01 -3.0994993376558810e-01 -6.6836290323523695e-01 
+-3.0994993376558816e-01 3.0994993376558810e-01 6.6836290323523695e-01 
+-6.6836290323523728e-01 6.6836290323523695e-01 2.8116415337265361e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+0.0000000000000000e+00 -5.5511151231257827e-17 -3.3306690738754696e-16 
+5.5511151231257827e-17 0.0000000000000000e+00 0.0000000000000000e+00 
+3.3306690738754696e-16 0.0000000000000000e+00 0.0000000000000000e+00 
+-------------------------- Taylor test results ---------------------------
+		Gradient				Hessian
+--------------------------------------------------------------------------
+0.000912009	0.00000 	0	7.04768e-05	0.00000 	0
+0.000236613	1.94652 	2	9.00881e-06	2.96774 	3
+6.02665e-05	1.97310 	2	1.13887e-06	2.98374 	3
+1.52082e-05	1.98651 	2	1.43166e-07	2.99184 	3
+3.81989e-06	1.99324 	2	1.79466e-08	2.99591 	3
+9.57212e-07	1.99662 	2	2.24651e-09	2.99795 	3

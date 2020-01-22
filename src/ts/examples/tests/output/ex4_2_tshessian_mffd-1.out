@@ -192,12 +192,6 @@ Vec Object: 1 MPI processes
   type: seq
 0.5
 0.5
-  ---------- Testing Hessian -------------
-  Run with -tao_test_hessian_view and optionally -tao_test_hessian <threshold> to show difference
-    of hand-coded and finite difference Hessian entries greater than <threshold>.
-  Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
-    O(1.e-8), the hand-coded Hessian is probably correct.
-  ||H - Hfd||_F/||H||_F = 0., ||H - Hfd||_F = 0.
 
 Gradient via adjoint
 Vec Object: 1 MPI processes
@@ -219,7 +213,7 @@ Vec Object: 1 MPI processes
 -0.0339846
 0.20238
 
-TLM matrix
+TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
 Mat Object: 1 MPI processes
   type: seqdense
 -5.1187730415755739e-01 5.1187730415755739e-01 5.4418779449346166e-01 
@@ -229,18 +223,34 @@ Mat Object: 1 MPI processes
 -5.1187723983531397e-01 -3.4137068701960932e-01 
 5.1187723983531397e-01 3.4137068701960932e-01 
 5.4419394394146148e-01 1.1770733464081018e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+6.4322243420456005e-08 -6.4322243420456005e-08 6.1494479998147611e-06 
+5.1308967093377511e-06 -5.1308967093377511e-06 -6.5446469816876629e-06 
 
-Gradient via TLM (explicit)
+Gradient via TLM (explicit fwd via multtrans)
 Vec Object: 1 MPI processes
   type: seq
 0.0339831
 -0.0339831
 0.202383
+
+Gradient via TLM (explicit adj via mult)
+Vec Object: 1 MPI processes
+  type: seq
+0.0339846
+-0.0339846
+0.20238
 Mat Object: H 1 MPI processes
-  type: seqaij
-row 0: (0, 0.448025)  (1, -0.448025)  (2, -0.967272) 
-row 1: (0, -0.448025)  (1, 0.448025)  (2, 0.967272) 
-row 2: (0, -0.967283)  (1, 0.967283)  (2, 2.65953) 
+  type: seqdense
+4.4802529446494621e-01 -4.4802529836752708e-01 -9.6727241900265737e-01 
+-4.4802529481972625e-01 4.4802529801274699e-01 9.6727241900265737e-01 
+-9.6728250007868999e-01 9.6728251710813384e-01 2.6595340438183248e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+0.0000000000000000e+00 3.5478008308942321e-09 -1.0081076032619762e-05 
+-3.5478008308942321e-09 0.0000000000000000e+00 1.0098105476474828e-05 
+1.0081076032619762e-05 -1.0098105476474828e-05 0.0000000000000000e+00 
 -------------------------- Taylor test results ---------------------------
 		Gradient				Hessian
 --------------------------------------------------------------------------
