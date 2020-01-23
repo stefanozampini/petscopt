@@ -24,42 +24,54 @@
    TODO: register citations
 */
 typedef struct {
-  TSOpt     tsopt;
-  Vec       design;
-  PetscReal t0,tf;
-  PetscBool discrete;
-  TSObj     tsobj;
-  Vec       direction;
-  Vec       work1;
-  Vec       work2;
+  TS  adjts;
+  Vec work1;
+  Vec work2;
 } AdjEvalQuadCtx;
 
 static PetscErrorCode EvalQuadIntegrand_ADJ(Vec L, Vec Ldot, PetscReal t, Vec F, void* ctx)
 {
   Mat            adjF_m;
   AdjEvalQuadCtx *q = (AdjEvalQuadCtx*)ctx;
-  TSOpt          tsopt = q->tsopt;
-  PetscReal      fwdt = q->tf - t + q->t0;
+  AdjointCtx     *adj_ctx;
+  TSOpt          tsopt;
+  TSObj          tsobj;
+  PetscReal      fwdt;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  if (q->discrete) {
-    Vec U,Udot;
+  PetscCheckAdjointTS(q->adjts);
+  ierr  = TSGetApplicationContext(q->adjts,(void*)&adj_ctx);CHKERRQ(ierr);
+  fwdt  = adj_ctx->tf - t + adj_ctx->t0;
+  ierr  = TSGetTSOpt(adj_ctx->fwdts,&tsopt);CHKERRQ(ierr);
+  tsobj = adj_ctx->tsobj;
+  ierr  = VecSet(F,0.0);CHKERRQ(ierr);
+  if (adj_ctx->discrete) {
+    Vec       U,Udot;
+    PetscBool has;
 
     ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_U",(PetscObject*)&U);CHKERRQ(ierr);
     ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_Udot",(PetscObject*)&Udot);CHKERRQ(ierr);
     if (!U) SETERRQ(PetscObjectComm((PetscObject)L),PETSC_ERR_PLIB,"Missing sampling vector");
-    ierr = TSOptEvalGradientDAE(tsopt,fwdt,U,Udot,q->design,NULL,&adjF_m);CHKERRQ(ierr);
-    ierr = MatMult(adjF_m,L,F);CHKERRQ(ierr);
-    if (q->direction) { /* second order */
+    ierr = TSOptHasGradientDAE(tsopt,&has,NULL);CHKERRQ(ierr);
+    if (has) {
+      ierr = TSOptEvalGradientDAE(tsopt,fwdt,U,Udot,adj_ctx->design,NULL,&adjF_m);CHKERRQ(ierr);
+      ierr = MatMult(adjF_m,L,F);CHKERRQ(ierr);
+    }
+    if (!adj_ctx->direction) {
+      ierr = TSObjEval_M(tsobj,U,adj_ctx->design,fwdt,q->work1,&has,q->work2);CHKERRQ(ierr);
+      if (has) {
+        ierr = VecAXPY(F,1.0,q->work2);CHKERRQ(ierr);
+      }
+    }
+    if (adj_ctx->direction) { /* second order */
       Vec       TLMU,TLMUdot;
       Vec       FOAL;
-      TSObj     tsobj = q->tsobj;
       PetscBool flg;
 
-      ierr = TSObjEval_MU(tsobj,U,q->design,fwdt,U,q->work1,&flg,q->work2);CHKERRQ(ierr);
+      ierr = TSObjEval_MU(tsobj,U,adj_ctx->design,fwdt,U,q->work1,&flg,q->work2);CHKERRQ(ierr);
       if (flg) { ierr = VecAXPY(F,1.0,q->work2);CHKERRQ(ierr); }
-      ierr = TSObjEval_MM(tsobj,U,q->design,fwdt,q->direction,q->work1,&flg,q->work2);CHKERRQ(ierr);
+      ierr = TSObjEval_MM(tsobj,U,adj_ctx->design,fwdt,adj_ctx->direction,q->work1,&flg,q->work2);CHKERRQ(ierr);
       if (flg) { ierr = VecAXPY(F,1.0,q->work2);CHKERRQ(ierr); }
       ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_FOAL",(PetscObject*)&FOAL);CHKERRQ(ierr);
       if (FOAL) { /* Full hessian */
@@ -69,25 +81,39 @@ static PetscErrorCode EvalQuadIntegrand_ADJ(Vec L, Vec Ldot, PetscReal t, Vec F,
         ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_TLMU",(PetscObject*)&TLMU);CHKERRQ(ierr);
         ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_TLMUdot",(PetscObject*)&TLMUdot);CHKERRQ(ierr);
         if (Hhas[2][2]) { /* (L^T \otimes I_M) H_MM direction */
-          ierr = TSOptEvalHessianDAE(tsopt,2,2,fwdt,U,Udot,q->design,FOAL,q->direction,q->work1);CHKERRQ(ierr);
+          ierr = TSOptEvalHessianDAE(tsopt,2,2,fwdt,U,Udot,adj_ctx->design,FOAL,adj_ctx->direction,q->work1);CHKERRQ(ierr);
           ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
         }
         if (Hhas[2][0]) { /* (L^T \otimes I_M) H_MX \eta, \eta the TLM solution */
           if (!TLMU) SETERRQ(PetscObjectComm((PetscObject)L),PETSC_ERR_PLIB,"Missing TLM sampling vector");
-          ierr = TSOptEvalHessianDAE(tsopt,2,0,fwdt,U,Udot,q->design,FOAL,TLMU,q->work1);CHKERRQ(ierr);
+          ierr = TSOptEvalHessianDAE(tsopt,2,0,fwdt,U,Udot,adj_ctx->design,FOAL,TLMU,q->work1);CHKERRQ(ierr);
           ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
         }
         /* this is evaluated only via the IFunction interface */
         if (Hhas[2][1] && Udot) { /* (L^T \otimes I_M) H_MXdot \etadot */
           if (!TLMUdot) SETERRQ(PetscObjectComm((PetscObject)L),PETSC_ERR_PLIB,"Missing TLM sampling vector");
-          ierr = TSOptEvalHessianDAE(tsopt,2,1,t,U,Udot,q->design,FOAL,TLMUdot,q->work1);CHKERRQ(ierr);
+          ierr = TSOptEvalHessianDAE(tsopt,2,1,t,U,Udot,adj_ctx->design,FOAL,TLMUdot,q->work1);CHKERRQ(ierr);
           ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
         }
       }
     }
   } else {
-    ierr = TSOptEvalGradientDAE(tsopt,fwdt,NULL,NULL,q->design,NULL,&adjF_m);CHKERRQ(ierr);
-    ierr = MatMult(adjF_m,L,F);CHKERRQ(ierr);
+    PetscBool has;
+
+    ierr = TSOptHasGradientDAE(tsopt,&has,NULL);CHKERRQ(ierr);
+    if (has) {
+      ierr = TSOptEvalGradientDAE(tsopt,fwdt,NULL,NULL,adj_ctx->design,NULL,&adjF_m);CHKERRQ(ierr);
+      ierr = MatMult(adjF_m,L,F);CHKERRQ(ierr);
+    }
+    ierr = TSObjHasObjectiveIntegrand(tsobj,NULL,NULL,&has,NULL,NULL,NULL);CHKERRQ(ierr);
+    if (has && !adj_ctx->direction) {
+      Vec U;
+
+      ierr = TSTrajectoryGetUpdatedHistoryVecs(adj_ctx->fwdts->trajectory,adj_ctx->fwdts,fwdt,&U,NULL);CHKERRQ(ierr);
+      ierr = TSObjEval_M(tsobj,U,adj_ctx->design,fwdt,q->work1,&has,q->work2);CHKERRQ(ierr);
+      ierr = VecAXPY(F,1.0,q->work2);CHKERRQ(ierr);
+      ierr = TSTrajectoryRestoreUpdatedHistoryVecs(adj_ctx->fwdts->trajectory,&U,NULL);CHKERRQ(ierr);
+    }
   }
   PetscFunctionReturn(0);
 }
@@ -296,12 +322,14 @@ PetscErrorCode AdjointTSSetUpStep(TS adjts)
   ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
   if (!adj_ctx->cstep) adj_ctx->cstep = adjts->ops->step;
   if (adj_ctx->discrete) {
-    PetscBool flg;
+    PetscBool rk,theta,cn;
 
-    ierr = PetscObjectTypeCompare((PetscObject)adjts,TSRK,&flg);CHKERRQ(ierr);
-    if (flg) {
-      adjts->ops->step = TSStep_Adjoint_RK;
-    } else {
+    ierr = PetscObjectTypeCompare((PetscObject)adjts,TSRK,&rk);CHKERRQ(ierr);
+    ierr = PetscObjectTypeCompare((PetscObject)adjts,TSTHETA,&theta);CHKERRQ(ierr);
+    ierr = PetscObjectTypeCompare((PetscObject)adjts,TSCN,&cn);CHKERRQ(ierr);
+    if (rk)               adjts->ops->step = TSStep_Adjoint_RK;
+    else if (theta || cn) adjts->ops->step = TSStep_Adjoint_Theta;
+    else {
       TSType tstype;
 
       ierr = TSGetType(adjts,&tstype);CHKERRQ(ierr);
@@ -979,6 +1007,7 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
     Vec       f_x,W;
     PetscBool has_f;
 
+    if (adj_ctx->discrete) SETERRQ(PetscObjectComm((PetscObject)adjts),PETSC_ERR_USER,"Not coded for index-1 DAEs");
     ierr = VecDuplicate(adj_ctx->workinit,&f_x);CHKERRQ(ierr);
     if (!svec) {
       ierr = TSTrajectoryGetUpdatedHistoryVecs(adj_ctx->fwdts->trajectory,adj_ctx->fwdts,fwdt,&svec,NULL);CHKERRQ(ierr);
@@ -1187,51 +1216,55 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
     ierr = MatDestroy(&pD);CHKERRQ(ierr);
   } else {
     if (has_g) {
-      if (ijac) { /* lambda_T(T) = (J_Udot)^T D_x, D_x the gradients of the functionals that sample the solution at the final time */
-        KSP       ksp;
-        Mat       J_Udot, pJ_Udot;
-        DM        dm;
-        Vec       W;
+      if (adj_ctx->discrete) {
+        ierr = VecScale(adj_ctx->workinit,-1.0);CHKERRQ(ierr);
+      } else {
+        if (ijac) { /* lambda_T(T) = (J_Udot)^T D_x, D_x the gradients of the functionals that sample the solution at the final time */
+          KSP       ksp;
+          Mat       J_Udot, pJ_Udot;
+          DM        dm;
+          Vec       W;
 
-        ierr = TSUpdateSplitJacobiansFromHistory_Private(adj_ctx->fwdts,fwdt);CHKERRQ(ierr);
-        ierr = PetscObjectQuery((PetscObject)adjts,"_ts_adjointinit_ksp",(PetscObject*)&ksp);CHKERRQ(ierr);
-        if (!ksp) {
-          SNES       snes;
-          PC         pc;
-          KSPType    ksptype;
-          PCType     pctype;
-          const char *prefix;
+          ierr = TSUpdateSplitJacobiansFromHistory_Private(adj_ctx->fwdts,fwdt);CHKERRQ(ierr);
+          ierr = PetscObjectQuery((PetscObject)adjts,"_ts_adjointinit_ksp",(PetscObject*)&ksp);CHKERRQ(ierr);
+          if (!ksp) {
+            SNES       snes;
+            PC         pc;
+            KSPType    ksptype;
+            PCType     pctype;
+            const char *prefix;
 
-          ierr = TSGetSNES(adjts,&snes);CHKERRQ(ierr);
-          ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-          ierr = KSPGetType(ksp,&ksptype);CHKERRQ(ierr);
-          ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
-          ierr = PCGetType(pc,&pctype);CHKERRQ(ierr);
-          ierr = KSPCreate(PetscObjectComm((PetscObject)adjts),&ksp);CHKERRQ(ierr);
-          ierr = KSPSetTolerances(ksp,PETSC_SMALL,PETSC_SMALL,PETSC_DEFAULT,PETSC_DEFAULT);CHKERRQ(ierr);
-          if (ksptype) { ierr = KSPSetType(ksp,ksptype);CHKERRQ(ierr); }
-          ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
-          if (pctype) { ierr = PCSetType(pc,pctype);CHKERRQ(ierr); }
-          ierr = TSGetOptionsPrefix(adjts,&prefix);CHKERRQ(ierr);
-          ierr = KSPSetOptionsPrefix(ksp,prefix);CHKERRQ(ierr);
-          ierr = KSPAppendOptionsPrefix(ksp,"initlambda_");CHKERRQ(ierr);
-          ierr = KSPSetFromOptions(ksp);CHKERRQ(ierr);
-          ierr = PetscObjectCompose((PetscObject)adjts,"_ts_adjointinit_ksp",(PetscObject)ksp);CHKERRQ(ierr);
-          ierr = PetscObjectDereference((PetscObject)ksp);CHKERRQ(ierr);
+            ierr = TSGetSNES(adjts,&snes);CHKERRQ(ierr);
+            ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+            ierr = KSPGetType(ksp,&ksptype);CHKERRQ(ierr);
+            ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
+            ierr = PCGetType(pc,&pctype);CHKERRQ(ierr);
+            ierr = KSPCreate(PetscObjectComm((PetscObject)adjts),&ksp);CHKERRQ(ierr);
+            ierr = KSPSetTolerances(ksp,PETSC_SMALL,PETSC_SMALL,PETSC_DEFAULT,PETSC_DEFAULT);CHKERRQ(ierr);
+            if (ksptype) { ierr = KSPSetType(ksp,ksptype);CHKERRQ(ierr); }
+            ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
+            if (pctype) { ierr = PCSetType(pc,pctype);CHKERRQ(ierr); }
+            ierr = TSGetOptionsPrefix(adjts,&prefix);CHKERRQ(ierr);
+            ierr = KSPSetOptionsPrefix(ksp,prefix);CHKERRQ(ierr);
+            ierr = KSPAppendOptionsPrefix(ksp,"initlambda_");CHKERRQ(ierr);
+            ierr = KSPSetFromOptions(ksp);CHKERRQ(ierr);
+            ierr = PetscObjectCompose((PetscObject)adjts,"_ts_adjointinit_ksp",(PetscObject)ksp);CHKERRQ(ierr);
+            ierr = PetscObjectDereference((PetscObject)ksp);CHKERRQ(ierr);
+          }
+          ierr = TSGetSplitJacobians(adj_ctx->fwdts,NULL,NULL,&J_Udot,&pJ_Udot);CHKERRQ(ierr);
+          ierr = KSPSetOperators(ksp,J_Udot,pJ_Udot);CHKERRQ(ierr);
+          ierr = TSGetDM(adjts,&dm);CHKERRQ(ierr);
+          ierr = DMGetGlobalVector(dm,&W);CHKERRQ(ierr);
+          ierr = VecCopy(adj_ctx->workinit,W);CHKERRQ(ierr);
+          ierr = KSPSolveTranspose(ksp,W,adj_ctx->workinit);CHKERRQ(ierr);
+          ierr = DMRestoreGlobalVector(dm,&W);CHKERRQ(ierr);
+          /* destroy inner vectors to avoid ABA issues when destroying the DM */
+          ierr = VecDestroy(&ksp->vec_rhs);CHKERRQ(ierr);
+          ierr = VecDestroy(&ksp->vec_sol);CHKERRQ(ierr);
         }
-        ierr = TSGetSplitJacobians(adj_ctx->fwdts,NULL,NULL,&J_Udot,&pJ_Udot);CHKERRQ(ierr);
-        ierr = KSPSetOperators(ksp,J_Udot,pJ_Udot);CHKERRQ(ierr);
-        ierr = TSGetDM(adjts,&dm);CHKERRQ(ierr);
-        ierr = DMGetGlobalVector(dm,&W);CHKERRQ(ierr);
-        ierr = VecCopy(adj_ctx->workinit,W);CHKERRQ(ierr);
-        ierr = KSPSolveTranspose(ksp,W,adj_ctx->workinit);CHKERRQ(ierr);
-        ierr = DMRestoreGlobalVector(dm,&W);CHKERRQ(ierr);
-        /* destroy inner vectors to avoid ABA issues when destroying the DM */
-        ierr = VecDestroy(&ksp->vec_rhs);CHKERRQ(ierr);
-        ierr = VecDestroy(&ksp->vec_sol);CHKERRQ(ierr);
+        /* the lambdas we use are equivalent to -lambda_T in [1] */
+        ierr = VecScale(adj_ctx->workinit,-1.0);CHKERRQ(ierr);
       }
-      /* the lambdas we use are equivalent to -lambda_T in [1] */
-      ierr = VecScale(adj_ctx->workinit,-1.0);CHKERRQ(ierr);
     }
   }
 initialize:
@@ -1653,12 +1686,14 @@ static PetscErrorCode JacCoupling(TS qts, PetscReal t, Vec L, Vec Ldot, PetscRea
 {
   AdjEvalQuadCtx *adjq;
   TSQuadCtx      *qctx;
+  PetscBool      flg;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
   ierr = TSGetApplicationContext(qts,(void*)&qctx);CHKERRQ(ierr);
   adjq = qctx->evalquadctx;
-  if (adjq->discrete) SETERRQ(PetscObjectComm((PetscObject)qts),PETSC_ERR_PLIB,"This should not happen");
+  ierr = AdjointTSIsDiscrete(adjq->adjts,&flg);CHKERRQ(ierr);
+  if (flg) SETERRQ(PetscObjectComm((PetscObject)qts),PETSC_ERR_PLIB,"This should not happen");
   ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
@@ -1762,7 +1797,6 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts)
 {
   AdjointCtx     *adj_ctx;
   TSOpt          tsopt;
-  TSObj          tsobj = NULL;
   PetscBool      flg;
   PetscErrorCode ierr;
 
@@ -1771,23 +1805,26 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts)
   ierr = TSSetUp(adjts);CHKERRQ(ierr);
   ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
   ierr = TSGetTSOpt(adj_ctx->fwdts,&tsopt);CHKERRQ(ierr);
-  ierr = TSGetTSObj(adj_ctx->fwdts,&tsobj);CHKERRQ(ierr);
   ierr = TSOptHasGradientDAE(tsopt,&flg,NULL);CHKERRQ(ierr);
-  if (!flg && adj_ctx->direction && adj_ctx->discrete) {
-    TSIFunction ifunc;
-    PetscBool   Hhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
-                              {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
-                              {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
-    PetscBool   has1,has2;
-
-    ierr = TSObjHasObjectiveIntegrand(tsobj,NULL,NULL,NULL,NULL,&has1,&has2);CHKERRQ(ierr);
-    flg  = (PetscBool)(has1 || has2);
-    if (adj_ctx->foats) {
-      ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
+  if (!flg) {
+    if (!adj_ctx->direction) {
+      ierr = TSObjHasObjectiveIntegrand(adj_ctx->tsobj,NULL,NULL,&flg,NULL,NULL,NULL);CHKERRQ(ierr);
     }
-    ierr = TSGetIFunction(adj_ctx->fwdts,NULL,&ifunc,NULL);CHKERRQ(ierr);
-    if (!ifunc) Hhas[2][1] = PETSC_FALSE;
-    flg = (PetscBool)(flg || Hhas[2][0] || Hhas[2][1] || Hhas[2][2]);
+    if (adj_ctx->direction && adj_ctx->discrete) { /* for continuous adjoints, these terms are evaluated during the continuous TLM */
+      TSIFunction ifunc;
+      PetscBool   has1, has2, Hhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                                            {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                                            {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
+
+      ierr = TSObjHasObjectiveIntegrand(adj_ctx->tsobj,NULL,NULL,NULL,NULL,&has1,&has2);CHKERRQ(ierr);
+      if (adj_ctx->foats) {
+        ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
+      }
+      flg  = (PetscBool)(flg || has1 || has2);
+      ierr = TSGetIFunction(adj_ctx->fwdts,NULL,&ifunc,NULL);CHKERRQ(ierr);
+      if (!ifunc) Hhas[2][1] = PETSC_FALSE;
+      flg = (PetscBool)(flg || Hhas[2][0] || Hhas[2][1] || Hhas[2][2]);
+    }
   }
   if (flg) {
     TS             ats,qts;
@@ -1799,20 +1836,10 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts)
     PetscBool      diffrhs = (adjts->Arhs != adjts->Brhs) ? PETSC_TRUE : PETSC_FALSE;
 
     if (!adj_ctx->quadvec) SETERRQ(PetscObjectComm((PetscObject)adjts),PETSC_ERR_ORDER,"Missing quadrature vector. You should call AdjointTSSetQuadratureVec() first");
-    adjq.tsopt     = tsopt;
-    adjq.t0        = adj_ctx->t0;
-    adjq.tf        = adj_ctx->tf;
-    adjq.design    = adj_ctx->design;
-    adjq.discrete  = adj_ctx->discrete;
-    adjq.direction = adj_ctx->direction;
-    adjq.tsobj     = tsobj;
-    adjq.work1     = NULL;
-    adjq.work2     = NULL;
 
-    if (adjq.direction) {
-      ierr = VecDuplicate(adj_ctx->quadvec,&adjq.work1);CHKERRQ(ierr);
-      ierr = VecDuplicate(adj_ctx->quadvec,&adjq.work2);CHKERRQ(ierr);
-    }
+    adjq.adjts = adjts;
+    ierr = VecDuplicate(adj_ctx->quadvec,&adjq.work1);CHKERRQ(ierr);
+    ierr = VecDuplicate(adj_ctx->quadvec,&adjq.work2);CHKERRQ(ierr);
 
     qctx.evalquad       = EvalQuadIntegrand_ADJ;
     qctx.evalquad_fixed = NULL;

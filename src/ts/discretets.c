@@ -15,28 +15,26 @@ PetscErrorCode TSStep_Adjoint_RK(TS ts)
   Vec             direction,*FOAY = NULL,*TLMY = NULL,Q;
   const PetscReal *A,*b,*c;
   PetscScalar     w[TS_RK_DISCRETE_MAXSTAGES+1];
-  PetscReal       h = ts->time_step, at = ts->ptime, t, dummy;
+  PetscReal       h = ts->time_step, at = ts->ptime, dummy;
   PetscInt        step,astep,tstep;
   PetscInt        s,sf,i,j,k,skps,acts;
   PetscBool       flg,sonly,quad;
   PetscErrorCode  ierr;
 
   PetscFunctionBegin;
+  ierr = AdjointTSGetModelTS(ts,&fwdts);CHKERRQ(ierr);
 #if PETSC_VERSION_GE(3,13,0)
-  ierr = TSRKGetTableau(ts,&s,&A,&b,&c,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
+  ierr = TSRKGetTableau(fwdts,&s,&A,&b,&c,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
 #else
   SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_SUP,"RK discrete adjoints need PETSc version greater or equal 3.13");
 #endif
   if (s > TS_RK_DISCRETE_MAXSTAGES) SETERRQ1(PetscObjectComm((PetscObject)ts),PETSC_ERR_SUP,"Not coded for %D stages",s);
-  ierr = AdjointTSGetModelTS(ts,&fwdts);CHKERRQ(ierr);
   ierr = TSTrajectoryGetSolutionOnly(fwdts->trajectory,&sonly);CHKERRQ(ierr);
   if (sonly) SETERRQ(PetscObjectComm((PetscObject)fwdts->trajectory),PETSC_ERR_SUP,"TSTrajectory did not save the stages! Rerun with TSTrajectorySetSolutionOnly(tj,PETSC_TRUE)");
   ierr = TSGetStepNumber(ts,&astep);CHKERRQ(ierr);
   ierr = TSTrajectoryGetNumSteps(fwdts->trajectory,&tstep);CHKERRQ(ierr);
   step = tstep - astep - 1;
-  /* XXX t may be garbage... */
   ierr = TSTrajectoryGet(fwdts->trajectory,fwdts,step,&dummy);CHKERRQ(ierr);
-  ierr = TSHistoryGetTime(fwdts->trajectory->tsh,PETSC_FALSE,step,&t);CHKERRQ(ierr);
   ierr = TSGetStages(fwdts,&sf,&Y);CHKERRQ(ierr);
   if (s != sf) SETERRQ2(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Mismatch number of stages %D != %D",s,sf);
   for (i=0; i<s; i++) {
@@ -157,8 +155,7 @@ PetscErrorCode TSStep_Adjoint_RK(TS ts)
   }
   ts->ptime += h;
 
-  ierr = TSGetStepNumber(ts,&step);CHKERRQ(ierr);
-  ierr = TSHistoryGetTimeStep(fwdts->trajectory->tsh,PETSC_TRUE,step+1,&ts->time_step);CHKERRQ(ierr);
+  ierr = TSHistoryGetTimeStep(fwdts->trajectory->tsh,PETSC_TRUE,astep+1,&ts->time_step);CHKERRQ(ierr);
   if (ts->time_step == 0.0) ts->reason = TS_CONVERGED_ITS;
   PetscFunctionReturn(0);
 }
@@ -177,13 +174,13 @@ PetscErrorCode TSStep_TLM_RK(TS ts)
   PetscErrorCode  ierr;
 
   PetscFunctionBegin;
+  ierr = TLMTSGetModelTS(ts,&fwdts);CHKERRQ(ierr);
 #if PETSC_VERSION_GE(3,13,0)
-  ierr = TSRKGetTableau(ts,&s,&A,&b,&c,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
+  ierr = TSRKGetTableau(fwdts,&s,&A,&b,&c,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
 #else
   SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_SUP,"RK discrete tangent linear models need PETSc version greater or equal 3.13");
 #endif
   if (s > TS_RK_DISCRETE_MAXSTAGES) SETERRQ1(PetscObjectComm((PetscObject)ts),PETSC_ERR_SUP,"Not coded for %D stages",s);
-  ierr = TLMTSGetModelTS(ts,&fwdts);CHKERRQ(ierr);
   ierr = TSTrajectoryGetSolutionOnly(fwdts->trajectory,&sonly);CHKERRQ(ierr);
   if (sonly) SETERRQ(PetscObjectComm((PetscObject)fwdts->trajectory),PETSC_ERR_SUP,"TSTrajectory did not save the stages! Rerun with TSTrajectorySetSolutionOnly(tj,PETSC_TRUE)");
   ierr = TSGetStepNumber(ts,&i);CHKERRQ(ierr);
@@ -227,6 +224,221 @@ PetscErrorCode TSStep_TLM_RK(TS ts)
   for (i=0; i<s; i++) {
     ierr = VecLockReadPop(fwdY[i]);CHKERRQ(ierr);
   }
+  ts->ptime += h;
+  ierr = TSGetStepNumber(ts,&i);CHKERRQ(ierr);
+  ierr = TSHistoryGetTimeStep(fwdts->trajectory->tsh,PETSC_FALSE,i+1,&ts->time_step);CHKERRQ(ierr);
+  if (ts->time_step == 0.0) ts->reason = TS_CONVERGED_ITS;
+  PetscFunctionReturn(0);
+}
+#if 0
+static PetscErrorCode TSGetStages_Theta(TS ts,PetscInt *ns,Vec **Y)
+{
+  TS_Theta     *th = (TS_Theta*)ts->data;
+
+  PetscFunctionBegin;
+  if (ns) *ns = 1;
+  if (Y)  *Y  = th->endpoint ? &(th->X0) : &(th->X);
+  PetscFunctionReturn(0);
+}
+#endif
+
+/* The forward step of the endpoint variant assumes linear time-independent mass matrix */
+/* Otherwise, we should sample J_xdot at stage_time, and J_x at the beginning of the step and compute s * J_xdot + (theta-1)/theta J_x */
+PetscErrorCode TSStep_Adjoint_Theta(TS ts)
+{
+  TS             fwdts;
+  SNES           snes;
+  KSP            ksp;
+  DM             dm;
+  Mat            J, Jp;
+  Vec            *LY,L,*fwdY,fwdYdot,fwdYSol,F,direction,Q;
+  PetscReal      at = ts->ptime, dummy;
+  PetscReal      h = ts->time_step;
+  PetscReal      theta, astage_time, s;
+  PetscInt       i, j, astep, tstep, step;
+  PetscBool      endpoint,flg,quad;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = AdjointTSGetModelTS(ts,&fwdts);CHKERRQ(ierr);
+  ierr = TSThetaGetTheta(fwdts,&theta);CHKERRQ(ierr);
+  ierr = TSThetaGetEndpoint(fwdts,&endpoint);CHKERRQ(ierr);
+  ierr = TSTrajectoryGetSolutionOnly(fwdts->trajectory,&flg);CHKERRQ(ierr);
+  if (flg) SETERRQ(PetscObjectComm((PetscObject)fwdts->trajectory),PETSC_ERR_SUP,"TSTrajectory did not save the stages! Rerun with TSTrajectorySetSolutionOnly(tj,PETSC_TRUE)");
+  ierr = TSGetStepNumber(ts,&astep);CHKERRQ(ierr);
+  ierr = TSTrajectoryGetNumSteps(fwdts->trajectory,&tstep);CHKERRQ(ierr);
+  step = tstep - astep - 1;
+  ierr = TSTrajectoryGet(fwdts->trajectory,fwdts,step,&dummy);CHKERRQ(ierr);
+
+  ierr = TSGetSolution(fwdts,&fwdYSol);CHKERRQ(ierr);
+  ierr = TSGetStages(fwdts,&i,&fwdY);CHKERRQ(ierr);
+  ierr = TSGetStages(ts,&j,&LY);CHKERRQ(ierr);
+  if (i != j || i != 1) SETERRQ3(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Mismatch number of stages %D != %D || %D != 1",i,j,i);
+  ierr = VecLockReadPush(fwdYSol);CHKERRQ(ierr);
+  ierr = VecLockReadPush(fwdY[0]);CHKERRQ(ierr);
+  ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
+  ierr = DMGetGlobalVector(dm,&fwdYdot);CHKERRQ(ierr);
+  ierr = TSGetSolution(ts,&L);CHKERRQ(ierr);
+  ierr = TSGetDM(ts,&dm);CHKERRQ(ierr);
+  ierr = DMGetGlobalVector(dm,&F);CHKERRQ(ierr);
+  ierr = DMGetGlobalVector(dm,&Q);CHKERRQ(ierr);
+  ierr = TSGetIJacobian(ts,&J,&Jp,NULL,NULL);CHKERRQ(ierr);
+
+  astage_time = at + (endpoint ? 0.0 : 1.0 - theta)*h;
+  quad = PETSC_FALSE;
+  ierr = AdjointTSGetDirectionVec(ts,&direction);CHKERRQ(ierr);
+  if (direction) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_SUP,"SOA not yet done");
+  if (!endpoint) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_SUP,"!Endpoint not yet done");
+  /* XXX Adjoint stage */
+  ierr = VecCopy(L,LY[0]);CHKERRQ(ierr);
+  ierr = VecLockReadPush(LY[0]);CHKERRQ(ierr);
+  s    = 1.0/(theta*h);
+  ierr = VecAXPBYPCZ(fwdYdot,s,-s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
+  ierr = AdjointTSComputeForcing(ts,astage_time,fwdYSol,fwdYdot,NULL,NULL,NULL,NULL,&flg,F);CHKERRQ(ierr);
+  if (flg) {
+    ierr = VecAXPY(L,-1.0/s,F);CHKERRQ(ierr);
+  }
+  ierr = TSComputeIJacobian(ts,astage_time,fwdYSol,fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+#define DUMP 0
+#if DUMP
+      {
+         Mat Je;
+         MatComputeOperator(J,MATAIJ,&Je);
+         MatView(Je,NULL);
+         MatDestroy(&Je);
+      }
+#endif
+  ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
+  ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+  ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
+  ierr = KSPSolveTranspose(ksp,L,L);CHKERRQ(ierr);
+  ierr = VecSet(Q,0.0);CHKERRQ(ierr);
+  ierr = AdjointTSComputeQuadrature(ts,astage_time,fwdYSol,fwdYdot,L,NULL,NULL,NULL,NULL,NULL,&quad,Q);CHKERRQ(ierr);
+  if (quad) { ierr = VecScale(Q,-theta/(theta-1.0));CHKERRQ(ierr); }
+
+  ierr = VecZeroEntries(fwdYdot);CHKERRQ(ierr);
+  s    = 1.0/((theta-1.0)*h);
+  ierr = TSComputeIJacobian(ts,at+h,fwdY[0],fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+#if DUMP
+      {
+         Mat Je;
+         MatComputeOperator(J,MATAIJ,&Je);
+         MatView(Je,NULL);
+         MatDestroy(&Je);
+      }
+#endif
+  ierr = AdjointTSComputeForcing(ts,at+h,fwdY[0],fwdYdot,NULL,NULL,NULL,NULL,&flg,F);CHKERRQ(ierr);
+  if (flg) {
+    ierr = MatMultTransposeAdd(J,L,F,F);CHKERRQ(ierr);
+  } else {
+    ierr = MatMultTranspose(J,L,F);CHKERRQ(ierr);
+  }
+
+  if (quad) {
+    Vec Q2;
+
+    ierr = DMGetGlobalVector(dm,&Q2);CHKERRQ(ierr);
+    ierr = VecSet(Q2,0.0);CHKERRQ(ierr);
+    ierr = AdjointTSComputeQuadrature(ts,at+h,fwdY[0],fwdYdot,L,NULL,NULL,NULL,NULL,NULL,&flg,Q2);CHKERRQ(ierr);
+    ierr = VecAXPY(Q,1.0,Q2);CHKERRQ(ierr);
+    ierr = DMRestoreGlobalVector(dm,&Q2);CHKERRQ(ierr);
+  }
+
+  if (quad) {
+    ierr = VecWAXPY(L,-1.0,Q,F);CHKERRQ(ierr);
+  } else {
+    ierr = VecCopy(F,L);CHKERRQ(ierr);
+  }
+  ierr = VecScale(L,(theta-1.0)/theta);CHKERRQ(ierr);
+  ierr = DMRestoreGlobalVector(dm,&Q);CHKERRQ(ierr);
+  ierr = DMRestoreGlobalVector(dm,&F);CHKERRQ(ierr);
+  ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
+  ierr = DMRestoreGlobalVector(dm,&fwdYdot);CHKERRQ(ierr);
+  ierr = VecLockReadPop(LY[0]);CHKERRQ(ierr);
+  ierr = VecLockReadPop(fwdY[0]);CHKERRQ(ierr);
+  ierr = VecLockReadPop(fwdYSol);CHKERRQ(ierr);
+
+  ts->ptime += h;
+  ierr = TSHistoryGetTimeStep(fwdts->trajectory->tsh,PETSC_TRUE,astep+1,&ts->time_step);CHKERRQ(ierr);
+  if (ts->time_step == 0.0) ts->reason = TS_CONVERGED_ITS;
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSStep_TLM_Theta(TS ts)
+{
+  TS             fwdts;
+  SNES           snes;
+  KSP            ksp;
+  DM             dm;
+  Mat            J, Jp;
+  Vec            *Y,U,*fwdY,fwdYdot,fwdYSol,F,F2;
+  PetscReal      t = ts->ptime,dummy;
+  PetscReal      h = ts->time_step;
+  PetscReal      theta, stage_time, s;
+  PetscInt       i, j;
+  PetscBool      endpoint,flg;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TLMTSGetModelTS(ts,&fwdts);CHKERRQ(ierr);
+  ierr = TSThetaGetTheta(fwdts,&theta);CHKERRQ(ierr);
+  ierr = TSThetaGetEndpoint(fwdts,&endpoint);CHKERRQ(ierr);
+  ierr = TSTrajectoryGetSolutionOnly(fwdts->trajectory,&flg);CHKERRQ(ierr);
+  if (flg) SETERRQ(PetscObjectComm((PetscObject)fwdts->trajectory),PETSC_ERR_SUP,"TSTrajectory did not save the stages! Rerun with TSTrajectorySetSolutionOnly(tj,PETSC_TRUE)");
+  ierr = TSGetStepNumber(ts,&i);CHKERRQ(ierr);
+  ierr = TSTrajectoryGet(fwdts->trajectory,fwdts,i+1,&dummy);CHKERRQ(ierr);
+  ierr = TSGetSolution(fwdts,&fwdYSol);CHKERRQ(ierr);
+  ierr = TSGetStages(fwdts,&i,&fwdY);CHKERRQ(ierr);
+  ierr = TSGetStages(ts,&j,&Y);CHKERRQ(ierr);
+  if (i != j || i != 1) SETERRQ3(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Mismatch number of stages %D != %D || %D != 1",i,j,i);
+  ierr = VecLockReadPush(fwdYSol);CHKERRQ(ierr);
+  ierr = VecLockReadPush(fwdY[0]);CHKERRQ(ierr);
+  ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
+  ierr = DMGetGlobalVector(dm,&fwdYdot);CHKERRQ(ierr);
+  ierr = TSGetSolution(ts,&U);CHKERRQ(ierr);
+  ierr = TSGetDM(ts,&dm);CHKERRQ(ierr);
+  ierr = DMGetGlobalVector(dm,&F);CHKERRQ(ierr);
+  ierr = DMGetGlobalVector(dm,&F2);CHKERRQ(ierr);
+  ierr = TSGetIJacobian(ts,&J,&Jp,NULL,NULL);CHKERRQ(ierr);
+
+  stage_time = t + (endpoint ? 1.0 : theta)*h;
+
+  if (!endpoint) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_SUP,"!Endpoint not yet done");
+  /* TLM stage */
+  ierr = VecCopy(U,Y[0]);CHKERRQ(ierr);
+  ierr = VecLockReadPush(Y[0]);CHKERRQ(ierr);
+  /* forward step assumes linear time-independent mass matrix */
+  /* otherwise, we should sample J_xdot at stage_time, and J_x at the beginning of the step and compute s * J_xdot + (theta-1)/theta J_x */
+  ierr = VecZeroEntries(fwdYdot);CHKERRQ(ierr);
+  s    = 1.0/((theta-1.0)*h);
+  ierr = TSComputeIJacobian(ts,t,fwdY[0],fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+  ierr = TLMTSComputeForcing(ts,t,fwdY[0],fwdYdot,&flg,F);CHKERRQ(ierr);
+  if (flg) {
+    ierr = MatMultAdd(J,U,F,F);CHKERRQ(ierr);
+  } else {
+    ierr = MatMult(J,U,F);CHKERRQ(ierr);
+  }
+  ierr = VecScale(F,(theta-1.0)/theta);CHKERRQ(ierr);
+  ierr = VecAXPBYPCZ(fwdYdot,s,-s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
+  s    = 1.0/(theta*h);
+  ierr = TSComputeIJacobian(ts,stage_time,fwdYSol,fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+  ierr = TLMTSComputeForcing(ts,stage_time,fwdYSol,fwdYdot,&flg,F2);CHKERRQ(ierr);
+  if (flg) {
+    ierr = VecAXPY(F,-1.0,F2);CHKERRQ(ierr);
+  }
+  ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
+  ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+  ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
+  ierr = KSPSolve(ksp,F,U);CHKERRQ(ierr);
+
+  ierr = DMRestoreGlobalVector(dm,&F2);CHKERRQ(ierr);
+  ierr = DMRestoreGlobalVector(dm,&F);CHKERRQ(ierr);
+  ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
+  ierr = DMRestoreGlobalVector(dm,&fwdYdot);CHKERRQ(ierr);
+  ierr = VecLockReadPop(Y[0]);CHKERRQ(ierr);
+  ierr = VecLockReadPop(fwdY[0]);CHKERRQ(ierr);
+  ierr = VecLockReadPop(fwdYSol);CHKERRQ(ierr);
+
   ts->ptime += h;
   ierr = TSGetStepNumber(ts,&i);CHKERRQ(ierr);
   ierr = TSHistoryGetTimeStep(fwdts->trajectory->tsh,PETSC_FALSE,i+1,&ts->time_step);CHKERRQ(ierr);

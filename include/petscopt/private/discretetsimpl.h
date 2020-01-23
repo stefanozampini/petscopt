@@ -5,5 +5,7 @@
 
 PETSC_INTERN PetscErrorCode TSStep_Adjoint_RK(TS);
 PETSC_INTERN PetscErrorCode TSStep_TLM_RK(TS);
+PETSC_INTERN PetscErrorCode TSStep_Adjoint_Theta(TS);
+PETSC_INTERN PetscErrorCode TSStep_TLM_Theta(TS);
 
 #endif

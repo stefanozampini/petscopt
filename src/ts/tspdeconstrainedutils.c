@@ -311,6 +311,9 @@ static PetscErrorCode EvalQuadIntegrand_FWD(Vec U, Vec Udot, PetscReal t, Vec F,
 
   PetscFunctionBegin;
   ierr = TSObjEval_M(evalctx->obj,U,evalctx->design,t,evalctx->work,&has_m,F);CHKERRQ(ierr);
+  if (!has_m) {
+    ierr = VecSet(F,0);CHKERRQ(ierr);
+  }
   PetscFunctionReturn(0);
 }
 
@@ -655,7 +658,6 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
   QuadEval       squad,squad_fixed,vquad,vquad_fixed;
   TSIJacobian    jaccoup[] = {NULL,NULL};
   Mat            Acoup[] = {NULL,NULL}, Bcoup[] = {NULL,NULL};
-  PetscBool      dtlm = PETSC_FALSE;
   void           *squad_ctx,*vquad_ctx;
 
   PetscFunctionBegin;
@@ -724,12 +726,14 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     if (!has) squad_fixed = NULL;
   }
 
-  if (vquad) {
-    PetscBool has;
+  if (vquad || vquad_fixed) {
+    PetscBool has = PETSC_FALSE;
 
     if (direction) { /* Hessian computations */
-      ierr = TLMTSIsDiscrete(ts,&dtlm);CHKERRQ(ierr);
-      if (dtlm) has = PETSC_FALSE; /* Quadrature performed during second-order adjoint */
+      PetscBool flg;
+
+      ierr = TLMTSIsDiscrete(ts,&flg);CHKERRQ(ierr);
+      if (flg) has = PETSC_FALSE; /* Quadrature performed during second-order adjoint */
       else {
         TS          adjts;
         TSOpt       tsopt;
@@ -751,10 +755,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
         if (!ifunc) Hhas[2][1] = PETSC_FALSE;
         has = (PetscBool)(has || Hhas[2][0] || Hhas[2][1] || Hhas[2][2]);
       }
-    } else {
-      ierr = TSObjHasObjectiveIntegrand(funchead,NULL,NULL,&has,NULL,NULL,NULL);CHKERRQ(ierr);
     }
-    /* cost integrands not present */
     if (!has) vquad = NULL;
 
     if (direction) { /* we use PETSC_SMALL since some of the fixed terms can be at the initial time */

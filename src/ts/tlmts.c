@@ -540,12 +540,14 @@ PetscErrorCode TLMTSSetUpStep(TS lts)
   ierr = TSGetApplicationContext(lts,(void*)&tlm);CHKERRQ(ierr);
   if (!tlm->cstep) tlm->cstep = lts->ops->step;
   if (tlm->discrete) {
-    PetscBool flg;
+    PetscBool rk,theta,cn;
 
-    ierr = PetscObjectTypeCompare((PetscObject)lts,TSRK,&flg);CHKERRQ(ierr);
-    if (flg) {
-      lts->ops->step = TSStep_TLM_RK;
-    } else {
+    ierr = PetscObjectTypeCompare((PetscObject)lts,TSRK,&rk);CHKERRQ(ierr);
+    ierr = PetscObjectTypeCompare((PetscObject)lts,TSTHETA,&theta);CHKERRQ(ierr);
+    ierr = PetscObjectTypeCompare((PetscObject)lts,TSCN,&cn);CHKERRQ(ierr);
+    if (rk)               lts->ops->step = TSStep_TLM_RK;
+    else if (theta || cn) lts->ops->step = TSStep_TLM_Theta;
+    else {
       TSType tstype;
 
       ierr = TSGetType(lts,&tstype);CHKERRQ(ierr);
