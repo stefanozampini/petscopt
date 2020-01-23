@@ -15,7 +15,7 @@ Vec Object: 1 MPI processes
   1 TAO,  Function value: 0.000659685,  Residual: 0.0205093 
   2 TAO,  Function value: 4.85546e-07,  Residual: 0.000596687 
   3 TAO,  Function value: 3.55549e-13,  Residual: 5.48549e-07 
-  4 TAO,  Function value: 1.6877e-25,  Residual: 0. 
+  4 TAO,  Function value: 1.68153e-25,  Residual: 0. 
 
 Tao solution
 Vec Object: 1 MPI processes

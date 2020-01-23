@@ -709,16 +709,21 @@ test:
 test:
     requires: !complex !single
     suffix: 3
-    args: -ts_type alpha -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -tao_type nls -tao_nls_pc_type none  -test_tlm 0 -tf 1 -tshessian_gn {{0 1}separate output} -test_taylor_gn -test_taylor -taylor_ts_hessian -tshessian_view
+    args: -ts_type theta -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -tao_type nls -tao_nls_pc_type none  -test_tlm 0 -tf 1 -tshessian_gn {{0 1}separate output} -test_taylor_gn -test_taylor -taylor_ts_hessian -tshessian_view
 
 test:
     requires: !complex !single
     suffix: discrete
-    args: -ts_type rk -ts_rk_type {{1fe 2a 3 3bs 4 5f 5dp 5bs 6vr 7vr 8vr}separate output} -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_foadjoint_discrete -jactsic_pc_type lu -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tao_test_gradient
+    args: -ts_type rk -ts_rk_type {{1fe 2a 3 3bs 4 5f 5dp 5bs 6vr 7vr 8vr}separate output} -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tlm_discrete -adjoint_tlm_discrete -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_foadjoint_discrete -jactsic_pc_type lu -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tao_test_gradient
 
 test:
     requires: !complex !single
     suffix: discrete_adapt
     args: -ts_type rk -ts_rk_type {{2a 3bs 5f 5dp 5bs 6vr 7vr 8vr}separate output} -ts_adapt_type {{dsp basic}separate output} -ts_atol 1.e-6 -ts_rtol 1.e-6 -ts_trajectory_type memory -tao_monitor -test_tao -tao_type nls -tao_nls_pc_type none -test_tlm -t0 0 -tf 0.1 -dt 1.e-2  -tsgradient_adjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_foadjoint_discrete -jactsic_pc_type lu -test_taylor -taylor_ts_hessian -taylor_ts_steps 6 -tshessian_view -tao_test_hessian
+
+test:
+    requires: !complex !single
+    suffix: discrete_cn
+    args: -ts_type cn -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tlm_discrete -adjoint_tlm_discrete -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tao_test_gradient -tshessian_mffd
 
 TEST*/

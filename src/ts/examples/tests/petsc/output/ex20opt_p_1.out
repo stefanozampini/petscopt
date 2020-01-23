@@ -1,9 +1,9 @@
-Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.19477;-1.07354], Cost function f=0.0347842
-Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.22539;-0.978675], Cost function f=0.0165733
-Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.21162;-1.02076], Cost function f=0.0001289
-Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.21265;-1.01757], Cost function f=1.68662e-06
-Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.21272;-1.01736], Cost function f=1.21245e-06
-Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.21272;-1.01736], Cost function f=1.21244e-06
+Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.19546;-1.07272], Cost function f=0.0336267
+Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.22506;-0.980663], Cost function f=0.0149892
+Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.21199;-1.02075], Cost function f=0.000118634
+Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.21299;-1.01767], Cost function f=4.20056e-07
+Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.21305;-1.01747], Cost function f=1.18094e-11
+Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.21305;-1.01747], Cost function f=1.17556e-18
 Tao Object: 1 MPI processes
   type: blmvm
   Gradient steps: 0
@@ -30,11 +30,11 @@ Tao Object: 1 MPI processes
     Termination reason: 1
   Active Set subset type: subvec
   convergence tolerances: gatol=1e-08,   steptol=0.,   gttol=0.
-  Residual in Function/Gradient:=2.27487e-09
-  Objective value=1.21244e-06
+  Residual in Function/Gradient:=2.04642e-09
+  Objective value=1.17556e-18
   total number of iterations=5,                          (max: 2000)
   total number of function/gradient evaluations=6,      (max: 4000)
   Solution converged:    ||g(X)|| <= gatol
 Vec Object: 1 MPI processes
   type: seq
-0.997863
+1.

@@ -24,7 +24,6 @@ typedef struct _n_User *User;
 struct _n_User {
   PetscReal mu;
   PetscReal next_output;
-  PetscInt  steps;
   PetscReal ftime,x_ob[2];
   Mat       A;                  /* Jacobian matrix */
   Mat       Jacp;               /* JacobianP matrix */
@@ -147,7 +146,6 @@ int main(int argc,char **argv)
     - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   user.mu          = 1.0;
   user.next_output = 0.0;
-  user.steps       = 0;
   user.ftime       = 0.5;
 
   ierr = PetscOptionsGetReal(NULL,NULL,"-mu",&user.mu,NULL);CHKERRQ(ierr);
@@ -173,8 +171,8 @@ int main(int argc,char **argv)
   ierr = TSCreate(PETSC_COMM_WORLD,&ts);CHKERRQ(ierr);
   ierr = TSSetType(ts,TSRK);CHKERRQ(ierr);
   ierr = TSSetRHSFunction(ts,NULL,RHSFunction,&user);CHKERRQ(ierr);
+  ierr = TSSetRHSJacobian(ts,user.A,user.A,RHSJacobian,&user);CHKERRQ(ierr);
   ierr = TSSetMaxTime(ts,user.ftime);CHKERRQ(ierr);
-  ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_MATCHSTEP);CHKERRQ(ierr);
   if (monitor) {
     ierr = TSMonitorSet(ts,Monitor,&user,NULL);CHKERRQ(ierr);
   }
@@ -185,8 +183,6 @@ int main(int argc,char **argv)
   ierr = VecGetArray(user.x,&x_ptr);CHKERRQ(ierr);
   x_ptr[0] = 2.0;   x_ptr[1] = 0.66666654321;
   ierr = VecRestoreArray(user.x,&x_ptr);CHKERRQ(ierr);
-  ierr = TSSetTime(ts,0.0);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"mu %g, steps %D, ftime %g\n",(double)user.mu,user.steps,(double)(user.ftime));CHKERRQ(ierr);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     Save trajectory of solution so that TSAdjointSolve() may be used
@@ -197,14 +193,13 @@ int main(int argc,char **argv)
      Set runtime options
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
+  ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_MATCHSTEP);CHKERRQ(ierr);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Solve nonlinear system
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   ierr = TSSolve(ts,user.x);CHKERRQ(ierr);
   ierr = TSGetSolveTime(ts,&(user.ftime));CHKERRQ(ierr);
-  ierr = TSGetStepNumber(ts,&user.steps);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"mu %g, steps %D, ftime %g\n",(double)user.mu,user.steps,(double)user.ftime);CHKERRQ(ierr);
   ierr = TSDestroy(&ts);CHKERRQ(ierr);
 
   ierr = VecGetArray(user.x,&x_ptr);CHKERRQ(ierr);
@@ -321,6 +316,7 @@ PetscErrorCode FormFunctionGradient(Tao tao,Vec P,PetscReal *f,Vec G,void *ctx)
   ierr = TSCreate(PETSC_COMM_WORLD,&ts);CHKERRQ(ierr);
   ierr = TSSetType(ts,TSRK);CHKERRQ(ierr);
   ierr = TSSetRHSFunction(ts,NULL,RHSFunction,user);CHKERRQ(ierr);
+  ierr = TSSetRHSJacobian(ts,user->A,user->A,RHSJacobian,user);CHKERRQ(ierr);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Set initial conditions
@@ -329,9 +325,6 @@ PetscErrorCode FormFunctionGradient(Tao tao,Vec P,PetscReal *f,Vec G,void *ctx)
   x_ptr[0] = 2;
   x_ptr[1] = 0.66666654321;
   ierr = VecRestoreArray(user->x,&x_ptr);CHKERRQ(ierr);
-  ierr = TSSetTime(ts,0.0);CHKERRQ(ierr);
-  ierr = TSSetMaxTime(ts,0.5);CHKERRQ(ierr);
-  ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_MATCHSTEP);CHKERRQ(ierr);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     Save trajectory of solution so that TSAdjointSolve() may be used
@@ -342,15 +335,13 @@ PetscErrorCode FormFunctionGradient(Tao tao,Vec P,PetscReal *f,Vec G,void *ctx)
      Set runtime options
    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
+  ierr = TSSetMaxTime(ts,user->ftime);CHKERRQ(ierr);
+  ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_MATCHSTEP);CHKERRQ(ierr);
 
   ierr = TSSolve(ts,user->x);CHKERRQ(ierr);
-  ierr = TSGetSolveTime(ts,&user->ftime);CHKERRQ(ierr);
-  ierr = TSGetStepNumber(ts,&user->steps);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"mu %g, steps %D, ftime %g\n",(double)user->mu,user->steps,(double)user->ftime);CHKERRQ(ierr);
 
   ierr = VecGetArray(user->x,&x_ptr);CHKERRQ(ierr);
   *f   = (x_ptr[0]-user->x_ob[0])*(x_ptr[0]-user->x_ob[0])+(x_ptr[1]-user->x_ob[1])*(x_ptr[1]-user->x_ob[1]);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"Observed value y_ob=[%f; %f], ODE solution y=%f, Cost function f=%f\n",(double)user->x_ob[0],(double)user->x_ob[1],(double)x_ptr[0],(double)(*f));CHKERRQ(ierr);
 
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Adjoint model starts here
@@ -373,9 +364,8 @@ PetscErrorCode FormFunctionGradient(Tao tao,Vec P,PetscReal *f,Vec G,void *ctx)
   x_ptr[0] = 0.0;
   ierr = VecRestoreArray(user->mup[1],&x_ptr);CHKERRQ(ierr);
   ierr = TSSetCostGradients(ts,1,user->lambda,user->mup);CHKERRQ(ierr);
-
-  ierr = TSSetRHSJacobian(ts,user->A,user->A,RHSJacobian,user);CHKERRQ(ierr);
   ierr = TSSetRHSJacobianP(ts,user->Jacp,RHSJacobianP,user);CHKERRQ(ierr);
+
 
   ierr = TSAdjointSolve(ts);CHKERRQ(ierr);
 
@@ -580,15 +570,17 @@ PetscErrorCode FormFunctionGradient_AO(Tao tao,Vec P,PetscReal *f,Vec G,void *ct
   ierr = TSSetRHSFunction(ts,NULL,RHSFunction,user);CHKERRQ(ierr);
   ierr = TSSetRHSJacobian(ts,user->A,user->A,RHSJacobian,user);CHKERRQ(ierr);
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
+  ierr = TSSetMaxTime(ts,user->ftime);CHKERRQ(ierr);
+  ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_MATCHSTEP);CHKERRQ(ierr);
   ierr = VecGetArray(user->x,&x_ptr);CHKERRQ(ierr);
   x_ptr[0] = 2;
   x_ptr[1] = 0.66666654321;
   ierr = VecRestoreArray(user->x,&x_ptr);CHKERRQ(ierr);
-  /* the cost functional needs to be evaluated at time 0.5 */
-  ierr = TSAddObjective(ts,0.5,EvalObjective_AO,EvalObjectiveGradient_U_AO,NULL,
+  /* the cost functional needs to be evaluated at final time */
+  ierr = TSAddObjective(ts,user->ftime,EvalObjective_AO,EvalObjectiveGradient_U_AO,NULL,
                         NULL,NULL,NULL,NULL,NULL,NULL,user);CHKERRQ(ierr);
   ierr = TSSetGradientDAE(ts,user->Jacp,EvalGradientDAE_P,user);CHKERRQ(ierr);
-  ierr = TSComputeObjectiveAndGradient(ts,0.0,PETSC_DECIDE,0.5,user->x,P,G,f);CHKERRQ(ierr);
+  ierr = TSComputeObjectiveAndGradient(ts,0.0,PETSC_DECIDE,user->ftime,user->x,P,G,f);CHKERRQ(ierr);
   ierr = TSDestroy(&ts);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -630,6 +622,8 @@ PetscErrorCode FormHessian_AO(Tao tao,Vec P,Mat H,Mat Hp,void *ctx)
   ierr = TSSetRHSFunction(ts,NULL,RHSFunction,user);CHKERRQ(ierr);
   ierr = TSSetRHSJacobian(ts,user->A,user->A,RHSJacobian,user);CHKERRQ(ierr);
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
+  ierr = TSSetMaxTime(ts,user->ftime);CHKERRQ(ierr);
+  ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_MATCHSTEP);CHKERRQ(ierr);
   ierr = VecGetArray(user->x,&x_ptr);CHKERRQ(ierr);
   x_ptr[0] = 2;
   x_ptr[1] = 0.66666654321;
@@ -639,8 +633,8 @@ PetscErrorCode FormHessian_AO(Tao tao,Vec P,Mat H,Mat Hp,void *ctx)
   ierr = MatAssemblyBegin(H_UU,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(H_UU,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatShift(H_UU,2.0);CHKERRQ(ierr);
-  /* the cost functional needs to be evaluated at time 0.5 */
-  ierr = TSAddObjective(ts,0.5,EvalObjective_AO,EvalObjectiveGradient_U_AO,NULL,
+  /* the cost functional needs to be evaluated at final time */
+  ierr = TSAddObjective(ts,user->ftime,EvalObjective_AO,EvalObjectiveGradient_U_AO,NULL,
                         H_UU,NULL,NULL,NULL,NULL,NULL,user);CHKERRQ(ierr);
   ierr = MatDestroy(&H_UU);CHKERRQ(ierr);
   ierr = TSSetGradientDAE(ts,user->Jacp,EvalGradientDAE_P,user);CHKERRQ(ierr);
@@ -652,7 +646,7 @@ PetscErrorCode FormHessian_AO(Tao tao,Vec P,Mat H,Mat Hp,void *ctx)
   /* Add TSSetUp from design (needed if we want to use -tshessian_mffd) */
   ierr = TSSetSetUpFromDesign(ts,TSSetUpFromDesign_Private,user);CHKERRQ(ierr);
 
-  ierr = TSComputeHessian(ts,0.0,PETSC_DECIDE,0.5,user->x,P,H);CHKERRQ(ierr);
+  ierr = TSComputeHessian(ts,0.0,PETSC_DECIDE,user->ftime,user->x,P,H);CHKERRQ(ierr);
 #if 0
   {
     Mat He;
@@ -677,6 +671,10 @@ PetscErrorCode FormHessian_AO(Tao tao,Vec P,Mat H,Mat Hp,void *ctx)
     test:
       suffix: ao
       args: -ts_trajectory_type memory -adjointode -tao_view -tao_monitor -tao_gttol 1.e-5 -tsgradient_adjoint_ts_atol 1.e-9
+
+    test:
+      suffix: ao_discrete
+      args: -ts_trajectory_type memory -adjointode -tao_view -tao_monitor -tao_gttol 1.e-5 -tao_type tron -tao_mf_hessian -ts_type {{rk cn}separate output} -ts_adapt_type none -tao_test_gradient -tsgradient_adjoint_discrete
 
     test:
       suffix: ao_hessian_mf
