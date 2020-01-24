@@ -295,8 +295,9 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
   s    = 1.0/(theta*h);
   ierr = VecAXPBYPCZ(fwdYdot,s,-s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
   ierr = AdjointTSComputeForcing(ts,astage_time,fwdYSol,fwdYdot,NULL,NULL,NULL,NULL,&flg,F);CHKERRQ(ierr);
+  ierr = VecScale(L,s);CHKERRQ(ierr);
   if (flg) {
-    ierr = VecAXPY(L,-1.0/s,F);CHKERRQ(ierr);
+    ierr = VecAXPY(L,-1.0,F);CHKERRQ(ierr);
   }
   ierr = TSComputeIJacobian(ts,astage_time,fwdYSol,fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
 #define DUMP 0
@@ -333,7 +334,6 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
   } else {
     ierr = MatMultTranspose(J,L,F);CHKERRQ(ierr);
   }
-
   if (quad) {
     Vec Q2;
 
@@ -344,12 +344,13 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
     ierr = DMRestoreGlobalVector(dm,&Q2);CHKERRQ(ierr);
   }
 
+  s = (theta - 1.0)*h;
   if (quad) {
-    ierr = VecWAXPY(L,-1.0,Q,F);CHKERRQ(ierr);
+    ierr = VecAXPBYPCZ(L,-s,s,0.0,Q,F);CHKERRQ(ierr);
   } else {
     ierr = VecCopy(F,L);CHKERRQ(ierr);
+    ierr = VecScale(L,s);CHKERRQ(ierr);
   }
-  ierr = VecScale(L,(theta-1.0)/theta);CHKERRQ(ierr);
   ierr = DMRestoreGlobalVector(dm,&Q);CHKERRQ(ierr);
   ierr = DMRestoreGlobalVector(dm,&F);CHKERRQ(ierr);
   ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
@@ -419,8 +420,8 @@ PetscErrorCode TSStep_TLM_Theta(TS ts)
     ierr = MatMult(J,U,F);CHKERRQ(ierr);
   }
   ierr = VecScale(F,(theta-1.0)/theta);CHKERRQ(ierr);
-  ierr = VecAXPBYPCZ(fwdYdot,s,-s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
   s    = 1.0/(theta*h);
+  ierr = VecAXPBYPCZ(fwdYdot,s,-s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
   ierr = TSComputeIJacobian(ts,stage_time,fwdYSol,fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
   ierr = TLMTSComputeForcing(ts,stage_time,fwdYSol,fwdYdot,&flg,F2);CHKERRQ(ierr);
   if (flg) {
