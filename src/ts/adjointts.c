@@ -63,8 +63,7 @@ static PetscErrorCode EvalQuadIntegrand_ADJ(Vec L, Vec Ldot, PetscReal t, Vec F,
       if (has) {
         ierr = VecAXPY(F,1.0,q->work2);CHKERRQ(ierr);
       }
-    }
-    if (adj_ctx->direction) { /* second order */
+    } else { /* second order adjoint */
       Vec       TLMU,TLMUdot;
       Vec       FOAL;
       PetscBool flg;
