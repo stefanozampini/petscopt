@@ -836,6 +836,10 @@ PetscErrorCode AugmentedTSInitialize(TS ats)
   actx->model->reject            = 0;
   actx->model->steprestart       = PETSC_TRUE;
   actx->model->steprollback      = PETSC_FALSE;
+  actx->model->rhsjacobian.time  = PETSC_MIN_REAL;
+  for (i=0;i<actx->nqts;i++) {
+    actx->qts[i]->rhsjacobian.time = PETSC_MIN_REAL;
+  }
   ierr = TSSetUp(actx->model);CHKERRQ(ierr);
   ierr = TSEventInitialize(actx->model->event,actx->model,t0,actx->model->vec_sol);CHKERRQ(ierr);
   PetscFunctionReturn(0);
