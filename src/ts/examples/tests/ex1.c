@@ -971,9 +971,9 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsBool("-test_rhsjacconst","Test with TSComputeRHSJacobianConstant","",testrhsjacconst,&testrhsjacconst,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_nullgrad_M","Test with NULL M gradient","",testnullgradM,&testnullgradM,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_nulljac_IC","Test with NULL G_X jacobian","",testnulljacIC,&testnulljacIC,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsBool("-test_event_constant","Test constant functional at given time in between the simulation","",testeventconst,&testeventconst,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsBool("-test_event_func","Test functional at given time in between the simulation","",testevent,&testevent,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsBool("-test_event_final","Test functional at final time of the simulation","",testeventfinal,&testeventfinal,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-test_objfixed_constant","Test constant functional at given time in between the simulation","",testeventconst,&testeventconst,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-test_objfixed_func","Test functional at given time in between the simulation","",testevent,&testevent,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-test_objfixed_final","Test functional at final time of the simulation","",testeventfinal,&testeventfinal,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_general_final","Test general functional","",testgeneral_final,&testgeneral_final,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_general_final_double","Test general functional (twice)","",testgeneral_final_double,&testgeneral_final_double,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_general_fixed","Test general functional","",testgeneral_fixed,&testgeneral_fixed,NULL);CHKERRQ(ierr);
@@ -1431,65 +1431,96 @@ int main(int argc, char* argv[])
   test:
     requires: !complex !single
     suffix: 1
-    args: -t0 1.1 -tf 1.2 -ts_type rk -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -ts_trajectory_type memory -use_taylor
+    args: -t0 1.1 -tf 1.2 -ts_type rk -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_objfixed_final -p 1.3 -ts_trajectory_type memory -use_taylor
+
+  test:
+    requires: !complex !single
+    suffix: 1_discrete
+    args: -t0 1.1 -tf 1.2 -ts_type rk -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_objfixed_final -p 1.3 -ts_trajectory_type memory -use_taylor -tsgradient_adjoint_discrete -tshessian_foadjoint_discrete -tshessian_tlm_discrete  -tshessian_soadjoint_discrete -tlm_discrete -adjoint_tlm_discrete -phi_view -phiT_view -err_view -taylor_ts_steps 6
 
   test:
     requires: !complex !single
     suffix: 2
-    args: -t0 1.6 -tf 1.7 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -use_taylor -ts_trajectory_type memory
+    args: -t0 1.6 -tf 1.7 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_objfixed_final -p 1.3 -use_taylor -ts_trajectory_type memory
 
   test:
     requires: !complex !single
     suffix: 3
-    args: -t0 1.6 -tf 1.7 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_event_final -p 1.3 -test_ifunc -test_nulljac_IC -test_nullgrad_M -use_taylor -ts_trajectory_type memory
+    args: -t0 1.6 -tf 1.7 -ts_type bdf -ts_adapt_type basic -ts_atol 1.e-9 -ts_rtol 1.e-9 -test_objfixed_final -p 1.3 -test_ifunc -test_nulljac_IC -test_nullgrad_M -use_taylor -ts_trajectory_type memory
 
   test:
     requires: !complex !single
     suffix: 4
-    args: -t0 1.1 -tf 1.15 -ts_type rk -ts_adapt_type none -test_event_constant -test_rhsjacconst -ts_trajectory_reconstruction_order 3 -use_taylor -dt 0.001 -ts_trajectory_type memory
+    args: -t0 1.1 -tf 1.15 -ts_type rk -ts_adapt_type none -test_objfixed_constant -test_rhsjacconst -ts_trajectory_reconstruction_order 3 -use_taylor -dt 0.001 -ts_trajectory_type memory
+
+  test:
+    requires: !complex !single
+    suffix: 4_discrete
+    args: -t0 1.1 -tf 1.15 -ts_type rk -ts_adapt_type none -test_objfixed_constant -test_rhsjacconst -use_taylor -dt 0.001 -ts_trajectory_type memory -tsgradient_adjoint_discrete -tshessian_foadjoint_discrete -tshessian_tlm_discrete  -tshessian_soadjoint_discrete -tlm_discrete -adjoint_tlm_discrete -phi_view -phiT_view -err_view -taylor_ts_steps 6
 
   test:
     requires: !complex !single
     suffix: 5
-    args: -t0 0.7 -tf 0.8 -ts_type cn -test_event_constant -p 0.8 -test_ifunc -ts_trajectory_reconstruction_order 2 -test_pjac 0 -tsgradient_adjoint_ts_adapt_type history -tshessian_tlm_ts_adapt_type history -tshessian_foadjoint_ts_adapt_type history -tshessian_soadjoint_ts_adapt_type {{none history}} -tshessian_tlm_userijacobian -use_taylor -m 0.1 -dt 0.005 -ts_trajectory_type memory -b 0.01
+    args: -t0 0.7 -tf 0.8 -ts_type cn -test_objfixed_constant -p 0.8 -test_ifunc -ts_trajectory_reconstruction_order 2 -test_pjac 0 -tsgradient_adjoint_ts_adapt_type history -tshessian_tlm_ts_adapt_type history -tshessian_foadjoint_ts_adapt_type history -tshessian_soadjoint_ts_adapt_type {{none history}} -tshessian_tlm_userijacobian -use_taylor -m 0.1 -dt 0.005 -ts_trajectory_type memory -b 0.01
+
+  test:
+    requires: !complex !single
+    suffix: 5_discrete_mffd
+    args: -t0 0.7 -tf 0.8 -ts_type cn -test_objfixed_constant -p 0.8 -test_ifunc -test_pjac 0 -use_taylor -m 0.1 -dt 0.005 -ts_trajectory_type memory -b 0.01 -tsgradient_adjoint_discrete -tlm_discrete -adjoint_tlm_discrete -phi_view -phiT_view -err_view -taylor_ts_steps 6 -tshessian_mffd -tshessian_view
 
   test:
     requires: !complex !single
     suffix: 6
-    args: -t0 0.01 -tf 0.1 -b 0.3 -a 1.7 -p 1 -ts_type rk -dt 0.01 -ts_adapt_type none -test_event_func -tshessian_mffd -use_taylor -ts_trajectory_type memory -tsgradient_adjoint_ts_adapt_type history
+    args: -t0 0.01 -tf 0.1 -b 0.3 -a 1.7 -p 1 -ts_type rk -dt 0.01 -ts_adapt_type none -test_objfixed_func -tshessian_mffd -use_taylor -ts_trajectory_type memory -tsgradient_adjoint_ts_adapt_type history
+
+  test:
+    requires: !complex !single
+    suffix: 6_discrete
+    args: -t0 0.01 -tf 0.1 -b 0.3 -a 1.7 -p 1 -ts_type rk -dt 0.01 -ts_adapt_type none -test_objfixed_func -tshessian_mffd -use_taylor -ts_trajectory_type memory -tsgradient_adjoint_discrete -tlm_discrete -adjoint_tlm_discrete -phi_view -phiT_view -err_view -taylor_ts_steps 6 -tsgradient_adjoint_discrete
 
   test:
     requires: !complex !single
     suffix: 7
-    args: -t0 0 -tf 0.02 -dt 0.001 -b 0.3 -a 1.7 -p 1 -ts_type rosw -test_ifunc -test_event_func -ts_adapt_type none -tshessian_mffd -use_taylor -ts_trajectory_type memory
+    args: -t0 0 -tf 0.02 -dt 0.001 -b 0.3 -a 1.7 -p 1 -ts_type rosw -test_ifunc -test_objfixed_func -ts_adapt_type none -tshessian_mffd -use_taylor -ts_trajectory_type memory
 
   test:
     requires: !complex !single
     suffix: 8
-    args: -t0 0 -tf 0.07 -b -0.5 -a -1.1 -p 0.4 -ts_type bdf -test_mix -test_pjac 0 -test_event_constant -ts_adapt_type none -use_taylor -ts_trajectory_type memory -dt 0.005 -test_objective_norm -m 0.8
+    args: -t0 0 -tf 0.07 -b -0.5 -a -1.1 -p 0.4 -ts_type bdf -test_mix -test_pjac 0 -test_objfixed_constant -ts_adapt_type none -use_taylor -ts_trajectory_type memory -dt 0.005 -test_objective_norm -m 0.8
 
   test:
     requires: !complex !single
     suffix: 9
     nsize: 2
-    args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type rk -test_general_fixed -test_general_final -test_general -test_event_func -test_event_constant -test_event_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -tshessian_mffd -use_taylor -ts_trajectory_type memory
+    args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type rk -test_general_fixed -test_general_final -test_general -test_objfixed_func -test_objfixed_constant -test_objfixed_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -tshessian_mffd -use_taylor -ts_trajectory_type memory
+
+  test:
+    requires: !complex !single
+    suffix: 9_discrete
+    nsize: 2
+    args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type rk -test_general_fixed -test_general_final -test_general -test_objfixed_func -test_objfixed_constant -test_objfixed_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -tshessian_mffd -use_taylor -ts_trajectory_type memory -tsgradient_adjoint_discrete -tlm_discrete -adjoint_tlm_discrete -phi_view -phiT_view -err_view -taylor_ts_steps 6
 
   test:
     requires: !complex !single
     suffix: 10
     nsize: 2
-    args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type bdf -test_general_fixed -test_general_final -test_general -test_event_func -test_event_constant -test_event_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -tshessian_mffd -use_taylor -ts_trajectory_type memory
+    args: -t0 -0.3 -tf -0.28 -b 1.2 -a 2.1 -p 0.3 -ts_type bdf -test_general_fixed -test_general_final -test_general -test_objfixed_func -test_objfixed_constant -test_objfixed_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -tshessian_mffd -use_taylor -ts_trajectory_type memory
 
   test:
     requires: !complex !single
     suffix: 11
-    args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type rk -test_general_final -test_general -test_event_constant -test_event_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -ts_trajectory_type memory -test_forward_event -use_taylor
+    args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type rk -test_general_final -test_general -test_objfixed_constant -test_objfixed_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -ts_trajectory_type memory -test_forward_event -use_taylor
+
+  test:
+    requires: !complex !single
+    suffix: 11_discrete
+    args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type rk -test_general_final -test_general -test_objfixed_constant -test_objfixed_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -ts_trajectory_type memory -test_forward_event -use_taylor -tsgradient_adjoint_discrete -tlm_discrete -adjoint_tlm_discrete -phi_view -phiT_view -err_view -taylor_ts_steps 6 -tsgradient_adjoint_discrete -tshessian_foadjoint_discrete -tshessian_tlm_discrete  -tshessian_soadjoint_discrete
 
   test:
     requires: !complex !single
     timeoutfactor: 2
     suffix: 12
-    args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type bdf -test_general_final -test_general -test_event_constant -test_event_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -ts_trajectory_type memory -test_forward_event -use_taylor -test_ifunc -m 1.1
+    args: -t0 0.41 -tf 0.44 -b 0.3 -a 1.25 -p 2.3 -ts_type bdf -test_general_final -test_general -test_objfixed_constant -test_objfixed_final -ts_rtol 1.e-4 -ts_atol 1.e-4 -ts_trajectory_type memory -test_forward_event -use_taylor -test_ifunc -m 1.1
 
   test:
     requires: !complex !single
@@ -1500,11 +1531,22 @@ int main(int argc, char* argv[])
   test:
     requires: !complex !single
     suffix: 14
-    args: -t0 1.1 -tf 1.9 -dt 0.01 -ts_type theta -test_event_final -p 1.3 -ts_trajectory_type memory -tshessian_view -tshessian_gn {{0 1}separate output} -test_objective_norm -test_ifunc -m 1.1
+    args: -t0 1.1 -tf 1.9 -dt 0.01 -ts_type theta -test_objfixed_final -p 1.3 -ts_trajectory_type memory -tshessian_view -tshessian_gn {{0 1}separate output} -test_objective_norm -test_ifunc -m 1.1
+
+  test:
+    requires: !complex !single
+    suffix: 14_discrete_theta_endpoint_mffd
+    args: -t0 1.1 -tf 1.9 -dt 0.01 -ts_type theta -ts_theta_theta {{0.1 0.65}separate output} -ts_theta_endpoint -test_objfixed_final -p 1.3 -ts_trajectory_type memory -tshessian_view -test_objective_norm -test_ifunc -m 1.1 -tsgradient_adjoint_discrete -tlm_discrete -adjoint_tlm_discrete -phi_view -phiT_view -err_view -taylor_ts_steps 6 -use_taylor -tshessian_mffd
 
   test:
     requires: !complex !single
     suffix: 15
-    args: -t0 -1.9 -tf -1.1 -dt 0.01 -ts_type theta -test_general_double -test_event_final -p 1.3 -ts_trajectory_type memory -test_objective_norm -test_ifunc {{0 1}} -test_mass 0 -m 1.1 -use_taylor
+    args: -t0 -1.9 -tf -1.1 -dt 0.01 -ts_type theta -test_general_double -test_objfixed_final -p 1.3 -ts_trajectory_type memory -test_objective_norm -test_ifunc {{0 1}} -test_mass 0 -m 1.1 -use_taylor
+
+  # cannot compare to the last digit ifunc and rhsfunc result
+  test:
+    requires: !complex !single
+    suffix: 15_discrete_theta_endpoint_mffd
+    args: -t0 -1.9 -tf -1.1 -dt 0.01 -ts_type theta -ts_theta_theta {{0.23 0.71}separate output} -ts_theta_endpoint -test_general_double -test_objfixed_final -p 1.3 -ts_trajectory_type memory -test_objective_norm -test_ifunc {{0 1}separate output} -test_mass 0 -m 1.1 -use_taylor -tsgradient_adjoint_discrete -tlm_discrete -adjoint_tlm_discrete -phi_view -phiT_view -err_view -taylor_ts_steps 6 -use_taylor -tshessian_mffd
 
 TEST*/
