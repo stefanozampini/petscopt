@@ -1547,6 +1547,12 @@ int main(int argc, char* argv[])
   test:
     requires: !complex !single
     suffix: 15_discrete_theta_endpoint_mffd
-    args: -t0 -1.9 -tf -1.1 -dt 0.01 -ts_type theta -ts_theta_theta {{0.23 0.71}separate output} -ts_theta_endpoint -test_general_double -test_objfixed_final -p 1.3 -ts_trajectory_type memory -test_objective_norm -test_ifunc {{0 1}separate output} -test_mass 0 -m 1.1 -use_taylor -tsgradient_adjoint_discrete -tlm_discrete -adjoint_tlm_discrete -phi_view -phiT_view -err_view -taylor_ts_steps 6 -use_taylor -tshessian_mffd
+    args: -t0 -1.9 -tf -1.1 -dt 0.01 -ts_type theta -ts_theta_theta {{0.23 0.71}separate output} -ts_theta_endpoint -test_general_double -test_objfixed_final -p 1.3 -ts_trajectory_type memory -test_objective_norm -test_ifunc {{0 1}separate output} -test_mass 0 -m 1.1 -use_taylor -tsgradient_adjoint_discrete -tlm_discrete -adjoint_tlm_discrete -phi_view -phiT_view -err_view -taylor_ts_steps 6 -use_taylor -tshessian_mffd -tshessian_view
+
+  test:
+    requires: !complex !single
+    suffix: 15_discrete_theta_endpoint_full
+    args: -t0 -1.9 -tf -1.1 -dt 0.01 -ts_type theta -ts_theta_theta {{0.23 0.71}separate output} -ts_theta_endpoint -test_general_double -test_objfixed_final -p 1.3 -ts_trajectory_type memory -test_objective_norm -test_ifunc {{0 1}separate output} -test_mass 0 -m 1.1 -use_taylor -tsgradient_adjoint_discrete -tlm_discrete -adjoint_tlm_discrete -phi_view -phiT_view -err_view -taylor_ts_steps 6 -use_taylor -tsgradient_adjoint_discrete -tshessian_foadjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_view
+
 
 TEST*/

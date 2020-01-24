@@ -726,4 +726,10 @@ test:
     suffix: discrete_cn
     args: -ts_type cn -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tlm_discrete -adjoint_tlm_discrete -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tao_test_gradient -tshessian_mffd
 
+test:
+    requires: !complex !single
+    suffix: discrete_cn_full
+    args: -ts_type cn -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tlm_discrete -adjoint_tlm_discrete -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tao_test_hessian -tshessian_foadjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tao_type nls -tao_nls_pc_type none
+
+
 TEST*/
