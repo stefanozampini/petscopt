@@ -1589,7 +1589,7 @@ PetscErrorCode AdjointTSFinalizeQuadrature(TS adjts)
     ierr = DMGetGlobalVector(adm,&work);CHKERRQ(ierr);
     ierr = TSGetSolution(adjts,&lambda);CHKERRQ(ierr);
     ierr = TSGetIJacobian(adjts,NULL,NULL,&ijacfunc,NULL);CHKERRQ(ierr);
-    if (!ijacfunc) {
+    if (!ijacfunc || adj_ctx->discrete) {
       ierr = VecCopy(lambda,work);CHKERRQ(ierr);
     } else {
       ierr = TSUpdateSplitJacobiansFromHistory_Private(fwdts,adj_ctx->t0);CHKERRQ(ierr);
