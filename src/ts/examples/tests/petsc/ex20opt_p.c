@@ -670,6 +670,10 @@ PetscErrorCode FormHessian_AO(Tao tao,Vec P,Mat H,Mat Hp,void *ctx)
       args: -adjointode -tao_monitor -monitor 0 -tao_view -tao_type tron -ts_trajectory_type memory
 
     test:
+      suffix: ao_hessian_discrete
+      args: -adjointode -tao_monitor -monitor 0 -tao_view -tao_type tron -ts_trajectory_type memory -tsgradient_adjoint_discrete  -tshessian_foadjoint_discrete -tshessian_tlm_discrete  -tshessian_soadjoint_discrete -tao_test_hessian
+
+    test:
       suffix: ao_hessian_mf
       args: -adjointode -tao_monitor -monitor 0 -tao_view -tao_type tron -tao_mf_hessian -ts_trajectory_type memory
 
