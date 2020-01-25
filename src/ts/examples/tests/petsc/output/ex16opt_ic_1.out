@@ -1,4 +1,3 @@
-mu 1., steps 0, ftime 0.5
 mu 1., steps 9, ftime 0.5
   0 TAO,  Function value: 0.00926269,  Residual: 0.176594 
   1 TAO,  Function value: 4.84553e-06,  Residual: 0.000984617 

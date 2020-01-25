@@ -671,14 +671,18 @@ int main(int argc, char* argv[])
     }
     ierr = PetscOptionsHasName(NULL,NULL,"-tshessian_view",&flg);CHKERRQ(ierr);
     if (flg) {
-      Mat He,H;
+      Mat He,H,HeT;
 
       ierr = MatCreate(PETSC_COMM_SELF,&H);CHKERRQ(ierr);
       ierr = TSComputeHessian(ts,t0,dt,tf,NULL,M,H);CHKERRQ(ierr);
       ierr = MatComputeOperator(H,MATAIJ,&He);CHKERRQ(ierr);
-      ierr = MatConvert(He,MATAIJ,MAT_INPLACE_MATRIX,&He);CHKERRQ(ierr);
+      ierr = MatConvert(He,MATDENSE,MAT_INPLACE_MATRIX,&He);CHKERRQ(ierr);
       ierr = PetscObjectSetName((PetscObject)He,"H");CHKERRQ(ierr);
       ierr = MatViewFromOptions(He,NULL,"-tshessian_view");CHKERRQ(ierr);
+      ierr = MatTranspose(He,MAT_INITIAL_MATRIX,&HeT);CHKERRQ(ierr);
+      ierr = MatAXPY(HeT,-1.0,He,DIFFERENT_NONZERO_PATTERN);CHKERRQ(ierr);
+      ierr = MatViewFromOptions(HeT,NULL,"-tshessian_view");CHKERRQ(ierr);
+      ierr = MatDestroy(&HeT);CHKERRQ(ierr);
       ierr = MatDestroy(&He);CHKERRQ(ierr);
       ierr = MatDestroy(&H);CHKERRQ(ierr);
     }
