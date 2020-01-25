@@ -264,7 +264,6 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
   ierr = AdjointTSGetModelTS(ts,&fwdts);CHKERRQ(ierr);
   ierr = TSThetaGetTheta(fwdts,&theta);CHKERRQ(ierr);
   ierr = TSThetaGetEndpoint(fwdts,&endpoint);CHKERRQ(ierr);
-  if (!endpoint) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_SUP,"!Endpoint not yet done");
   ierr = TSTrajectoryGetSolutionOnly(fwdts->trajectory,&flg);CHKERRQ(ierr);
   if (flg) SETERRQ(PetscObjectComm((PetscObject)fwdts->trajectory),PETSC_ERR_SUP,"TSTrajectory did not save the stages! Rerun with TSTrajectorySetSolutionOnly(tj,PETSC_TRUE)");
   ierr = TSGetStepNumber(ts,&astep);CHKERRQ(ierr);
@@ -313,66 +312,116 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
       ierr = DMGetGlobalVector(dm,&FOALdot);CHKERRQ(ierr);
     }
   }
-  s    = 1.0/(theta*h);
-  ierr = VecAXPBYPCZ(fwdYdot,s,-s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
-  if (direction) {
-    FOAL = FOAY ? FOAY[0] : NULL;
-    ierr = VecAXPBYPCZ(TLMUdot,s,-s,0.0,TLMSol,TLMY[0]);CHKERRQ(ierr);
-    TLMU = TLMSol;
-    if (FOAL) {
-      ierr = VecAXPBY(FOALdot,s,0.0,FOAL);CHKERRQ(ierr);
+  if (endpoint) {
+    s    = 1.0/(theta*h);
+    ierr = VecAXPBYPCZ(fwdYdot,s,-s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
+    if (direction) {
+      FOAL = FOAY ? FOAY[0] : NULL;
+      ierr = VecAXPBYPCZ(TLMUdot,s,-s,0.0,TLMSol,TLMY[0]);CHKERRQ(ierr);
+      TLMU = TLMSol;
+      if (FOAL) {
+        ierr = VecAXPBY(FOALdot,s,0.0,FOAL);CHKERRQ(ierr);
+      }
     }
-  }
 
-  ierr = AdjointTSComputeForcing(ts,astage_time,fwdYSol,fwdYdot,FOAL,FOALdot,TLMU,TLMUdot,&flg,F);CHKERRQ(ierr);
-  ierr = VecScale(L,s);CHKERRQ(ierr);
-  if (flg) {
-    ierr = VecAXPY(L,-1.0,F);CHKERRQ(ierr);
-  }
-  ierr = TSComputeIJacobian(ts,astage_time,fwdYSol,fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
-  ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
-  ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-  ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
-  /* Adjoint stage */
-  ierr = KSPSolveTranspose(ksp,L,LY[0]);CHKERRQ(ierr);
-  ierr = VecLockReadPush(LY[0]);CHKERRQ(ierr);
-  ierr = VecSet(Q,0.0);CHKERRQ(ierr);
-  ierr = AdjointTSComputeQuadrature(ts,astage_time,fwdYSol,fwdYdot,LY[0],NULL,FOAL,NULL,TLMU,TLMUdot,&quad,Q);CHKERRQ(ierr);
-  if (quad) { ierr = VecScale(Q,-theta/(theta-1.0));CHKERRQ(ierr); }
-
-  ierr = VecZeroEntries(fwdYdot);CHKERRQ(ierr);
-  s    = 1.0/((theta-1.0)*h);
-  ierr = TSComputeIJacobian(ts,at+h,fwdY[0],fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
-  if (direction) {
-    FOAL = FOAY ? FOAY[0] : NULL;
-    ierr = VecZeroEntries(TLMUdot);CHKERRQ(ierr);
-    TLMU = TLMY[0];
-    if (FOAL) {
-      ierr = VecAXPBY(FOALdot,s,0.0,FOAL);CHKERRQ(ierr);
+    ierr = AdjointTSComputeForcing(ts,astage_time,fwdYSol,fwdYdot,FOAL,FOALdot,TLMU,TLMUdot,&flg,F);CHKERRQ(ierr);
+    ierr = VecScale(L,s);CHKERRQ(ierr);
+    if (flg) {
+      ierr = VecAXPY(L,-1.0,F);CHKERRQ(ierr);
     }
-  }
-  ierr = AdjointTSComputeForcing(ts,at+h,fwdY[0],fwdYdot,FOAL,FOALdot,TLMU,TLMUdot,&flg,F);CHKERRQ(ierr);
-  if (flg) {
-    ierr = MatMultTransposeAdd(J,LY[0],F,F);CHKERRQ(ierr);
-  } else {
-    ierr = MatMultTranspose(J,LY[0],F);CHKERRQ(ierr);
-  }
-  if (quad) {
-    Vec Q2;
+    ierr = TSComputeIJacobian(ts,astage_time,fwdYSol,fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
+    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+    ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
+    /* Adjoint stage */
+    ierr = KSPSolveTranspose(ksp,L,LY[0]);CHKERRQ(ierr);
+    ierr = VecLockReadPush(LY[0]);CHKERRQ(ierr);
+    ierr = VecSet(Q,0.0);CHKERRQ(ierr);
+    ierr = AdjointTSComputeQuadrature(ts,astage_time,fwdYSol,fwdYdot,LY[0],NULL,FOAL,NULL,TLMU,TLMUdot,&quad,Q);CHKERRQ(ierr);
+    if (quad) { ierr = VecScale(Q,-theta/(theta-1.0));CHKERRQ(ierr); }
 
-    ierr = TSGetDM(ts,&dm);CHKERRQ(ierr);
-    ierr = DMGetGlobalVector(dm,&Q2);CHKERRQ(ierr);
-    ierr = VecSet(Q2,0.0);CHKERRQ(ierr);
-    ierr = AdjointTSComputeQuadrature(ts,at+h,fwdY[0],fwdYdot,LY[0],NULL,FOAL,NULL,TLMU,TLMUdot,&flg,Q2);CHKERRQ(ierr);
-    ierr = VecAXPY(Q,1.0,Q2);CHKERRQ(ierr);
-    ierr = DMRestoreGlobalVector(dm,&Q2);CHKERRQ(ierr);
-  }
+    ierr = VecZeroEntries(fwdYdot);CHKERRQ(ierr);
+    s    = 1.0/((theta-1.0)*h);
+    ierr = TSComputeIJacobian(ts,at+h,fwdY[0],fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    if (direction) {
+      FOAL = FOAY ? FOAY[0] : NULL;
+      ierr = VecZeroEntries(TLMUdot);CHKERRQ(ierr);
+      TLMU = TLMY[0];
+      if (FOAL) {
+        ierr = VecAXPBY(FOALdot,s,0.0,FOAL);CHKERRQ(ierr);
+      }
+    }
+    ierr = AdjointTSComputeForcing(ts,at+h,fwdY[0],fwdYdot,FOAL,FOALdot,TLMU,TLMUdot,&flg,F);CHKERRQ(ierr);
+    if (flg) {
+      ierr = MatMultTransposeAdd(J,LY[0],F,F);CHKERRQ(ierr);
+    } else {
+      ierr = MatMultTranspose(J,LY[0],F);CHKERRQ(ierr);
+    }
+    if (quad) {
+      Vec Q2;
 
-  s = (theta-1.0)*h;
-  if (quad) {
-    ierr = VecAXPBYPCZ(L,-s,s,0.0,Q,F);CHKERRQ(ierr);
+      ierr = TSGetDM(ts,&dm);CHKERRQ(ierr);
+      ierr = DMGetGlobalVector(dm,&Q2);CHKERRQ(ierr);
+      ierr = VecSet(Q2,0.0);CHKERRQ(ierr);
+      ierr = AdjointTSComputeQuadrature(ts,at+h,fwdY[0],fwdYdot,LY[0],NULL,FOAL,NULL,TLMU,TLMUdot,&flg,Q2);CHKERRQ(ierr);
+      ierr = VecAXPY(Q,1.0,Q2);CHKERRQ(ierr);
+      ierr = DMRestoreGlobalVector(dm,&Q2);CHKERRQ(ierr);
+    }
+
+    s = (theta-1.0)*h;
+    if (quad) {
+      ierr = VecAXPBYPCZ(L,-s,s,0.0,Q,F);CHKERRQ(ierr);
+    } else {
+      ierr = VecAXPBY(L,s,0.0,F);CHKERRQ(ierr);
+    }
   } else {
-    ierr = VecAXPBY(L,s,0.0,F);CHKERRQ(ierr);
+    /* need to reconstruct x0 from loaded solution (next time step) and stage solution
+       to properly compute fwdYdot */
+    s    = 1.0/(h*(theta-1.0));
+    ierr = VecAXPBYPCZ(fwdYdot,-s,s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
+    if (direction) { /* FOAY SAMPLING IS WRONG */
+      FOAL = FOAY ? FOAY[0] : NULL;
+      ierr = VecAXPBYPCZ(TLMUdot,-s,s,0.0,TLMSol,TLMY[0]);CHKERRQ(ierr);
+      TLMU = TLMSol;
+      if (FOAL) {
+      SETERRQ(PETSC_COMM_SELF,PETSC_ERR_SUP,"NOT YET IMPL");
+        s    = h;
+        ierr = VecAXPBY(FOALdot,s,0.0,FOAL);CHKERRQ(ierr);
+      }
+    }
+
+    s    = 1.0/(h*theta);
+    /* FOALDOT */
+    ierr = AdjointTSComputeForcing(ts,astage_time,fwdYSol,fwdYdot,FOALdot,FOALdot,TLMU,TLMUdot,&flg,F);CHKERRQ(ierr);
+    if (flg) {
+      ierr = VecAXPY(F,-s,L);CHKERRQ(ierr);
+    } else {
+      ierr = VecAXPBY(F,-s,0.0,L);CHKERRQ(ierr);
+    }
+    ierr = VecScale(F,h);CHKERRQ(ierr);
+    ierr = TSComputeIJacobian(ts,astage_time,fwdY[0],fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
+    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+    ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
+    /* Adjoint stage */
+    ierr = KSPSolveTranspose(ksp,F,LY[0]);CHKERRQ(ierr);
+    ierr = VecLockReadPush(LY[0]);CHKERRQ(ierr);
+    ierr = VecSet(Q,0.0);CHKERRQ(ierr);
+    ierr = AdjointTSComputeQuadrature(ts,astage_time,fwdYSol,fwdYdot,LY[0],NULL,FOAL,NULL,TLMU,TLMUdot,&quad,Q);CHKERRQ(ierr);
+    if (quad) {
+      SETERRQ(PETSC_COMM_SELF,PETSC_ERR_SUP,"NOT YET IMPL");
+      ierr = VecAXPY(L,0,Q);CHKERRQ(ierr);
+    }
+    ierr = TSComputeIJacobian(ts,astage_time,fwdY[0],fwdYdot,0.0,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = VecZeroEntries(fwdYdot);CHKERRQ(ierr);
+    if (TLMUdot) { ierr = VecZeroEntries(TLMUdot);CHKERRQ(ierr); }
+    if (FOALdot) { ierr = VecZeroEntries(FOALdot);CHKERRQ(ierr); }
+    /* FOALDOT */
+    ierr = AdjointTSComputeForcing(ts,astage_time,fwdYSol,fwdYdot,FOALdot,FOALdot,TLMU,TLMUdot,&flg,F);CHKERRQ(ierr);
+    if (flg) {
+      ierr = VecAXPY(L,-1.0/theta,F);CHKERRQ(ierr);
+    }
+    ierr = MatMultTransposeAdd(J,LY[0],L,L);CHKERRQ(ierr);
   }
   ierr = TSGetDM(ts,&dm);CHKERRQ(ierr);
   ierr = DMRestoreGlobalVector(dm,&Q);CHKERRQ(ierr);
@@ -442,39 +491,62 @@ PetscErrorCode TSStep_TLM_Theta(TS ts)
 
   stage_time = t + (endpoint ? 1.0 : theta)*h;
 
-  if (!endpoint) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_SUP,"!Endpoint not yet done");
-  /* TLM stage */
-  ierr = VecCopy(U,Y[0]);CHKERRQ(ierr);
-  ierr = VecLockReadPush(Y[0]);CHKERRQ(ierr);
-  /* forward step assumes linear time-independent mass matrix */
-  /* otherwise, we should sample J_xdot at stage_time, and J_x at the beginning of the step and compute s * J_xdot + (theta-1)/theta J_x */
-  ierr = VecZeroEntries(fwdYdot);CHKERRQ(ierr);
-  s    = 1.0/((theta-1.0)*h);
-  ierr = TSComputeIJacobian(ts,t,fwdY[0],fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
-  ierr = TLMTSComputeForcing(ts,t,fwdY[0],fwdYdot,&flg,F);CHKERRQ(ierr);
-  if (flg) {
-    ierr = MatMultAdd(J,U,F,F);CHKERRQ(ierr);
+  if (endpoint) {
+    /* TLM stage */
+    ierr = VecCopy(U,Y[0]);CHKERRQ(ierr);
+    ierr = VecLockReadPush(Y[0]);CHKERRQ(ierr);
+    /* forward step assumes linear time-independent mass matrix */
+    /* otherwise, we should sample J_xdot at stage_time, and J_x at the beginning of the step and compute s * J_xdot + (theta-1)/theta J_x */
+    ierr = VecZeroEntries(fwdYdot);CHKERRQ(ierr);
+    s    = 1.0/((theta-1.0)*h);
+    ierr = TSComputeIJacobian(ts,t,fwdY[0],fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = TLMTSComputeForcing(ts,t,fwdY[0],fwdYdot,&flg,F);CHKERRQ(ierr);
+    if (flg) {
+      ierr = MatMultAdd(J,U,F,F);CHKERRQ(ierr);
+    } else {
+      ierr = MatMult(J,U,F);CHKERRQ(ierr);
+    }
+    ierr = VecScale(F,(theta-1.0)/theta);CHKERRQ(ierr);
+    s    = 1.0/(theta*h);
+    ierr = VecAXPBYPCZ(fwdYdot,s,-s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
+    ierr = TSComputeIJacobian(ts,stage_time,fwdYSol,fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = TLMTSComputeForcing(ts,stage_time,fwdYSol,fwdYdot,&flg,F2);CHKERRQ(ierr);
+    if (flg) {
+      ierr = VecAXPY(F,-1.0,F2);CHKERRQ(ierr);
+    }
+    ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
+    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+    ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
+    ierr = KSPSolve(ksp,F,U);CHKERRQ(ierr);
+    ierr = VecLockReadPop(Y[0]);CHKERRQ(ierr);
   } else {
-    ierr = MatMult(J,U,F);CHKERRQ(ierr);
+    /* need to reconstruct x0 from loaded solution (next time step) and stage solution
+       to properly compute fwdYdot */
+    s    = 1.0/(h*(theta-1.0));
+    ierr = VecAXPBYPCZ(fwdYdot,-s,s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
+    ierr = TSComputeIJacobian(ts,stage_time,fwdY[0],fwdYdot,0.0,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = TLMTSComputeForcing(ts,stage_time,fwdY[0],fwdYdot,&flg,F);CHKERRQ(ierr);
+    if (flg) {
+      ierr = MatMultAdd(J,U,F,F);CHKERRQ(ierr);
+    } else {
+      ierr = MatMult(J,U,F);CHKERRQ(ierr);
+    }
+    ierr = VecScale(F,-1.0);CHKERRQ(ierr);
+    s    = 1.0/(h*theta);
+    ierr = TSComputeIJacobian(ts,stage_time,fwdY[0],fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
+    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+    ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
+    /* TLM stage */
+    ierr = KSPSolve(ksp,F,Y[0]);CHKERRQ(ierr);
+    /* Advance TLM solution */
+    ierr = VecAXPY(U,1.0/theta,Y[0]);CHKERRQ(ierr);
   }
-  ierr = VecScale(F,(theta-1.0)/theta);CHKERRQ(ierr);
-  s    = 1.0/(theta*h);
-  ierr = VecAXPBYPCZ(fwdYdot,s,-s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
-  ierr = TSComputeIJacobian(ts,stage_time,fwdYSol,fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
-  ierr = TLMTSComputeForcing(ts,stage_time,fwdYSol,fwdYdot,&flg,F2);CHKERRQ(ierr);
-  if (flg) {
-    ierr = VecAXPY(F,-1.0,F2);CHKERRQ(ierr);
-  }
-  ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
-  ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-  ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
-  ierr = KSPSolve(ksp,F,U);CHKERRQ(ierr);
 
   ierr = DMRestoreGlobalVector(dm,&F2);CHKERRQ(ierr);
   ierr = DMRestoreGlobalVector(dm,&F);CHKERRQ(ierr);
   ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
   ierr = DMRestoreGlobalVector(dm,&fwdYdot);CHKERRQ(ierr);
-  ierr = VecLockReadPop(Y[0]);CHKERRQ(ierr);
   ierr = VecLockReadPop(fwdY[0]);CHKERRQ(ierr);
   ierr = VecLockReadPop(fwdYSol);CHKERRQ(ierr);
 
