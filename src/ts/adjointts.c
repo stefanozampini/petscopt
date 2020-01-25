@@ -68,28 +68,31 @@ static PetscErrorCode EvalQuadIntegrand_ADJ(Vec L, Vec Ldot, PetscReal t, Vec F,
       Vec       FOAL;
       PetscBool flg;
 
-      ierr = TSObjEval_MU(tsobj,U,adj_ctx->design,fwdt,U,q->work1,&flg,q->work2);CHKERRQ(ierr);
+      ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_TLMU",(PetscObject*)&TLMU);CHKERRQ(ierr);
+      if (!TLMU) SETERRQ(PetscObjectComm((PetscObject)L),PETSC_ERR_PLIB,"Missing TLM sampling vector");
+      ierr = TSObjEval_MU(tsobj,U,adj_ctx->design,fwdt,TLMU,q->work1,&flg,q->work2);CHKERRQ(ierr);
       if (flg) { ierr = VecAXPY(F,1.0,q->work2);CHKERRQ(ierr); }
       ierr = TSObjEval_MM(tsobj,U,adj_ctx->design,fwdt,adj_ctx->direction,q->work1,&flg,q->work2);CHKERRQ(ierr);
       if (flg) { ierr = VecAXPY(F,1.0,q->work2);CHKERRQ(ierr); }
       ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_FOAL",(PetscObject*)&FOAL);CHKERRQ(ierr);
       if (FOAL) { /* Full hessian */
-        PetscBool Hhas[3][3];
+        TSIFunction ifunc;
+        PetscBool   Hhas[3][3];
 
         ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
-        ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_TLMU",(PetscObject*)&TLMU);CHKERRQ(ierr);
-        ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_TLMUdot",(PetscObject*)&TLMUdot);CHKERRQ(ierr);
+        ierr = TSGetIFunction(adj_ctx->fwdts,NULL,&ifunc,NULL);CHKERRQ(ierr);
+        if (!ifunc) Hhas[2][1] = PETSC_FALSE;
         if (Hhas[2][2]) { /* (L^T \otimes I_M) H_MM direction */
           ierr = TSOptEvalHessianDAE(tsopt,2,2,fwdt,U,Udot,adj_ctx->design,FOAL,adj_ctx->direction,q->work1);CHKERRQ(ierr);
           ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
         }
         if (Hhas[2][0]) { /* (L^T \otimes I_M) H_MX \eta, \eta the TLM solution */
-          if (!TLMU) SETERRQ(PetscObjectComm((PetscObject)L),PETSC_ERR_PLIB,"Missing TLM sampling vector");
           ierr = TSOptEvalHessianDAE(tsopt,2,0,fwdt,U,Udot,adj_ctx->design,FOAL,TLMU,q->work1);CHKERRQ(ierr);
           ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
         }
         /* this is evaluated only via the IFunction interface */
         if (Hhas[2][1] && Udot) { /* (L^T \otimes I_M) H_MXdot \etadot */
+          ierr = PetscObjectQuery((PetscObject)L,"_ts_adjoint_discrete_TLMUdot",(PetscObject*)&TLMUdot);CHKERRQ(ierr);
           if (!TLMUdot) SETERRQ(PetscObjectComm((PetscObject)L),PETSC_ERR_PLIB,"Missing TLM sampling vector");
           ierr = TSOptEvalHessianDAE(tsopt,2,1,t,U,Udot,adj_ctx->design,FOAL,TLMUdot,q->work1);CHKERRQ(ierr);
           ierr = VecAXPY(F,1.0,q->work1);CHKERRQ(ierr);
@@ -134,6 +137,7 @@ static PetscErrorCode AdjointTSDestroy_Private(void *ptr)
   PetscFunctionReturn(0);
 }
 
+/* use U to sample the Jacobian for discrete adjoints */
 static PetscErrorCode AdjointTSRHSJacobian(TS adjts, PetscReal time, Vec U, Mat A, Mat P, void *ctx)
 {
   AdjointCtx     *adj_ctx;
@@ -223,6 +227,7 @@ static PetscErrorCode AdjointTSIFunctionLinear(TS adjts, PetscReal time, Vec U, 
   PetscFunctionReturn(0);
 }
 
+/* use U and Udot to sample the Jacobian for discrete adjoints */
 static PetscErrorCode AdjointTSIJacobian(TS adjts, PetscReal time, Vec U, Vec Udot, PetscReal shift, Mat A, Mat B, void *ctx)
 {
   AdjointCtx     *adj_ctx;
@@ -946,8 +951,9 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
       ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,&svec,NULL);CHKERRQ(ierr);
       rsve = PETSC_FALSE;
     }
-    /* these terms need to be evaluated only if we have point-form functionals */
-    if (foats) { /* Not present for Gauss-Newton Hessians */
+    /* these terms need to be evaluated only if we have point-form functionals,
+       and only in the case of full Hessians for continuous adjoints */
+    if (foats && !adj_ctx->discrete) {
       ierr = TSOptHasHessianDAE(tsopt,HFhas);CHKERRQ(ierr);
     }
     if (has_g && (HFhas[1][0] || HFhas[1][1] || HFhas[1][2])) {
@@ -1215,7 +1221,7 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
     ierr = MatDestroy(&pD);CHKERRQ(ierr);
   } else {
     if (has_g) {
-      if (adj_ctx->discrete) {
+      if (adj_ctx->discrete) { /* adjoint variable is scaled by -1.0 only to make it comparable with the continuous adjoint case */
         ierr = VecScale(adj_ctx->workinit,-1.0);CHKERRQ(ierr);
       } else {
         if (ijac) { /* lambda_T(T) = (J_Udot)^T D_x, D_x the gradients of the functionals that sample the solution at the final time */
@@ -1580,15 +1586,17 @@ PetscErrorCode AdjointTSFinalizeQuadrature(TS adjts)
   if (has) {
     TS          fwdts = adj_ctx->fwdts;
     Vec         lambda, FWDH[2], work;
-    TSIJacobian ijacfunc;
+    TSIJacobian ijacfunc = NULL;
     Mat         J_Udot = NULL;
     DM          adm;
 
     ierr = TSGetDM(adjts,&adm);CHKERRQ(ierr);
     ierr = DMGetGlobalVector(adm,&work);CHKERRQ(ierr);
     ierr = TSGetSolution(adjts,&lambda);CHKERRQ(ierr);
-    ierr = TSGetIJacobian(adjts,NULL,NULL,&ijacfunc,NULL);CHKERRQ(ierr);
-    if (!ijacfunc || adj_ctx->discrete) {
+    if (!adj_ctx->discrete) { /* no need to adjust for IJacobian for discrete adjoints */
+      ierr = TSGetIJacobian(adjts,NULL,NULL,&ijacfunc,NULL);CHKERRQ(ierr);
+    }
+    if (!ijacfunc) {
       ierr = VecCopy(lambda,work);CHKERRQ(ierr);
     } else {
       ierr = TSUpdateSplitJacobiansFromHistory_Private(fwdts,adj_ctx->t0);CHKERRQ(ierr);
@@ -1606,7 +1614,7 @@ PetscErrorCode AdjointTSFinalizeQuadrature(TS adjts)
     } else { /* second-order adjoint in Hessian computations */
       TS        foats = adj_ctx->foats;
       TS        tlmts = adj_ctx->tlmts;
-      Vec       soawork0 = NULL,soawork1 = NULL,FOAH = NULL,FWDH[2],TLMH,TLMHdot = NULL;
+      Vec       soawork0 = NULL,soawork1 = NULL,FOAH = NULL,FWDH[2] = {NULL, NULL},TLMH,TLMHdot = NULL;
       PetscBool HGhas[2][2] = {{PETSC_FALSE,PETSC_FALSE},
                                {PETSC_FALSE,PETSC_FALSE}};
       PetscBool HFhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
@@ -1617,10 +1625,12 @@ PetscErrorCode AdjointTSFinalizeQuadrature(TS adjts)
         ierr = DMGetGlobalVector(adm,&soawork0);CHKERRQ(ierr);
         ierr = DMGetGlobalVector(adm,&soawork1);CHKERRQ(ierr);
         ierr = TSOptHasHessianIC(tsopt,HGhas);CHKERRQ(ierr);
-        ierr = TSOptHasHessianDAE(tsopt,HFhas);CHKERRQ(ierr);
+        if (!adj_ctx->discrete) { /* for discrete adjoints, we only need to sample the IC terms */
+          ierr = TSOptHasHessianDAE(tsopt,HFhas);CHKERRQ(ierr);
+        }
         ierr = TSTrajectoryGetUpdatedHistoryVecs(foats->trajectory,foats,adj_ctx->tf,&FOAH,NULL);CHKERRQ(ierr);
         ierr = TSTrajectoryGetUpdatedHistoryVecs(tlmts->trajectory,tlmts,adj_ctx->t0,&TLMH,HFhas[1][1] ? &TLMHdot : NULL);CHKERRQ(ierr);
-        ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,adj_ctx->t0,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
+        ierr = TSTrajectoryGetUpdatedHistoryVecs(fwdts->trajectory,fwdts,adj_ctx->t0,&FWDH[0],(HFhas[1][0] || HFhas[1][1] || HFhas[1][2]) ? &FWDH[1] : NULL);CHKERRQ(ierr);
         if (!J_Udot) {
           ierr = VecCopy(FOAH,soawork1);CHKERRQ(ierr);
         } else {
@@ -1666,7 +1676,7 @@ PetscErrorCode AdjointTSFinalizeQuadrature(TS adjts)
         if (foats) {
           ierr = TSTrajectoryRestoreUpdatedHistoryVecs(foats->trajectory,&FOAH,NULL);CHKERRQ(ierr);
         }
-        ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,&FWDH[0],&FWDH[1]);CHKERRQ(ierr);
+        ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,&FWDH[0],FWDH[1] ? &FWDH[1] : NULL);CHKERRQ(ierr);
         ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tlmts->trajectory,&TLMH,TLMHdot ? &TLMHdot : NULL);CHKERRQ(ierr);
         ierr = DMRestoreGlobalVector(adm,&soawork0);CHKERRQ(ierr);
         ierr = DMRestoreGlobalVector(adm,&soawork1);CHKERRQ(ierr);
