@@ -731,5 +731,15 @@ test:
     suffix: discrete_cn_full
     args: -ts_type cn -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tlm_discrete -adjoint_tlm_discrete -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tao_test_hessian -tshessian_foadjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tao_type nls -tao_nls_pc_type none
 
+test:
+    requires: !complex !single
+    suffix: discrete_theta
+    args: -ts_type theta -ts_theta_theta {{0.17 0.5 0.88}separate output} -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tlm_discrete -adjoint_tlm_discrete -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tao_test_gradient -tshessian_mffd
+
+test:
+    requires: !complex !single
+    suffix: discrete_theta_gn
+    args: -ts_type theta -ts_theta_theta {{0.17 0.5 0.88}separate output} -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tlm_discrete -adjoint_tlm_discrete -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tshessian_gn -test_taylor_gn -tao_type nls -tao_nls_pc_type none -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_foadjoint_discrete
+
 
 TEST*/

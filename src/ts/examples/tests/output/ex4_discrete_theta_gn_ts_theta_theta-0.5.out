@@ -1,0 +1,96 @@
+
+Initial state
+Vec Object: 1 MPI processes
+  type: seq
+0.5
+0.5
+
+Final state
+Vec Object: 1 MPI processes
+  type: seq
+0.526271
+0.47623
+  0 TAO,  Function value: 0.249377,  Residual: 1.69185 
+  0 TAO,  Function value: 0.0251346,  Residual: 0.0734839 
+  1 TAO,  Function value: 0.000511515,  Residual: 0.0388346 
+  2 TAO,  Function value: 2.50557e-07,  Residual: 0.000723214 
+  3 TAO,  Function value: 8.88415e-14,  Residual: 3.12949e-07 
+  4 TAO,  Function value: 1.60769e-26,  Residual: 0. 
+
+Tao solution
+Vec Object: 1 MPI processes
+  type: seq
+-0.346574
+0.346574
+-0.693147
+
+Initial state solution
+Vec Object: 1 MPI processes
+  type: seq
+0.5
+0.5
+
+Gradient via adjoint
+Vec Object: 1 MPI processes
+  type: seq
+-0.026204
+0.026204
+0.520582
+
+Gradient of objective function
+Vec Object: 1 MPI processes
+  type: seq
+0.00268189
+0.487313
+
+Gradient via adjoint (TLM)
+Vec Object: 1 MPI processes
+  type: seq
+-0.026204
+0.026204
+0.520582
+
+TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
+Mat Object: 1 MPI processes
+  type: seqdense
+-5.2758619630959558e-01 5.2758619630959558e-01 1.0030301788144595e+00 
+-5.0868863291664207e-02 5.0868863291664207e-02 1.0627498972580358e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+-5.2758619630959447e-01 -5.0868863291664228e-02 
+5.2758619630959447e-01 5.0868863291664228e-02 
+1.0030301788144571e+00 1.0627498972580358e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+1.1102230246251565e-15 -1.1102230246251565e-15 -2.4424906541753444e-15 
+-2.0816681711721685e-17 2.0816681711721685e-17 0.0000000000000000e+00 
+
+Gradient via TLM (explicit fwd via multtrans)
+Vec Object: 1 MPI processes
+  type: seq
+-0.026204
+0.026204
+0.520582
+
+Gradient via TLM (explicit adj via mult)
+Vec Object: 1 MPI processes
+  type: seq
+-0.026204
+0.026204
+0.520582
+Mat Object: H 1 MPI processes
+  type: seqaij
+row 0: (0, 0.276877)  (1, -0.276877)  (2, -0.551875) 
+row 1: (0, -0.276877)  (1, 0.276877)  (2, 0.551875) 
+row 2: (0, -0.551875)  (1, 0.551875)  (2, 1.32687) 
+-------------------------- Taylor test results ---------------------------
+		Gradient				Hessian
+--------------------------------------------------------------------------
+0.000814301	0.00000 	0	6.70747e-05	0.00000 	0
+0.000211766	1.94309 	2	8.57794e-06	2.96706 	3
+5.40013e-05	1.97140 	2	1.08465e-06	2.98340 	3
+1.36351e-05	1.98567 	2	1.36367e-07	2.99167 	3
+3.42578e-06	1.99282 	2	1.70953e-08	2.99582 	3
+8.58579e-07	1.99641 	2	2.14001e-09	2.99791 	3
+2.14912e-07	1.99820 	2	2.67695e-10	2.99895 	3
+5.37614e-08	1.99910 	2	3.34740e-11	2.99948 	3
