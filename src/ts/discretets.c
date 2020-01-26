@@ -230,17 +230,6 @@ PetscErrorCode TSStep_TLM_RK(TS ts)
   if (ts->time_step == 0.0) ts->reason = TS_CONVERGED_ITS;
   PetscFunctionReturn(0);
 }
-#if 0
-static PetscErrorCode TSGetStages_Theta(TS ts,PetscInt *ns,Vec **Y)
-{
-  TS_Theta     *th = (TS_Theta*)ts->data;
-
-  PetscFunctionBegin;
-  if (ns) *ns = 1;
-  if (Y)  *Y  = th->endpoint ? &(th->X0) : &(th->X);
-  PetscFunctionReturn(0);
-}
-#endif
 
 /* The forward step of the endpoint variant assumes linear time-independent mass matrix */
 /* Otherwise, we should sample J_xdot at stage_time, and J_x at the beginning of the step and compute s * J_xdot + (theta-1)/theta J_x */
@@ -252,23 +241,32 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
   DM             dm;
   Mat            J, Jp;
   Vec            *LY,L,*fwdY,fwdYdot,fwdYSol,F,direction,Q;
-  Vec            *FOAY = NULL,*TLMY = NULL,TLMSol = NULL,FOAL = NULL,FOALdot = NULL,TLMU = NULL,TLMUdot = NULL;
+  Vec            *FOAY = NULL,*TLMY = NULL,TLMSol = NULL,FOAL = NULL,FOASol = NULL,FOALdot = NULL,TLMU = NULL,TLMUdot = NULL;
+  Vec            beY0 = NULL, beTLM0 = NULL;
   PetscReal      at = ts->ptime, dummy;
   PetscReal      h = ts->time_step;
   PetscReal      theta, astage_time, s;
   PetscInt       i, j, astep, tstep, step;
-  PetscBool      endpoint,flg,quad;
+  PetscBool      endpoint, flg, quad, beuler = PETSC_FALSE;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
   ierr = AdjointTSGetModelTS(ts,&fwdts);CHKERRQ(ierr);
   ierr = TSThetaGetTheta(fwdts,&theta);CHKERRQ(ierr);
+  if (theta == 1.0) beuler = PETSC_TRUE;
   ierr = TSThetaGetEndpoint(fwdts,&endpoint);CHKERRQ(ierr);
   ierr = TSTrajectoryGetSolutionOnly(fwdts->trajectory,&flg);CHKERRQ(ierr);
   if (flg) SETERRQ(PetscObjectComm((PetscObject)fwdts->trajectory),PETSC_ERR_SUP,"TSTrajectory did not save the stages! Rerun with TSTrajectorySetSolutionOnly(tj,PETSC_TRUE)");
   ierr = TSGetStepNumber(ts,&astep);CHKERRQ(ierr);
   ierr = TSTrajectoryGetNumSteps(fwdts->trajectory,&tstep);CHKERRQ(ierr);
   step = tstep - astep - 1;
+  if (beuler && !endpoint) {
+    ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
+    ierr = DMGetGlobalVector(dm,&beY0);CHKERRQ(ierr);
+    ierr = TSTrajectoryGet(fwdts->trajectory,fwdts,step-1,&dummy);CHKERRQ(ierr);
+    ierr = TSGetSolution(fwdts,&fwdYSol);CHKERRQ(ierr);
+    ierr = VecCopy(fwdYSol,beY0);CHKERRQ(ierr);
+  }
   ierr = TSTrajectoryGet(fwdts->trajectory,fwdts,step,&dummy);CHKERRQ(ierr);
 
   ierr = TSGetSolution(fwdts,&fwdYSol);CHKERRQ(ierr);
@@ -294,10 +292,18 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
     ierr = AdjointTSGetTLMTSAndFOATS(ts,&tlmts,&foats);CHKERRQ(ierr);
     ierr = TSTrajectoryGetSolutionOnly(tlmts->trajectory,&flg);CHKERRQ(ierr);
     if (flg) SETERRQ(PetscObjectComm((PetscObject)tlmts->trajectory),PETSC_ERR_SUP,"TSTrajectory did not save the stages! Rerun with TSTrajectorySetSolutionOnly(tj,PETSC_TRUE)");
+    if (beuler && !endpoint) {
+      ierr = TSGetDM(tlmts,&dm);CHKERRQ(ierr);
+      ierr = DMGetGlobalVector(dm,&beTLM0);CHKERRQ(ierr);
+      ierr = TSTrajectoryGet(tlmts->trajectory,tlmts,step-1,&dummy);CHKERRQ(ierr);
+      ierr = TSGetSolution(tlmts,&TLMSol);CHKERRQ(ierr);
+      ierr = VecCopy(TLMSol,beTLM0);CHKERRQ(ierr);
+    }
     ierr = TSTrajectoryGet(tlmts->trajectory,tlmts,step,&dummy);CHKERRQ(ierr);
     ierr = TSGetStages(tlmts,&i,&TLMY);CHKERRQ(ierr);
     if (i != 1) SETERRQ1(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Mismatch number of stages %D != 1",i);
     ierr = TSGetSolution(tlmts,&TLMSol);CHKERRQ(ierr);
+    ierr = VecLockReadPush(TLMSol);CHKERRQ(ierr);
     ierr = VecLockReadPush(TLMY[0]);CHKERRQ(ierr);
     ierr = TSGetDM(tlmts,&dm);CHKERRQ(ierr);
     ierr = DMGetGlobalVector(dm,&TLMUdot);CHKERRQ(ierr);
@@ -307,12 +313,14 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
       ierr = TSTrajectoryGet(foats->trajectory,foats,astep+1,&dummy);CHKERRQ(ierr);
       ierr = TSGetStages(foats,&i,&FOAY);CHKERRQ(ierr);
       if (i != 1) SETERRQ1(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Mismatch number of stages %D != 1",i);
+      ierr = TSGetSolution(foats,&FOASol);CHKERRQ(ierr);
+      ierr = VecLockReadPush(FOASol);CHKERRQ(ierr);
       ierr = VecLockReadPush(FOAY[0]);CHKERRQ(ierr);
       ierr = TSGetDM(foats,&dm);CHKERRQ(ierr);
       ierr = DMGetGlobalVector(dm,&FOALdot);CHKERRQ(ierr);
     }
   }
-  if (endpoint) {
+  if (endpoint && !beuler) {
     s    = 1.0/(theta*h);
     ierr = VecAXPBYPCZ(fwdYdot,s,-s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
     if (direction) {
@@ -374,15 +382,31 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
     } else {
       ierr = VecAXPBY(L,s,0.0,F);CHKERRQ(ierr);
     }
-  } else {
+  } else { /* theta case or beuler (endpoint or not) */
+    Vec fwdU = fwdY[0];
     /* need to reconstruct x0 from loaded solution (next time step) and stage solution
-       to properly compute fwdYdot */
-    s    = 1.0/(h*(theta-1.0));
-    ierr = VecAXPBYPCZ(fwdYdot,-s,s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
+       to properly compute fwdYdot.
+       This is not doable with BEULER, unless we have the endpoint variant which stores
+       it as a stage vector.
+    */
+    if (endpoint) { beY0 = fwdY[0]; beTLM0 = TLMY ? TLMY[0] : NULL; fwdU = fwdYSol; }
+    if (!beY0) {
+      s    = 1.0/(h*(theta-1.0));
+      ierr = VecAXPBYPCZ(fwdYdot,-s,s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
+    } else {
+      s    = 1.0/(theta*h);
+      ierr = VecAXPBYPCZ(fwdYdot,s,-s,0.0,fwdYSol,beY0);CHKERRQ(ierr);
+    }
     if (direction) {
+      if (!beTLM0) {
+        s    = 1.0/(h*(theta-1.0));
+        ierr = VecAXPBYPCZ(TLMUdot,-s,s,0.0,TLMSol,TLMY[0]);CHKERRQ(ierr);
+      } else {
+        s    = 1.0/(theta*h);
+        ierr = VecAXPBYPCZ(TLMUdot,s,-s,0.0,TLMSol,beTLM0);CHKERRQ(ierr);
+      }
+      TLMU = endpoint ? TLMSol : TLMY[0];
       FOAL = FOAY ? FOAY[0] : NULL;
-      ierr = VecAXPBYPCZ(TLMUdot,-s,s,0.0,TLMSol,TLMY[0]);CHKERRQ(ierr);
-      TLMU = TLMY[0];
       if (FOAL) {
         s    = 1.0/(h*theta);
         ierr = VecAXPBY(FOALdot,s,0.0,FOAL);CHKERRQ(ierr);
@@ -390,13 +414,13 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
     }
 
     s    = 1.0/(h*theta);
-    ierr = AdjointTSComputeForcing(ts,astage_time,fwdY[0],fwdYdot,FOAL,FOALdot,TLMU,TLMUdot,&flg,F);CHKERRQ(ierr);
+    ierr = AdjointTSComputeForcing(ts,astage_time,fwdU,fwdYdot,FOAL,FOALdot,TLMU,TLMUdot,&flg,F);CHKERRQ(ierr);
     if (flg) {
       ierr = VecAXPBY(F,s,-1.0,L);CHKERRQ(ierr);
     } else {
       ierr = VecAXPBY(F,s,0.0,L);CHKERRQ(ierr);
     }
-    ierr = TSComputeIJacobian(ts,astage_time,fwdY[0],fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = TSComputeIJacobian(ts,astage_time,fwdU,fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
     ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
     ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
     ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
@@ -404,20 +428,21 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
     ierr = KSPSolveTranspose(ksp,F,LY[0]);CHKERRQ(ierr);
     ierr = VecLockReadPush(LY[0]);CHKERRQ(ierr);
     ierr = VecSet(Q,0.0);CHKERRQ(ierr);
-    ierr = AdjointTSComputeQuadrature(ts,astage_time,fwdY[0],fwdYdot,LY[0],FOAL,NULL,TLMU,TLMUdot,&quad,Q);CHKERRQ(ierr);
+    ierr = AdjointTSComputeQuadrature(ts,astage_time,fwdU,fwdYdot,LY[0],FOAL,NULL,TLMU,TLMUdot,&quad,Q);CHKERRQ(ierr);
     if (quad) {
       ierr = VecAXPY(L,h,Q);CHKERRQ(ierr);
     }
-    ierr = TSComputeIJacobian(ts,astage_time,fwdY[0],fwdYdot,0.0,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = TSComputeIJacobian(ts,astage_time,fwdU,fwdYdot,0.0,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
     ierr = VecZeroEntries(fwdYdot);CHKERRQ(ierr);
     if (TLMUdot) { ierr = VecZeroEntries(TLMUdot);CHKERRQ(ierr); }
     if (FOALdot) { ierr = VecZeroEntries(FOALdot);CHKERRQ(ierr); }
-    ierr = AdjointTSComputeForcing(ts,astage_time,fwdY[0],fwdYdot,FOAL,FOALdot,TLMU,TLMUdot,&flg,F);CHKERRQ(ierr);
+    ierr = AdjointTSComputeForcing(ts,astage_time,fwdU,fwdYdot,FOAL,FOALdot,TLMU,TLMUdot,&flg,F);CHKERRQ(ierr);
     if (flg) {
       ierr = VecAXPY(L,-h,F);CHKERRQ(ierr);
     }
     ierr = MatMultTranspose(J,LY[0],F);CHKERRQ(ierr);
     ierr = VecAXPY(L,-h,F);CHKERRQ(ierr);
+    if (endpoint) { beY0 = NULL; beTLM0 = NULL; }
   }
   ierr = TSGetDM(ts,&dm);CHKERRQ(ierr);
   ierr = DMRestoreGlobalVector(dm,&Q);CHKERRQ(ierr);
@@ -430,8 +455,14 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
   if (TLMY) {
     ierr = VecLockReadPop(TLMY[0]);CHKERRQ(ierr);
   }
+  if (TLMSol) {
+    ierr = VecLockReadPop(TLMSol);CHKERRQ(ierr);
+  }
   if (FOAY) {
     ierr = VecLockReadPop(FOAY[0]);CHKERRQ(ierr);
+  }
+  if (FOASol) {
+    ierr = VecLockReadPop(FOASol);CHKERRQ(ierr);
   }
   if (tlmts) {
     ierr = TSGetDM(tlmts,&dm);CHKERRQ(ierr);
@@ -440,6 +471,14 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
   if (foats) {
     ierr = TSGetDM(foats,&dm);CHKERRQ(ierr);
     ierr = DMRestoreGlobalVector(dm,&FOALdot);CHKERRQ(ierr);
+  }
+  if (beY0) {
+    ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
+    ierr = DMRestoreGlobalVector(dm,&beY0);CHKERRQ(ierr);
+  }
+  if (beTLM0) {
+    ierr = TSGetDM(tlmts,&dm);CHKERRQ(ierr);
+    ierr = DMRestoreGlobalVector(dm,&beTLM0);CHKERRQ(ierr);
   }
   ts->ptime += h;
   ierr = TSHistoryGetTimeStep(fwdts->trajectory->tsh,PETSC_TRUE,astep+1,&ts->time_step);CHKERRQ(ierr);
@@ -454,21 +493,29 @@ PetscErrorCode TSStep_TLM_Theta(TS ts)
   KSP            ksp;
   DM             dm;
   Mat            J, Jp;
-  Vec            *Y,U,*fwdY,fwdYdot,fwdYSol,F,F2;
+  Vec            *Y,U,*fwdY,fwdYdot,fwdYSol,F,F2,beY0 = NULL;
   PetscReal      t = ts->ptime,dummy;
   PetscReal      h = ts->time_step;
   PetscReal      theta, stage_time, s;
   PetscInt       i, j;
-  PetscBool      endpoint,flg;
+  PetscBool      endpoint,flg,beuler = PETSC_FALSE;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
   ierr = TLMTSGetModelTS(ts,&fwdts);CHKERRQ(ierr);
   ierr = TSThetaGetTheta(fwdts,&theta);CHKERRQ(ierr);
+  if (theta == 1.0) beuler = PETSC_TRUE;
   ierr = TSThetaGetEndpoint(fwdts,&endpoint);CHKERRQ(ierr);
   ierr = TSTrajectoryGetSolutionOnly(fwdts->trajectory,&flg);CHKERRQ(ierr);
   if (flg) SETERRQ(PetscObjectComm((PetscObject)fwdts->trajectory),PETSC_ERR_SUP,"TSTrajectory did not save the stages! Rerun with TSTrajectorySetSolutionOnly(tj,PETSC_TRUE)");
   ierr = TSGetStepNumber(ts,&i);CHKERRQ(ierr);
+  if (beuler && !endpoint) {
+    ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
+    ierr = DMGetGlobalVector(dm,&beY0);CHKERRQ(ierr);
+    ierr = TSTrajectoryGet(fwdts->trajectory,fwdts,i,&dummy);CHKERRQ(ierr);
+    ierr = TSGetSolution(fwdts,&fwdYSol);CHKERRQ(ierr);
+    ierr = VecCopy(fwdYSol,beY0);CHKERRQ(ierr);
+  }
   ierr = TSTrajectoryGet(fwdts->trajectory,fwdts,i+1,&dummy);CHKERRQ(ierr);
   ierr = TSGetSolution(fwdts,&fwdYSol);CHKERRQ(ierr);
   ierr = TSGetStages(fwdts,&i,&fwdY);CHKERRQ(ierr);
@@ -486,7 +533,7 @@ PetscErrorCode TSStep_TLM_Theta(TS ts)
 
   stage_time = t + (endpoint ? 1.0 : theta)*h;
 
-  if (endpoint) {
+  if (endpoint && !beuler) {
     /* TLM stage */
     ierr = VecCopy(U,Y[0]);CHKERRQ(ierr);
     ierr = VecLockReadPush(Y[0]);CHKERRQ(ierr);
@@ -515,12 +562,19 @@ PetscErrorCode TSStep_TLM_Theta(TS ts)
     ierr = KSPSolve(ksp,F,U);CHKERRQ(ierr);
     ierr = VecLockReadPop(Y[0]);CHKERRQ(ierr);
   } else {
+    Vec fwdU = fwdY[0];
+    if (endpoint) { beY0 = fwdY[0]; fwdU = fwdYSol; }
     /* need to reconstruct x0 from loaded solution (next time step) and stage solution
        to properly compute fwdYdot */
-    s    = 1.0/(h*(theta-1.0));
-    ierr = VecAXPBYPCZ(fwdYdot,-s,s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
-    ierr = TSComputeIJacobian(ts,stage_time,fwdY[0],fwdYdot,0.0,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
-    ierr = TLMTSComputeForcing(ts,stage_time,fwdY[0],fwdYdot,&flg,F);CHKERRQ(ierr);
+    if (!beY0) {
+      s    = 1.0/(h*(theta-1.0));
+      ierr = VecAXPBYPCZ(fwdYdot,-s,s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
+    } else {
+      s    = 1.0/(theta*h);
+      ierr = VecAXPBYPCZ(fwdYdot,s,-s,0.0,fwdYSol,beY0);CHKERRQ(ierr);
+    }
+    ierr = TSComputeIJacobian(ts,stage_time,fwdU,fwdYdot,0.0,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = TLMTSComputeForcing(ts,stage_time,fwdU,fwdYdot,&flg,F);CHKERRQ(ierr);
     if (flg) {
       ierr = MatMultAdd(J,U,F,F);CHKERRQ(ierr);
     } else {
@@ -528,15 +582,17 @@ PetscErrorCode TSStep_TLM_Theta(TS ts)
     }
     ierr = VecScale(F,-1.0);CHKERRQ(ierr);
     s    = 1.0/(h*theta);
-    ierr = TSComputeIJacobian(ts,stage_time,fwdY[0],fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = TSComputeIJacobian(ts,stage_time,fwdU,fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
     ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
     ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
     ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
     ierr = KSPSolve(ksp,F,F);CHKERRQ(ierr);
     /* TLM stage */
-    ierr = VecWAXPY(Y[0],1.0,F,U);CHKERRQ(ierr);
+    if (endpoint) { ierr = VecCopy(U,Y[0]);CHKERRQ(ierr); }
+    else { ierr = VecWAXPY(Y[0],1.0,F,U);CHKERRQ(ierr); }
     /* Advance TLM solution */
     ierr = VecAXPY(U,1.0/theta,F);CHKERRQ(ierr);
+    if (endpoint) { beY0 = NULL; }
   }
 
   ierr = DMRestoreGlobalVector(dm,&F2);CHKERRQ(ierr);
@@ -545,6 +601,10 @@ PetscErrorCode TSStep_TLM_Theta(TS ts)
   ierr = DMRestoreGlobalVector(dm,&fwdYdot);CHKERRQ(ierr);
   ierr = VecLockReadPop(fwdY[0]);CHKERRQ(ierr);
   ierr = VecLockReadPop(fwdYSol);CHKERRQ(ierr);
+  if (beY0) {
+    ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
+    ierr = DMRestoreGlobalVector(dm,&beY0);CHKERRQ(ierr);
+  }
 
   ts->ptime += h;
   ierr = TSGetStepNumber(ts,&i);CHKERRQ(ierr);
