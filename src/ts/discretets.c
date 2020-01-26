@@ -121,7 +121,7 @@ PetscErrorCode TSStep_Adjoint_RK(TS ts)
     }
     if (cnt) {
       ierr = VecSet(F,0.0);CHKERRQ(ierr);
-      ierr = AdjointTSComputeQuadrature(ts,astage_time,Y[i],NULL,LY[k],NULL,FOAL,NULL,TLMU,NULL,&flg,F);CHKERRQ(ierr);
+      ierr = AdjointTSComputeQuadrature(ts,astage_time,Y[i],NULL,LY[k],FOAL,NULL,TLMU,NULL,&flg,F);CHKERRQ(ierr);
       if (flg) {
         if (!quad) { ierr = VecSet(Q,0.0);CHKERRQ(ierr); }
         quad = PETSC_TRUE;
@@ -337,7 +337,7 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
     ierr = KSPSolveTranspose(ksp,L,LY[0]);CHKERRQ(ierr);
     ierr = VecLockReadPush(LY[0]);CHKERRQ(ierr);
     ierr = VecSet(Q,0.0);CHKERRQ(ierr);
-    ierr = AdjointTSComputeQuadrature(ts,astage_time,fwdYSol,fwdYdot,LY[0],NULL,FOAL,NULL,TLMU,TLMUdot,&quad,Q);CHKERRQ(ierr);
+    ierr = AdjointTSComputeQuadrature(ts,astage_time,fwdYSol,fwdYdot,LY[0],FOAL,NULL,TLMU,TLMUdot,&quad,Q);CHKERRQ(ierr);
     if (quad) { ierr = VecScale(Q,-theta/(theta-1.0));CHKERRQ(ierr); }
 
     ierr = VecZeroEntries(fwdYdot);CHKERRQ(ierr);
@@ -363,7 +363,7 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
       ierr = TSGetDM(ts,&dm);CHKERRQ(ierr);
       ierr = DMGetGlobalVector(dm,&Q2);CHKERRQ(ierr);
       ierr = VecSet(Q2,0.0);CHKERRQ(ierr);
-      ierr = AdjointTSComputeQuadrature(ts,at+h,fwdY[0],fwdYdot,LY[0],NULL,FOAL,NULL,TLMU,TLMUdot,&flg,Q2);CHKERRQ(ierr);
+      ierr = AdjointTSComputeQuadrature(ts,at+h,fwdY[0],fwdYdot,LY[0],FOAL,NULL,TLMU,TLMUdot,&flg,Q2);CHKERRQ(ierr);
       ierr = VecAXPY(Q,1.0,Q2);CHKERRQ(ierr);
       ierr = DMRestoreGlobalVector(dm,&Q2);CHKERRQ(ierr);
     }
@@ -404,7 +404,7 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
     ierr = KSPSolveTranspose(ksp,F,LY[0]);CHKERRQ(ierr);
     ierr = VecLockReadPush(LY[0]);CHKERRQ(ierr);
     ierr = VecSet(Q,0.0);CHKERRQ(ierr);
-    ierr = AdjointTSComputeQuadrature(ts,astage_time,fwdY[0],fwdYdot,LY[0],NULL,FOAL,NULL,TLMU,TLMUdot,&quad,Q);CHKERRQ(ierr);
+    ierr = AdjointTSComputeQuadrature(ts,astage_time,fwdY[0],fwdYdot,LY[0],FOAL,NULL,TLMU,TLMUdot,&quad,Q);CHKERRQ(ierr);
     if (quad) {
       ierr = VecAXPY(L,h,Q);CHKERRQ(ierr);
     }

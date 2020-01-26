@@ -1780,7 +1780,7 @@ PetscErrorCode MatCreateShellWithMat(Mat A, PetscBool trans, Mat *B)
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode AdjointTSComputeQuadrature(TS ts, PetscReal t, Vec U, Vec Udot, Vec L, Vec Ldot, Vec FOAL, Vec FOALdot, Vec TLMU, Vec TLMUdot, PetscBool* has, Vec F)
+PetscErrorCode AdjointTSComputeQuadrature(TS ts, PetscReal t, Vec U, Vec Udot, Vec L, Vec FOAL, Vec FOALdot, Vec TLMU, Vec TLMUdot, PetscBool* has, Vec F)
 {
   PetscErrorCode ierr;
 
@@ -1789,16 +1789,15 @@ PetscErrorCode AdjointTSComputeQuadrature(TS ts, PetscReal t, Vec U, Vec Udot, V
   PetscValidHeaderSpecific(U,VEC_CLASSID,3);
   if (Udot) PetscValidHeaderSpecific(Udot,VEC_CLASSID,4);
   PetscValidHeaderSpecific(L,VEC_CLASSID,5);
-  if (Ldot) PetscValidHeaderSpecific(Ldot,VEC_CLASSID,6);
-  if (FOAL) PetscValidHeaderSpecific(FOAL,VEC_CLASSID,7);
-  if (FOALdot) PetscValidHeaderSpecific(FOALdot,VEC_CLASSID,8);
-  if (TLMU) PetscValidHeaderSpecific(TLMU,VEC_CLASSID,9);
-  if (TLMUdot) PetscValidHeaderSpecific(TLMUdot,VEC_CLASSID,10);
-  PetscValidPointer(has,11);
-  PetscValidHeaderSpecific(F,VEC_CLASSID,12);
+  if (FOAL) PetscValidHeaderSpecific(FOAL,VEC_CLASSID,6);
+  if (FOALdot) PetscValidHeaderSpecific(FOALdot,VEC_CLASSID,7);
+  if (TLMU) PetscValidHeaderSpecific(TLMU,VEC_CLASSID,8);
+  if (TLMUdot) PetscValidHeaderSpecific(TLMUdot,VEC_CLASSID,9);
+  PetscValidPointer(has,10);
+  PetscValidHeaderSpecific(F,VEC_CLASSID,11);
   *has = PETSC_FALSE;
-  ierr = PetscTryMethod(ts,"AdjointTSComputeQuadrature_C",(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,Vec,Vec,Vec,PetscBool*,Vec),
-                                                          (ts,t,U,Udot,L,Ldot,FOAL,FOALdot,TLMU,TLMUdot,has,F));CHKERRQ(ierr);
+  ierr = PetscTryMethod(ts,"AdjointTSComputeQuadrature_C",(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,Vec,Vec,PetscBool*,Vec),
+                                                          (ts,t,U,Udot,L,FOAL,FOALdot,TLMU,TLMUdot,has,F));CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 

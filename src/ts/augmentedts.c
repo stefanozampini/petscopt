@@ -245,11 +245,11 @@ PetscErrorCode AdjointTSComputeForcing_Aug(TS ats, PetscReal time, Vec U, Vec Ud
 }
 
 /* U,FOA,TLM on the state only, aL on state and quadrature */
-PetscErrorCode AdjointTSComputeQuadrature_Aug(TS ats, PetscReal time, Vec U, Vec Udot, Vec aL, Vec aLdot, Vec FOAL, Vec FOALdot, Vec TLMU, Vec TLMUdot, PetscBool *has, Vec F)
+PetscErrorCode AdjointTSComputeQuadrature_Aug(TS ats, PetscReal time, Vec U, Vec Udot, Vec aL, Vec FOAL, Vec FOALdot, Vec TLMU, Vec TLMUdot, PetscBool *has, Vec F)
 {
   TSAugCtx       *actx;
   DM             dm,qdm;
-  Vec            dummy,Q,L,Ldot;
+  Vec            dummy,Q,L;
   PetscInt       s = 0, q = 1;
   PetscErrorCode ierr;
 
@@ -261,11 +261,8 @@ PetscErrorCode AdjointTSComputeQuadrature_Aug(TS ats, PetscReal time, Vec U, Vec
   *has = PETSC_TRUE;
   ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
   ierr = DMCompositeGetAccessArray(dm,aL,1,&s,&L);CHKERRQ(ierr);
-  if (aLdot) {
-    ierr = DMCompositeGetAccessArray(dm,aLdot,1,&s,&Ldot);CHKERRQ(ierr);
-  } else Ldot = NULL;
   ierr = DMCompositeGetAccessArray(dm,F,1,&q,&Q);CHKERRQ(ierr);
-  ierr = (*actx->updatestates[0])(actx->qts[0],L,Ldot);CHKERRQ(ierr);
+  ierr = (*actx->updatestates[0])(actx->qts[0],L,NULL);CHKERRQ(ierr);
   ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_U",(PetscObject)U);CHKERRQ(ierr);
   ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_Udot",(PetscObject)Udot);CHKERRQ(ierr);
   ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_FOAL",(PetscObject)FOAL);CHKERRQ(ierr);
@@ -276,9 +273,6 @@ PetscErrorCode AdjointTSComputeQuadrature_Aug(TS ats, PetscReal time, Vec U, Vec
   ierr = DMGetGlobalVector(qdm,&dummy);CHKERRQ(ierr);
   ierr = TSComputeRHSFunction(actx->qts[0],time,dummy,Q);CHKERRQ(ierr);
   ierr = DMRestoreGlobalVector(qdm,&dummy);CHKERRQ(ierr);
-  if (Ldot) {
-    ierr = VecScale(Q,-1.0);CHKERRQ(ierr);
-  }
   ierr = (*actx->updatestates[0])(actx->qts[0],NULL,NULL);CHKERRQ(ierr);
   ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_U",NULL);CHKERRQ(ierr);
   ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_Udot",NULL);CHKERRQ(ierr);
@@ -287,9 +281,6 @@ PetscErrorCode AdjointTSComputeQuadrature_Aug(TS ats, PetscReal time, Vec U, Vec
   ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_TLMU",NULL);CHKERRQ(ierr);
   ierr = PetscObjectCompose((PetscObject)L,"_ts_adjoint_discrete_TLMUdot",NULL);CHKERRQ(ierr);
   ierr = DMCompositeRestoreAccessArray(dm,aL,1,&s,&L);CHKERRQ(ierr);
-  if (aLdot) {
-    ierr = DMCompositeRestoreAccessArray(dm,aLdot,1,&s,&Ldot);CHKERRQ(ierr);
-  }
   ierr = DMCompositeRestoreAccessArray(dm,F,1,&q,&Q);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }

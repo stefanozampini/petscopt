@@ -18,6 +18,6 @@ PETSC_EXTERN PetscErrorCode AdjointTSEventHandler(TS);
 PETSC_EXTERN PetscErrorCode AdjointTSFinalizeQuadrature(TS);
 PETSC_EXTERN PetscErrorCode AdjointTSIsDiscrete(TS,PetscBool*);
 PETSC_EXTERN PetscErrorCode AdjointTSSetUpStep(TS);
-PETSC_EXTERN PetscErrorCode AdjointTSComputeQuadrature(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,Vec,Vec,Vec,PetscBool*,Vec);
+PETSC_EXTERN PetscErrorCode AdjointTSComputeQuadrature(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,Vec,Vec,PetscBool*,Vec);
 
 #endif
