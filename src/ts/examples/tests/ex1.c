@@ -1557,12 +1557,12 @@ int main(int argc, char* argv[])
     suffix: 14_discrete_theta_full
     args: -t0 1.1 -tf 1.9 -dt 0.01 -ts_type theta -ts_theta_endpoint {{0 1}separate output} -ts_theta_theta {{0.1 0.65}separate output} -ts_theta_endpoint -test_objfixed_final -p 1.3 -ts_trajectory_type memory -tshessian_view -test_objective_norm -test_ifunc -m 1.1 -tsgradient_adjoint_discrete -tlm_discrete -adjoint_tlm_discrete -phi_view -phiT_view -err_view -taylor_ts_steps 6 -use_taylor -tshessian_foadjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_view
 
+  # cannot compare to the last digit ifunc and rhsfunc result
   test:
     requires: !complex !single
     suffix: 15
-    args: -t0 -1.9 -tf -1.1 -dt 0.01 -ts_type theta -test_general -test_objfixed_final -p 1.3 -ts_trajectory_type memory -test_objective_norm -test_ifunc {{0 1}} -test_mass -m 1.1 -use_taylor
+    args: -t0 -1.9 -tf -1.1 -dt 0.01 -ts_type theta -test_general -test_objfixed_final -p 1.3 -ts_trajectory_type memory -test_objective_norm -test_ifunc {{0 1}separate output} -test_mass -m 1.1 -use_taylor
 
-  # cannot compare to the last digit ifunc and rhsfunc result
   test:
     requires: !complex !single
     suffix: 15_discrete_theta_endpoint_mffd
