@@ -59,7 +59,7 @@ static PetscErrorCode MatMultTranspose_Propagator(Mat A, Vec x, Vec y)
 {
   MatPropagator_Ctx *prop;
   PetscErrorCode    ierr;
-  PetscBool         istr;
+  PetscBool         istr,dadj,dtlm;
   PetscReal         dt;
   Vec               tlmdesign,tlmworkrhs;
   TSTrajectory      otrj;
@@ -123,6 +123,10 @@ static PetscErrorCode MatMultTranspose_Propagator(Mat A, Vec x, Vec y)
     ierr = TSSetExactFinalTime(prop->adjlts,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
   }
   ierr = TSSetMaxTime(prop->adjlts,prop->tf);CHKERRQ(ierr);
+  ierr = TSSetUp(prop->adjlts);CHKERRQ(ierr);
+  ierr = TLMTSIsDiscrete(prop->lts,&dtlm);CHKERRQ(ierr);
+  ierr = AdjointTSIsDiscrete(prop->adjlts,&dadj);CHKERRQ(ierr);
+  if (dtlm != dadj) SETERRQ2(PetscObjectComm((PetscObject)A),PETSC_ERR_SUP,"Cannot mix %s TLM and %s adjoint",dtlm ? "discrete" : "continuous",dadj ? "discrete" : "continuous");
   ierr = AdjointTSSolveWithQuadrature_Private(prop->adjlts);CHKERRQ(ierr);
   ierr = AdjointTSFinalizeQuadrature(prop->adjlts);CHKERRQ(ierr);
   prop->lts->trajectory = NULL;
