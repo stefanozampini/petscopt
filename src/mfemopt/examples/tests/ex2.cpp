@@ -2105,7 +2105,7 @@ int main(int argc, char *argv[])
    testset:
      filter: sed -e "s/-nan/nan/g"
      timeoutfactor: 3
-     nsize: {{1 2}}
+     nsize: 2
      args: -scratch ./ -test_partitioning -meshfile ${petscopt_dir}/share/petscopt/meshes/segment-m5-5.mesh -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -test_newton
      test:
        suffix: null_test

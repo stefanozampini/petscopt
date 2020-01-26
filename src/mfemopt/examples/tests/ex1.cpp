@@ -652,25 +652,25 @@ int main(int argc, char* argv[])
 
   test:
     filter: sed -e "s/-nan/nan/g"
-    nsize: {{1 2}}
+    nsize: 2
     suffix: test
     args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor 0 -snes_converged_reason -quad 0 -order 2 -opt_tao_converged_reason -opt_tao_type bnls -test_taylor -taylor_seed 2
 
   test:
     filter: sed -e "s/-nan/nan/g"
-    nsize: {{1 2}}
+    nsize: 2
     suffix: test_pd
     args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor 0 -snes_converged_reason -quad 0 -order 2 -primaldual -opt_tao_converged_reason -opt_tao_type ntr -opt_tao_ntr_pc_type gamg
 
   test:
     timeoutfactor: 3
-    nsize: {{1 2}}
+    nsize: 2
     suffix: tv
     args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-10 -ksp_atol 1.e-10 -primaldual 0 -symmetrize 0 -monitor 0 -snes_converged_reason -opt_tao_converged_reason -opt_tao_type nls -opt_tao_nls_ksp_type gmres
 
   test:
     timeoutfactor: 3
-    nsize: {{1 2}}
+    nsize: 2
     requires: hypre
     suffix: tv_pd
     filter: sed -e "s/CONVERGED_FNORM_ABS iterations 17/CONVERGED_FNORM_ABS iterations 16/g"
@@ -678,19 +678,19 @@ int main(int argc, char* argv[])
 
   test:
     timeoutfactor: 3
-    nsize: {{1 2}}
+    nsize: 2
     suffix: tv_pd_project
     args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad 1 -order 1 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-10 -ksp_atol 1.e-10 -ksp_type cg -pc_type gamg -primaldual 1 -symmetrize 1 -project -monitor 0 -snes_converged_reason -opt_tao_converged_reason -opt_tao_type nls -opt_tao_nls_ksp_type cg -opt_tao_nls_pc_type gamg -opt_tao_gatol 1.e-10 -opt_tao_nls_ksp_rtol 1.e-10
 
   test:
-    nsize: {{1 2}}
+    nsize: 2
     suffix: vtv_test
-    args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor -quad -order 2 -opt_tao_max_it 0 -snes_max_it 0 -vector 1 -primaldual 0 -symmetrize {{0 1}} -coupled {{0 1}}
+    args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor -quad -order 2 -opt_tao_max_it 0 -snes_max_it 0 -vector 1 -primaldual 0 -symmetrize {{0 1}separate output} -coupled {{0 1}separate output}
 
   test:
-    nsize: {{1 2}}
+    nsize: 2
     suffix: vtv_pd_test
-    args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor -quad -order 2 -opt_tao_max_it 0 -snes_max_it 0 -vector 1 -primaldual 1 -symmetrize {{0 1}} -project {{0 1}} -coupled {{0 1}}
+    args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor -quad -order 2 -opt_tao_max_it 0 -snes_max_it 0 -vector 1 -primaldual 1 -symmetrize {{0 1}separate output} -project {{0 1}separate output} -coupled {{0 1}separate output}
 
   testset:
     nsize: 1

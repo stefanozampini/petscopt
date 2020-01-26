@@ -445,12 +445,12 @@ int main(int argc, char *argv[])
 
    test:
      suffix: conforming
-     nsize: {{1 2}}
+     nsize: 2
      args: -glvis 0 -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad.mesh -state_fec_type {{H1 HCURL HDIV L2}separate output} -state_ord 2 -mu_fec_type {{H1 HCURL HDIV L2}separate output} -mu_ord 2
 
    test:
      suffix: nonconforming
-     nsize: {{1 2}}
+     nsize: 1
      args: -glvis 0 -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad.mesh -state_fec_type {{H1 HCURL HDIV L2}separate output} -state_ord 2 -mu_fec_type {{H1 HCURL HDIV L2}separate output} -mu_ord 2 -ncrl 1
 
 TEST*/
