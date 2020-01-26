@@ -667,7 +667,7 @@ PetscErrorCode FormHessian_AO(Tao tao,Vec P,Mat H,Mat Hp,void *ctx)
 
     test:
       suffix: ao_discrete_theta
-      args: -adjointode -tsgradient_adjoint_discrete -tao_monitor -monitor 0 -ts_trajectory_type memory -tao_view -tao_test_gradient -ts_type theta -ts_theta_endpoint 0 -ts_theta_theta {{0.2 0.5 0.76}separate output}
+      args: -adjointode -tsgradient_adjoint_discrete -tao_monitor -monitor 0 -ts_trajectory_type memory -tao_view -tao_test_gradient -ts_type theta -ts_theta_endpoint 0 -ts_theta_theta {{0.2 0.5 0.76 1.0}separate output}
 
     test:
       suffix: ao_hessian

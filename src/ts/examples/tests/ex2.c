@@ -369,6 +369,6 @@ int main(int argc, char* argv[])
 
     test:
       suffix: propagator_theta_discrete
-      args: -ts_type theta -ts_theta_theta {{0.31 0.5 0.84}separate output} -tf 0.1 -dt 1.e-2 -lorentz {{0 1}separate output} -ifunc {{0 1}separate output} -ts_adapt_type basic -ts_trajectory_type memory -prop_view -propT_view -err_view -tlm_discrete -adjoint_tlm_discrete
+      args: -ts_type theta -ts_theta_theta {{0.31 0.5 0.84 1.0}separate output} -tf 0.1 -dt 1.e-2 -lorentz {{0 1}separate output} -ifunc {{0 1}separate output} -ts_adapt_type basic -ts_trajectory_type memory -prop_view -propT_view -err_view -tlm_discrete -adjoint_tlm_discrete
 
 TEST*/
