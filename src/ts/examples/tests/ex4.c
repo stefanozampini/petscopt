@@ -405,7 +405,7 @@ int main(int argc, char* argv[])
   k[2] =  1.0;
   k[3] =  0.0;
   k[4] =  0.0;
-  ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"Lotka-Volterra parameters","");
+  ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"Lotka-Volterra parameters","");CHKERRQ(ierr);
   ierr = PetscOptionsScalar("-k1","k1","",k[0],&k[0],NULL);CHKERRQ(ierr);
   ierr = PetscOptionsScalar("-k2","k2","",k[1],&k[1],NULL);CHKERRQ(ierr);
   ierr = PetscOptionsScalar("-k3","k3","",k[2],&k[2],NULL);CHKERRQ(ierr);
