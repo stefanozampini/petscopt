@@ -867,15 +867,29 @@ static PetscErrorCode HessianMult_Private(Mat H, Vec X, Vec Y)
 
 static PetscErrorCode TSCheckHessian_Private(TS ts, PetscReal t, Vec U, Vec Udot, Vec design, Vec L, PetscBool ic)
 {
-  MFFDCtx        mffd;
-  Mat            H,He;
-  Vec            base;
-  PetscInt       samples,i,j,m,n,M,N;
-  MPI_Comm       comm;
-  char           dstr[8],sstr[8];
-  PetscErrorCode ierr;
+  MFFDCtx           mffd;
+  Mat               H,He,HeMFFD;
+  Vec               base;
+  PetscInt          samples,i,j,m,n,M,N;
+  MPI_Comm          comm;
+  char              dstr[8],sstr[8];
+  PetscReal         nrm,gnorm;
+  PetscViewer       viewer,mviewer = NULL;
+  PetscViewerFormat format;
+  PetscBool         mview = PETSC_FALSE;
+  PetscErrorCode    ierr;
 
   PetscFunctionBegin;
+  ierr = PetscObjectOptionsBegin((PetscObject)ts);CHKERRQ(ierr);
+  ierr = PetscOptionsViewer("-ts_test_hessian_view","View difference between hand-coded and finite difference Hessian terms","None",&mviewer,&format,&mview);CHKERRQ(ierr);
+  ierr = PetscOptionsEnd();CHKERRQ(ierr);
+  if (mview) {
+    ierr = PetscViewerPushFormat(mviewer,format);CHKERRQ(ierr);
+  }
+  ierr = PetscObjectGetComm((PetscObject)ts,&comm);CHKERRQ(ierr);
+  ierr = PetscViewerASCIIGetStdout(comm,&viewer);CHKERRQ(ierr);
+  ierr = PetscViewerASCIIPrintf(viewer,"  ---------- Testing Hessian %s terms -------------\n",ic ? "IC" : "DAE");CHKERRQ(ierr);
+
   mffd.ts   = ts;
   mffd.ic   = ic;
   mffd.t    = t;
@@ -889,7 +903,6 @@ static PetscErrorCode TSCheckHessian_Private(TS ts, PetscReal t, Vec U, Vec Udot
     for (j=0;j<samples;j++) {
       mffd.deriv = j;
 
-      comm = PetscObjectComm((PetscObject)ts);
       if (mffd.deriv == samples - 1) {
         ierr = PetscStrcpy(dstr,"M");CHKERRQ(ierr);
         ierr = VecGetSize(design,&N);CHKERRQ(ierr);
@@ -928,21 +941,40 @@ static PetscErrorCode TSCheckHessian_Private(TS ts, PetscReal t, Vec U, Vec Udot
       ierr = MatMFFDSetFunction(H,(PetscErrorCode (*)(void*,Vec,Vec))ResidualHessian_Private,&mffd);CHKERRQ(ierr);
       ierr = MatAssemblyBegin(H,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
       ierr = MatAssemblyEnd(H,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-      ierr = MatComputeOperator(H,NULL,&He);CHKERRQ(ierr);
-      ierr = PetscPrintf(comm,"Hessian %s MFFD_%s%s\n",ic ? "IC" : "DAE",sstr,dstr);CHKERRQ(ierr);
-      ierr = MatView(He,NULL);CHKERRQ(ierr);
-      ierr = MatDestroy(&He);CHKERRQ(ierr);
+      ierr = MatComputeOperator(H,NULL,&HeMFFD);CHKERRQ(ierr);
       ierr = MatDestroy(&H);CHKERRQ(ierr);
 
       ierr = MatCreateShell(comm,m,n,M,N,&mffd,&H);CHKERRQ(ierr);
       ierr = MatShellSetOperation(H,MATOP_MULT,(void(*)(void))HessianMult_Private);CHKERRQ(ierr);
       ierr = MatComputeOperator(H,NULL,&He);CHKERRQ(ierr);
-      ierr = PetscPrintf(comm,"Hessian %s SHELL_%s%s\n",ic ? "IC" : "DAE",sstr,dstr);CHKERRQ(ierr);
-      ierr = MatView(He,NULL);CHKERRQ(ierr);
-      ierr = MatDestroy(&He);CHKERRQ(ierr);
       ierr = MatDestroy(&H);CHKERRQ(ierr);
+
+      ierr = MatDuplicate(He,MAT_COPY_VALUES,&H);CHKERRQ(ierr);
+      ierr = MatAXPY(H,-1.0,HeMFFD,DIFFERENT_NONZERO_PATTERN);CHKERRQ(ierr);
+      ierr = MatNorm(H,NORM_FROBENIUS,&nrm);CHKERRQ(ierr);
+      ierr = MatNorm(He,NORM_FROBENIUS,&gnorm);CHKERRQ(ierr);
+      if (!gnorm) gnorm = 1; /* just in case */
+      ierr = PetscViewerASCIIPrintf(viewer,"  Hessian%s_%s%s: ||H - Hmffd||_F/||H||_F = %g, ||H - Hmffd||_F = %g\n",ic ? "IC" : "DAE",sstr,dstr,(double)(nrm/gnorm),(double)nrm);CHKERRQ(ierr);
+
+      if (mview) {
+        ierr = PetscViewerASCIIPrintf(viewer,"  Hand-coded Hessian%s_%s%s ----------\n",ic ? "IC" : "DAE",sstr,dstr);CHKERRQ(ierr);
+        ierr = MatView(He,mviewer);CHKERRQ(ierr);
+        ierr = PetscViewerASCIIPrintf(viewer,"  Matrix-free finite difference Hessian%s_%s%s ----------\n",ic ? "IC" : "DAE",sstr,dstr);CHKERRQ(ierr);
+        ierr = MatView(HeMFFD,mviewer);CHKERRQ(ierr);
+        ierr = PetscViewerASCIIPrintf(viewer,"  Difference\n");CHKERRQ(ierr);
+        ierr = MatView(H,mviewer);CHKERRQ(ierr);
+      }
+
+      ierr = MatDestroy(&H);CHKERRQ(ierr);
+      ierr = MatDestroy(&He);CHKERRQ(ierr);
+      ierr = MatDestroy(&HeMFFD);CHKERRQ(ierr);
     }
   }
+  if (mview) {
+    ierr = PetscViewerPopFormat(mviewer);CHKERRQ(ierr);
+  }
+  ierr = PetscViewerDestroy(&mviewer);CHKERRQ(ierr);
+
   PetscFunctionReturn(0);
 }
 
