@@ -320,6 +320,7 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
       ierr = DMGetGlobalVector(dm,&FOALdot);CHKERRQ(ierr);
     }
   }
+
   if (endpoint && !beuler) {
     s    = 1.0/(theta*h);
     ierr = VecAXPBYPCZ(fwdYdot,s,-s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
@@ -433,8 +434,10 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
       ierr = VecAXPY(L,h,Q);CHKERRQ(ierr);
     }
     ierr = TSComputeIJacobian(ts,astage_time,fwdU,fwdYdot,0.0,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
-    ierr = VecZeroEntries(fwdYdot);CHKERRQ(ierr);
-    if (TLMUdot) { ierr = VecZeroEntries(TLMUdot);CHKERRQ(ierr); }
+    if (endpoint) {
+      ierr = VecZeroEntries(fwdYdot);CHKERRQ(ierr);
+      if (TLMUdot) { ierr = VecZeroEntries(TLMUdot);CHKERRQ(ierr); }
+    }
     if (FOALdot) { ierr = VecZeroEntries(FOALdot);CHKERRQ(ierr); }
     ierr = AdjointTSComputeForcing(ts,astage_time,fwdU,fwdYdot,FOAL,FOALdot,TLMU,TLMUdot,&flg,F);CHKERRQ(ierr);
     if (flg) {

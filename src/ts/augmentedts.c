@@ -619,7 +619,7 @@ static PetscErrorCode AugmentedTSOptionsHandler(PetscOptionItems *PetscOptionsOb
   PetscFunctionBegin;
   PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
-  ierr = TSSetFromOptions(actx->model);CHKERRQ(ierr);
+  ierr = TSSetFromOptions(actx->model);CHKERRQ(ierr); /* XXX remove */
   ierr = PetscOptionsHead(PetscOptionsObject,"Augmented TS options");CHKERRQ(ierr);
   ierr = PetscOptionsTail();CHKERRQ(ierr);
   PetscFunctionReturn(0);
@@ -901,7 +901,7 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
   ierr = TSGetI2Function(ts,NULL,&i2func,NULL);CHKERRQ(ierr);
   if (i2func) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_SUP,"Second order DAEs are not supported");
   ierr = TSCreateWithTS(ts,ats);CHKERRQ(ierr);
-  /* XXX */
+  /* HACK */
   if (ts->adapt) {
     ierr = TSAdaptDestroy(&((*ats)->adapt));CHKERRQ(ierr);
     ierr = PetscObjectReference((PetscObject)ts->adapt);CHKERRQ(ierr);
