@@ -57,7 +57,7 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   TSTrajectory   otrj;
   TSAdapt        adapt;
   PetscReal      dt;
-  PetscBool      istr,soadisc;
+  PetscBool      istr,soadisc,tlmdisc;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -83,6 +83,7 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   ierr = TSTrajectorySetFromOptions(tshess->tlmts->trajectory,tshess->tlmts);CHKERRQ(ierr);
   tshess->tlmts->trajectory->adjoint_solve_mode = PETSC_FALSE;
 
+  ierr = TLMTSIsDiscrete(tshess->tlmts,&tlmdisc);CHKERRQ(ierr);
   ierr = TLMTSSetPerturbationVec(tshess->tlmts,x);CHKERRQ(ierr);
   ierr = TLMTSComputeInitialConditions(tshess->tlmts,tshess->t0,tshess->x0);CHKERRQ(ierr);
   ierr = TSSetStepNumber(tshess->tlmts,0);CHKERRQ(ierr);
@@ -92,8 +93,11 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   ierr = TSHistoryGetTimeStep(tshess->modeltj->tsh,PETSC_FALSE,0,&dt);CHKERRQ(ierr);
   ierr = TSSetTimeStep(tshess->tlmts,dt);CHKERRQ(ierr);
   ierr = TSGetAdapt(tshess->tlmts,&adapt);CHKERRQ(ierr);
-  ierr = PetscObjectTypeCompare((PetscObject)adapt,TSADAPTHISTORY,&istr);CHKERRQ(ierr);
+  if (tlmdisc) {
+    ierr = TSAdaptSetType(adapt,TSADAPTHISTORY);CHKERRQ(ierr);
+  }
   ierr = TSAdaptHistorySetTSHistory(adapt,tshess->modeltj->tsh,PETSC_FALSE);CHKERRQ(ierr);
+  ierr = PetscObjectTypeCompare((PetscObject)adapt,TSADAPTHISTORY,&istr);CHKERRQ(ierr);
   if (istr) {
     PetscInt n;
 
@@ -122,6 +126,9 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   ierr = TSHistoryGetTimeStep(tshess->modeltj->tsh,PETSC_TRUE,0,&dt);CHKERRQ(ierr);
   ierr = TSSetTimeStep(tshess->soats,dt);CHKERRQ(ierr);
   ierr = TSGetAdapt(tshess->soats,&adapt);CHKERRQ(ierr);
+  if (soadisc) {
+    ierr = TSAdaptSetType(adapt,TSADAPTHISTORY);CHKERRQ(ierr);
+  }
   ierr = PetscObjectTypeCompare((PetscObject)adapt,TSADAPTHISTORY,&istr);CHKERRQ(ierr);
   if (!istr) {
     PetscBool isnone;
@@ -547,7 +554,7 @@ PetscErrorCode TSComputeObjectiveAndGradient(TS ts, PetscReal t0, PetscReal dt, 
   ierr = TSSetStepNumber(ts,0);CHKERRQ(ierr);
   ierr = TSRestartStep(ts);CHKERRQ(ierr);
   ierr = TSSetTime(ts,t0);CHKERRQ(ierr);
-  if (dt > 0) {
+  if (dt > 0.0) {
     ierr = TSSetTimeStep(ts,dt);CHKERRQ(ierr);
   }
   ierr = TSSetMaxTime(ts,tf);CHKERRQ(ierr);
