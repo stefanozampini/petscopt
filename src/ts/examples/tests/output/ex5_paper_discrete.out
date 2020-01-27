@@ -1,0 +1,68 @@
+
+Final state
+Vec Object: 1 MPI processes
+  type: seq
+1.
+0.000796332
+  ---------- Testing Hessian DAE terms -------------
+  HessianDAE_UU: ||H - Hmffd||_F/||H||_F = 7.29436e-09, ||H - Hmffd||_F = 1.27491e-09
+  HessianDAE_UUdot: ||H - Hmffd||_F/||H||_F = 3.4388e-09, ||H - Hmffd||_F = 3.51453e-09
+  HessianDAE_UM: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_UdotU: ||H - Hmffd||_F/||H||_F = 3.47383e-09, ||H - Hmffd||_F = 3.55033e-09
+  HessianDAE_UdotUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_UdotM: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_MU: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_MUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_MM: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+Null test: 0. (1.0008)
+[0] Gradient: -9.99203350664554e-01 1.00079601519030e+00
+
+TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
+Mat Object: 1 MPI processes
+  type: seqdense
+7.9633226469902720e-04 9.9999968292555830e-01 
+-9.9999968292924135e-01 7.9633226473812451e-04 
+Mat Object: 1 MPI processes
+  type: seqdense
+7.9633226469862919e-04 -9.9999968292924590e-01 
+9.9999968292556773e-01 7.9633226474087263e-04 
+Mat Object: 1 MPI processes
+  type: seqdense
+-3.9801061751942868e-16 9.4368957093138306e-15 
+-4.5519144009631418e-15 2.7481272465990081e-15 
+
+Gradient via TLM (explicit fwd via multtrans)
+Vec Object: 1 MPI processes
+  type: seq
+-0.999203
+1.0008
+Vec Object: 1 MPI processes
+  type: seq
+1.18794e-14
+-7.10543e-15
+
+Gradient via TLM (explicit adj via mult)
+Vec Object: 1 MPI processes
+  type: seq
+-0.999203
+1.0008
+Vec Object: 1 MPI processes
+  type: seq
+6.99441e-15
+5.10703e-15
+  ---------- Testing Gradient -------------
+  Run with -tao_test_gradient_view and optionally -tao_test_gradient <threshold> to show difference
+    of hand-coded and finite difference gradient entries greater than <threshold>.
+  Testing hand-coded Gradient, if (for double precision runs) ||G - Gfd||/||G|| is
+    O(1.e-8), the hand-coded Gradient is probably correct.
+  ||Gfd|| 1.41421, ||G|| = 1.41421, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 9.76512e-07, ||G - Gfd|| = 1.381e-06
+  max-norm ||G - Gfd||/||G|| = 9.79872e-07, ||G - Gfd|| = 9.80652e-07
+Mat Object: H 1 MPI processes
+  type: seqdense
+-4.6799658627869488e-12 -8.0928287822886988e-12 
+-8.0513271811713847e-12 4.7947370795655819e-12 
+Mat Object: 1 MPI processes
+  type: seqdense
+0.0000000000000000e+00 4.1501601117314101e-14 
+-4.1501601117314101e-14 0.0000000000000000e+00 

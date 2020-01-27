@@ -1,0 +1,66 @@
+
+Final state
+Vec Object: 1 MPI processes
+  type: seq
+1.
+0.000850079
+  ---------- Testing Hessian DAE terms -------------
+  HessianDAE_UU: ||H - Hmffd||_F/||H||_F = 7.29436e-09, ||H - Hmffd||_F = 1.27491e-09
+  HessianDAE_UUdot: ||H - Hmffd||_F/||H||_F = 3.4388e-09, ||H - Hmffd||_F = 3.51453e-09
+  HessianDAE_UM: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_UdotU: ||H - Hmffd||_F/||H||_F = 3.47383e-09, ||H - Hmffd||_F = 3.55033e-09
+  HessianDAE_UdotUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_UdotM: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_MU: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_MUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_MM: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+Null test: 1.77636e-15 (1.)
+[0] Gradient: -2.03429530165507e-14 1.99999999999799e+00
+
+TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
+Mat Object: 1 MPI processes
+  type: seqdense
+8.5007932233707381e-04 9.9999963868123520e-01 
+-9.9999963868177388e-01 8.5007932233566001e-04 
+Mat Object: 1 MPI processes
+  type: seqdense
+8.5007932233740753e-04 -9.9999963868177388e-01 
+9.9999963868123554e-01 8.5007932233570869e-04 
+Mat Object: 1 MPI processes
+  type: seqdense
+3.3371742869103826e-16 3.3306690738754696e-16 
+0.0000000000000000e+00 4.8680677544599149e-17 
+
+Gradient via TLM (explicit fwd via multtrans)
+Vec Object: 1 MPI processes
+  type: seq
+-1.89514e-14
+2.
+Vec Object: 1 MPI processes
+  type: seq
+1.39153e-15
+1.9984e-15
+
+Gradient via TLM (explicit adj via mult)
+Vec Object: 1 MPI processes
+  type: seq
+-1.8284e-14
+2.
+Vec Object: 1 MPI processes
+  type: seq
+2.059e-15
+2.66454e-15
+  ---------- Testing Hessian -------------
+  Run with -tao_test_hessian_view and optionally -tao_test_hessian <threshold> to show difference
+    of hand-coded and finite difference Hessian entries greater than <threshold>.
+  Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
+    O(1.e-8), the hand-coded Hessian is probably correct.
+  ||H - Hfd||_F/||H||_F = 6.67412e-08, ||H - Hfd||_F = 1.88773e-07
+Mat Object: H 1 MPI processes
+  type: seqdense
+2.0000000000000018e+00 9.2867850678060644e-17 
+1.6523252937685676e-15 2.0000000000000022e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+0.0000000000000000e+00 1.5594574430905069e-15 
+-1.5594574430905069e-15 0.0000000000000000e+00 
