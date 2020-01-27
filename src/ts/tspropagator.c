@@ -251,11 +251,11 @@ static PetscErrorCode MatPropagatorUpdate_Propagator(Mat A, PetscReal t0, PetscR
 static PetscErrorCode TSCreatePropagatorMat_Private(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec x0, Vec design, Mat P, Mat *A)
 {
   MatPropagator_Ctx *prop;
-  Mat               G_m;
   TSOpt             tsopt;
   TSAdapt           adapt;
   Vec               X;
   PetscInt          M,N,m,n,rbs,cbs;
+  PetscBool         has;
   PetscErrorCode    ierr;
 
   PetscFunctionBegin;
@@ -307,6 +307,9 @@ static PetscErrorCode TSCreatePropagatorMat_Private(TS ts, PetscReal t0, PetscRe
 
   /* create the tangent linear model solver */
   ierr = TSCreateTLMTS(prop->model,&prop->lts);CHKERRQ(ierr);
+  ierr = VecDuplicate(x0,&X);CHKERRQ(ierr);
+  ierr = TSSetSolution(prop->lts,X);CHKERRQ(ierr);
+  ierr = VecDestroy(&X);CHKERRQ(ierr);
   ierr = TSGetAdapt(prop->lts,&adapt);CHKERRQ(ierr);
   ierr = TSAdaptSetType(adapt,TSADAPTHISTORY);CHKERRQ(ierr);
   ierr = TLMTSSetDesignVec(prop->lts,design);CHKERRQ(ierr);
@@ -316,23 +319,24 @@ static PetscErrorCode TSCreatePropagatorMat_Private(TS ts, PetscReal t0, PetscRe
   ierr = TLMTSSetUpStep(prop->lts);CHKERRQ(ierr);
 
   ierr = VecDuplicate(x0,&prop->x0);CHKERRQ(ierr);
+  ierr = VecCopy(x0,prop->x0);CHKERRQ(ierr);
   ierr = VecLockReadPush(prop->x0);CHKERRQ(ierr); /* this vector is locked since it stores the initial conditions */
   ierr = MatPropagatorUpdate_Propagator(*A,t0,dt,tf,x0,design);CHKERRQ(ierr);
   ierr = MatSetUp(*A);CHKERRQ(ierr);
+
   /* model sampling can terminate before tf due to events */
   ierr = TSGetTime(prop->model,&prop->tf);CHKERRQ(ierr);
 
   ierr = TSAddObjective(prop->lts,prop->tf,TLMTS_dummyOBJ,TLMTS_dummyRHS,NULL,
                         NULL,NULL,NULL,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
+
   /* we need to call this since we will then compute the adjoint of the TLM */
   ierr = TSSetTSOpt(prop->lts,tsopt);CHKERRQ(ierr);
-  ierr = PetscObjectQuery((PetscObject)(*A),"_ts_propagator_default",(PetscObject*)&G_m);CHKERRQ(ierr);
-  if (G_m) {
-    ierr = TSSetGradientIC(prop->lts,NULL,G_m,NULL,NULL);CHKERRQ(ierr);
+
+  ierr = TSOptHasGradientIC(tsopt,&has);CHKERRQ(ierr);
+  if (!has) { /* we compute a linear dependence on u_0 by default */
+    ierr = TSSetGradientIC(prop->lts,NULL,NULL,TSEvalGradientICDefault,NULL);CHKERRQ(ierr);
   }
-  ierr = VecDuplicate(prop->x0,&X);CHKERRQ(ierr);
-  ierr = TSSetSolution(prop->lts,X);CHKERRQ(ierr);
-  ierr = VecDestroy(&X);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -374,8 +378,6 @@ $          ||du_0||=1
 @*/
 PetscErrorCode TSCreatePropagatorMat(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec x0, Vec design, Mat P, Mat *A)
 {
-  TSOpt          tsopt;
-  PetscBool      has;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -388,24 +390,6 @@ PetscErrorCode TSCreatePropagatorMat(TS ts, PetscReal t0, PetscReal dt, PetscRea
   if (P) PetscValidHeaderSpecific(P,MAT_CLASSID,7);
   PetscValidPointer(A,8);
   ierr = MatCreate(PetscObjectComm((PetscObject)ts),A);CHKERRQ(ierr);
-  ierr = TSGetTSOpt(ts,&tsopt);CHKERRQ(ierr);
-  ierr = TSOptHasGradientIC(tsopt,&has);CHKERRQ(ierr);
-  if (!has) { /* we compute a linear dependence on u_0 by default */
-    Mat      G_m;
-    PetscInt m;
-
-    ierr = VecGetLocalSize(x0,&m);CHKERRQ(ierr);
-    ierr = MatCreate(PetscObjectComm((PetscObject)ts),&G_m);CHKERRQ(ierr);
-    ierr = MatSetSizes(G_m,m,m,PETSC_DECIDE,PETSC_DECIDE);CHKERRQ(ierr);
-    ierr = MatSetType(G_m,MATAIJ);CHKERRQ(ierr);
-    ierr = MatSeqAIJSetPreallocation(G_m,1,NULL);CHKERRQ(ierr);
-    ierr = MatMPIAIJSetPreallocation(G_m,1,NULL,0,NULL);CHKERRQ(ierr);
-    ierr = MatAssemblyBegin(G_m,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-    ierr = MatAssemblyEnd(G_m,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-    ierr = MatShift(G_m,-1.0);CHKERRQ(ierr);
-    ierr = PetscObjectCompose((PetscObject)(*A),"_ts_propagator_default",(PetscObject)G_m);CHKERRQ(ierr);
-    ierr = MatDestroy(&G_m);CHKERRQ(ierr);
-  }
   ierr = TSCreatePropagatorMat_Private(ts,t0,dt,tf,x0,design,P,A);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }

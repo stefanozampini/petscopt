@@ -370,6 +370,21 @@ PetscErrorCode TSSetHessianDAE(TS ts, TSEvalHessianDAE f_xx,  TSEvalHessianDAE f
   PetscFunctionReturn(0);
 }
 
+PetscErrorCode TSEvalGradientICDefault(TS ts, PetscReal t, Vec X, Vec M, Mat G_x, Mat G_m , void* ctx)
+{
+  PetscFunctionBegin;
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode TSGradientICDefault(Mat G_m, Vec X, Vec Y)
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = VecAXPBY(Y,-1.0,0.0,X);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
 /*@C
    TSSetGradientIC - Sets the callback to compute the Jacobian matrices G_x(x0,m) and G_m(x0,m), with parameter dependent initial conditions implicitly defined by the function G(x(0),m) = 0.
 
@@ -422,20 +437,35 @@ PetscErrorCode TSSetGradientIC(TS ts, Mat J_x, Mat J_m, TSEvalGradientIC f, void
 
   ierr = PetscObjectCompose((PetscObject)ts,"_ts_gradientIC_G",NULL);CHKERRQ(ierr);
   ierr = PetscObjectCompose((PetscObject)ts,"_ts_gradientIC_GW",NULL);CHKERRQ(ierr);
+  if (f == TSEvalGradientICDefault) {
+    Vec      U;
+    PetscInt n,N;
 
-  if (J_x) {
-    ierr = PetscObjectReference((PetscObject)J_x);CHKERRQ(ierr);
+    ierr = MatDestroy(&tsopt->G_x);CHKERRQ(ierr);
+    ierr = MatDestroy(&tsopt->G_m);CHKERRQ(ierr);
+    ierr = TSGetSolution(ts,&U);CHKERRQ(ierr);
+    if (!U) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_ORDER,"Must set solution first");
+    ierr = VecGetLocalSize(U,&n);CHKERRQ(ierr);
+    ierr = VecGetSize(U,&N);CHKERRQ(ierr);
+    ierr = MatCreateShell(PetscObjectComm((PetscObject)ts),n,n,N,N,NULL,&tsopt->G_m);CHKERRQ(ierr);
+    ierr = MatShellSetOperation(tsopt->G_m,MATOP_MULT,(void(*)(void))TSGradientICDefault);CHKERRQ(ierr);
+    ierr = MatShellSetOperation(tsopt->G_m,MATOP_MULT_TRANSPOSE,(void(*)(void))TSGradientICDefault);CHKERRQ(ierr);
+    tsopt->Ggrad     = f;
+    tsopt->Ggrad_ctx = ctx;
+  } else {
+    if (J_x) {
+      ierr = PetscObjectReference((PetscObject)J_x);CHKERRQ(ierr);
+    }
+    if (J_m) {
+      ierr = PetscObjectReference((PetscObject)J_m);CHKERRQ(ierr);
+    }
+    ierr = MatDestroy(&tsopt->G_x);CHKERRQ(ierr);
+    ierr = MatDestroy(&tsopt->G_m);CHKERRQ(ierr);
+    tsopt->G_x       = J_x;
+    tsopt->G_m       = J_m;
+    tsopt->Ggrad     = f;
+    tsopt->Ggrad_ctx = ctx;
   }
-  ierr       = MatDestroy(&tsopt->G_x);CHKERRQ(ierr);
-  tsopt->G_x = J_x;
-
-  if (J_m) {
-    ierr = PetscObjectReference((PetscObject)J_m);CHKERRQ(ierr);
-  }
-  ierr             = MatDestroy(&tsopt->G_m);CHKERRQ(ierr);
-  tsopt->G_m       = J_m;
-  tsopt->Ggrad     = f;
-  tsopt->Ggrad_ctx = ctx;
   PetscFunctionReturn(0);
 }
 

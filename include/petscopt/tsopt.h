@@ -22,6 +22,7 @@ PETSC_EXTERN_TYPEDEF typedef PetscErrorCode (*TSEvalGradientDAE)(TS,PetscReal,Ve
 PETSC_EXTERN_TYPEDEF typedef PetscErrorCode (*TSEvalHessianDAE)(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,Vec,void*);
 PETSC_EXTERN_TYPEDEF typedef PetscErrorCode (*TSEvalHessianIC)(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,void*);
 
+PETSC_EXTERN PetscErrorCode TSEvalGradientICDefault(TS,PetscReal,Vec,Vec,Mat,Mat,void*);
 PETSC_EXTERN PetscErrorCode TSSetGradientDAE(TS,Mat,TSEvalGradientDAE,void*);
 PETSC_EXTERN PetscErrorCode TSSetHessianDAE(TS,TSEvalHessianDAE,TSEvalHessianDAE,TSEvalHessianDAE,
                                                TSEvalHessianDAE,TSEvalHessianDAE,TSEvalHessianDAE,
