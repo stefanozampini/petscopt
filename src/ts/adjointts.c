@@ -1004,7 +1004,7 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
   }
   ierr = TSGetEquationType(adj_ctx->fwdts,&eqtype);CHKERRQ(ierr);
   ierr = TSGetIJacobian(adjts,NULL,NULL,&ijac,NULL);CHKERRQ(ierr);
-  if (eqtype == TS_EQ_DAE_SEMI_EXPLICIT_INDEX1 && adj_ctx->design) { /* details in [1,Section 4.2] */
+  if (eqtype == TS_EQ_DAE_SEMI_EXPLICIT_INDEX1 && adj_ctx->design && !adj_ctx->discrete) { /* details in [1,Section 4.2] */
     KSP       kspM,kspD;
     Mat       M = NULL,B = NULL,C = NULL,D = NULL,pM = NULL,pD = NULL;
     Mat       J_U,J_Udot,pJ_U,pJ_Udot;
@@ -1014,7 +1014,6 @@ PetscErrorCode AdjointTSComputeInitialConditions(TS adjts, Vec svec, PetscBool a
     Vec       f_x,W;
     PetscBool has_f;
 
-    if (adj_ctx->discrete) SETERRQ(PetscObjectComm((PetscObject)adjts),PETSC_ERR_USER,"Not coded for index-1 DAEs");
     ierr = VecDuplicate(adj_ctx->workinit,&f_x);CHKERRQ(ierr);
     if (!svec) {
       ierr = TSTrajectoryGetUpdatedHistoryVecs(adj_ctx->fwdts->trajectory,adj_ctx->fwdts,fwdt,&svec,NULL);CHKERRQ(ierr);

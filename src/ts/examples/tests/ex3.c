@@ -23,9 +23,6 @@ typedef struct {
   PetscReal alpha;
   PetscReal beta;
   PetscReal fpi;
-  /* These are not parameters: we just pass them around */
-  PetscReal initdt;
-  PetscReal tf;
 } AppCtx;
 
 /* Reactions and their partial derivatives */
@@ -373,7 +370,13 @@ static PetscErrorCode FormICFunction(SNES snes, Vec X, Vec F, void* ctx)
   PetscFunctionReturn(0);
 }
 
-/* Jacobian for initial condition computation */
+/* Jacobian for initial condition computation
+
+     I B
+     C D
+
+   Identity on primal variables, B, C and D whatever comes from the constraints
+*/
 static PetscErrorCode FormICJacobian(SNES snes, Vec U, Mat J, Mat Jp, void* ctx)
 {
   TS             ts;
@@ -513,14 +516,19 @@ static PetscErrorCode EvalObjective_UU(Vec U, Vec M, PetscReal time, Mat H, void
   PetscFunctionReturn(0);
 }
 
+typedef struct {
+  TS ts;
+  PetscReal dt,tf;
+} OptCtx;
+
 /* callback for use with TAO solvers */
 static PetscErrorCode FormObjective(Tao tao, Vec M, PetscReal *obj, void* ctx)
 {
-  TS             ts = (TS)ctx;
+  OptCtx         *opt = (OptCtx*)ctx;
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser;
-  ierr = TSComputeObjectiveAndGradient(ts,0.0,0.0,0.0,NULL,M,NULL,obj);CHKERRQ(ierr);
+  ierr = TSComputeObjectiveAndGradient(opt->ts,0.0,opt->dt,opt->tf,NULL,M,NULL,obj);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -555,12 +563,6 @@ static PetscErrorCode MyTSSetUpFromDesign(TS ts, Vec x0, Vec M, void *ctx)
   ierr = VecRestoreArrayRead(lM,&a);CHKERRQ(ierr);
   ierr = DMRestoreLocalVector(dmred,&lM);CHKERRQ(ierr);
   ierr = FormInitialConditions(ts,x0,*wsnes);CHKERRQ(ierr);
-
-  /* Set initial timesteps and final time;
-     this could have been done (equivalently) from the public API of
-     TSComputeObjectiveAndGradient() and TSComputeHessian() too */
-  ierr = TSSetTimeStep(ts,appctx->initdt);CHKERRQ(ierr);
-  ierr = TSSetMaxTime(ts,appctx->tf);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -572,6 +574,7 @@ int main(int argc,char **argv)
   Mat            H,J;
   Vec            x,G,M;
   AppCtx         appctx;
+  OptCtx         opt;
   PetscReal      Ain[2][2],tf,dt;
   PetscInt       n,np,nc;
   PetscBool      wsnes = PETSC_TRUE, test[2] = { PETSC_TRUE, PETSC_FALSE };
@@ -680,23 +683,24 @@ int main(int argc,char **argv)
   ierr = MatDestroy(&J);CHKERRQ(ierr);
   ierr = TSSetSetUpFromDesign(ts,MyTSSetUpFromDesign,&wsnes);CHKERRQ(ierr);
 
-  appctx.initdt = dt;
-  appctx.tf = tf;
   ierr = VecSetValue(M,0,appctx.d1,INSERT_VALUES);CHKERRQ(ierr);
   ierr = VecSetValue(M,1,appctx.d2,INSERT_VALUES);CHKERRQ(ierr);
   ierr = VecAssemblyBegin(M);CHKERRQ(ierr);
   ierr = VecAssemblyEnd(M);CHKERRQ(ierr);
 
   /* Test gradient with TAO */
-  ierr = TSComputeObjectiveAndGradient(ts,0.0,0.0,0.0,NULL,M,G,NULL);CHKERRQ(ierr);
+  opt.dt = dt;
+  opt.tf = tf;
+  opt.ts = ts;
+  ierr = TSComputeObjectiveAndGradient(ts,0.0,dt,tf,NULL,M,G,NULL);CHKERRQ(ierr);
   ierr = VecViewFromOptions(G,NULL,"-gradient_view");CHKERRQ(ierr);
   ierr = TaoCreate(PETSC_COMM_WORLD,&tao);CHKERRQ(ierr);
-  ierr = TaoSetObjectiveRoutine(tao,FormObjective,ts);CHKERRQ(ierr);
+  ierr = TaoSetObjectiveRoutine(tao,FormObjective,&opt);CHKERRQ(ierr);
   ierr = TaoTestGradient(tao,M,G);CHKERRQ(ierr);
   ierr = TaoDestroy(&tao);CHKERRQ(ierr);
 
   /* Test gradient with Taylor test */
-  ierr = TSTaylorTest(ts,0.0,0.0,0.0,NULL,M,NULL);CHKERRQ(ierr);
+  ierr = TSTaylorTest(ts,0.0,dt,tf,NULL,M,NULL);CHKERRQ(ierr);
 
   ierr = VecDestroy(&G);CHKERRQ(ierr);
   ierr = VecDestroy(&M);CHKERRQ(ierr);
@@ -714,5 +718,14 @@ int main(int argc,char **argv)
       filter: sed -e "s/-nan/nan/g" -e "s/coded Hessian/coded Gradient/g" -e "s/||_F//g"
       nsize: 2
       args: -ts_max_steps 4 -da_grid_x 20 -da_grid_y 20 -ts_trajectory_type memory -ic_snes {{0 1}separate output} -test {{0,0 1,0 0,1 1,1}separate output} -tao_test_gradient -taylor_ts_hessian  -tshessian_mffd
+
+   test:
+      requires: !complex
+      timeoutfactor: 3
+      suffix: 1_discrete
+      filter: sed -e "s/-nan/nan/g" -e "s/coded Hessian/coded Gradient/g" -e "s/||_F//g"
+      nsize: 2
+      args: -ts_max_steps 4 -da_grid_x 20 -da_grid_y 20 -ts_trajectory_type memory -ic_snes {{0 1}separate output} -test {{0,0 1,0 0,1 1,1}separate output} -tao_test_gradient -taylor_ts_hessian  -tshessian_mffd -tsgradient_adjoint_discrete
+
 
 TEST*/

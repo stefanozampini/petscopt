@@ -1,0 +1,15 @@
+  ---------- Testing Gradient -------------
+  Run with -tao_test_gradient_view and optionally -tao_test_gradient <threshold> to show difference
+    of hand-coded and finite difference gradient entries greater than <threshold>.
+  Testing hand-coded Gradient, if (for double precision runs) ||G - Gfd||/||G|| is
+    O(1.e-8), the hand-coded Gradient is probably correct.
+  ||Gfd|| 1.4637e+14, ||G|| = 1.19667e+13, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 0.918243, ||G - Gfd|| = 1.34403e+14
+  max-norm ||G - Gfd||/||G|| = 0.918243, ||G - Gfd|| = 1.34403e+14
+-------------------------- Taylor test results ---------------------------
+		Gradient				Hessian
+--------------------------------------------------------------------------
+6.84182e+10	0.00000 	0	1.11456e+12	0.00000 	0
+1.77191e+10	1.94908 	2	2.78025e+11	2.00319 	2
+4.51091e+09	1.97382 	2	6.94252e+10	2.00169 	2
+1.13821e+09	1.98665 	2	1.73458e+10	2.00087 	2
