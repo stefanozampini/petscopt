@@ -36,10 +36,8 @@ PetscErrorCode TSSplitJacobiansDestroy_Private(void *ptr)
 .  B  - the F_Udot Jacobian matrix
 -  pB - the preconditioning matrix for B
 
-   Notes: this is an helper routine for the AdjointTS and the TLMTS. For the AdjointTS, the correct Jacobians would be F_Udot and F_U - d/dt F_Udot.
-          Note that most of the DAEs have d/dt F_Udot = 0.
-          The user can supersed the default implementation by calling
-
+Notes:
+   The user can supersed the default implementation by calling
 $             PetscObjectComposeFunction((PetscObject)(ts),"TSComputeSplitJacobians_C",MyImplementationOfSplitJacobians);CHKERRQ(ierr);
 
    Level: developer

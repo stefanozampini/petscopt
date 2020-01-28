@@ -726,6 +726,7 @@ PetscErrorCode TSTaylorTest(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec
       Mat He;
 
       ierr = MatComputeOperator(H,NULL,&He);CHKERRQ(ierr);
+      ierr = MatViewFromOptions(He,NULL,"-taylor_ts_hessian_view");CHKERRQ(ierr);
       ierr = MatDestroy(&H);CHKERRQ(ierr);
       H    = He;
     }
@@ -811,8 +812,8 @@ static PetscErrorCode ResidualHessian_Private(void *ctx, Vec X, Vec Y)
   if (mffd->ic) {
     ierr = TSOptEvalGradientIC(tsopt,mffd->t,(mffd->deriv == 0) ? X : mffd->U,
                                              (mffd->deriv == 1) ? X : mffd->M,
-                                             mffd->sample ? NULL : &G,
-                                             mffd->sample ? &G : NULL);CHKERRQ(ierr);
+                                              mffd->sample ? NULL : &G,
+                                              mffd->sample ? &G : NULL);CHKERRQ(ierr);
   } else {
     if (mffd->sample < 2) {
       Mat J_U,pJ_U,J_Udot,pJ_Udot;
