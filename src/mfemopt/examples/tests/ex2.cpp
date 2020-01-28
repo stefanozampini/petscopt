@@ -2122,6 +2122,26 @@ int main(int argc, char *argv[])
        filter: sed -e "s/lit=4/lit=3/g"
        args: -glvis 0 -test_newton 0 -test_opt -opt_tao_converged_reason -opt_tao_max_it 10 -opt_tao_gttol 1.e-4 -opt_tao_gatol 1.e-5 -opt_tao_type nls -opt_tao_nls_ksp_type fgmres -opt_tao_nls_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1
 
+   testset:
+     filter: sed -e "s/-nan/nan/g"
+     timeoutfactor: 3
+     nsize: 2
+     args: -scratch ./ -test_partitioning -meshfile ${petscopt_dir}/share/petscopt/meshes/segment-m5-5.mesh -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -test_newton
+     test:
+       suffix: null_test_discrete
+       args: -test_null -test_misfit_internal -test_misfit 1 -test_misfit_reg 1 -test_progress 0 -tv_alpha 0 -newton_pc_type none -newton_snes_atol 1.e-8 -glvis 0 -tsgradient_adjoint_worker_discrete -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -worker_tshessian_gn {{0 1}separate output}
+     test:
+       suffix: newton_test_discrete
+       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 1 -newton_snes_test_jacobian -newton_snes_rtol 1.e-6 -newton_snes_atol 1.e-6 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude_fn -ncrl 1 -tsgradient_adjoint_worker_discrete -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete
+     test:
+       suffix: newton_full_discrete
+       filter: sed -e "s/lit=4/lit=3/g"
+       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 10 -newton_snes_rtol 1.e-4 -newton_snes_atol 1.e-5 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1 -tsgradient_adjoint_worker_discrete -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -newton_snes_test_jacobian -tv_pd 0
+     test:
+       suffix: taonewton_full_discrete
+       filter: sed -e "s/lit=4/lit=3/g"
+       args: -glvis 0 -test_newton 0 -test_opt -opt_tao_converged_reason -opt_tao_max_it 10 -opt_tao_gttol 1.e-4 -opt_tao_gatol 1.e-5 -opt_tao_type nls -opt_tao_nls_ksp_type fgmres -opt_tao_nls_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1 -tsgradient_adjoint_worker_discrete -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -opt_tao_test_hessian -tv_pd 0
+
    test:
       filter: sed -e "s/-nan/nan/g"
       suffix: em_test
