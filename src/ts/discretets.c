@@ -231,6 +231,36 @@ PetscErrorCode TSStep_TLM_RK(TS ts)
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode LinearTSKSPReusePC(TS ts)
+{
+  PetscErrorCode ierr;
+  SNES           snes;
+  KSP            ksp;
+  PetscInt       lag,step;
+
+  PetscFunctionBegin;
+  ierr = TSGetStepNumber(ts,&step);CHKERRQ(ierr);
+  ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
+  ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+  ierr = SNESGetLagPreconditioner(snes,&lag);CHKERRQ(ierr);
+  if (!step && lag == -1) lag = -2;
+  if (lag == -2) {
+    ierr = PetscInfo(snes,"Rebuilding preconditioner exactly once since lag is -2\n");CHKERRQ(ierr);
+    ierr = KSPSetReusePreconditioner(ksp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = SNESSetLagPreconditioner(snes,-1);CHKERRQ(ierr);
+  } else if (lag == -1) {
+    ierr = PetscInfo(snes,"Reusing preconditioner because lag is -1\n");CHKERRQ(ierr);
+    ierr = KSPSetReusePreconditioner(ksp,PETSC_TRUE);CHKERRQ(ierr);
+  } else if (lag > 1 && step % lag) {
+    ierr = PetscInfo2(snes,"Reusing preconditioner because lag is %D and TS step number is %D\n",lag,step);CHKERRQ(ierr);
+    ierr = KSPSetReusePreconditioner(ksp,PETSC_TRUE);CHKERRQ(ierr);
+  } else {
+    ierr = PetscInfo(snes,"Rebuilding preconditioner\n");CHKERRQ(ierr);
+    ierr = KSPSetReusePreconditioner(ksp,PETSC_FALSE);CHKERRQ(ierr);
+  }
+  PetscFunctionReturn(0);
+}
+
 /* The forward step of the endpoint variant assumes linear time-independent mass matrix */
 /* Otherwise, we should sample J_xdot at stage_time, and J_x at the beginning of the step and compute s * J_xdot + (theta-1)/theta J_x */
 PetscErrorCode TSStep_Adjoint_Theta(TS ts)
@@ -339,6 +369,7 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
       ierr = VecAXPY(L,-1.0,F);CHKERRQ(ierr);
     }
     ierr = TSComputeIJacobian(ts,astage_time,fwdYSol,fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = LinearTSKSPReusePC(ts);CHKERRQ(ierr);
     ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
     ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
     ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
@@ -422,6 +453,7 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
       ierr = VecAXPBY(F,s,0.0,L);CHKERRQ(ierr);
     }
     ierr = TSComputeIJacobian(ts,astage_time,fwdU,fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = LinearTSKSPReusePC(ts);CHKERRQ(ierr);
     ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
     ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
     ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
