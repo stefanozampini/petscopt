@@ -326,6 +326,8 @@ PetscErrorCode AdjointTSSetUpStep(TS adjts)
   ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
   if (!adj_ctx->cstep) adj_ctx->cstep = adjts->ops->step;
   if (adj_ctx->discrete) {
+    SNES      snes;
+    KSP       ksp;
     PetscBool rk,theta,cn;
 
     ierr = PetscObjectTypeCompare((PetscObject)adjts,TSRK,&rk);CHKERRQ(ierr);
@@ -339,6 +341,11 @@ PetscErrorCode AdjointTSSetUpStep(TS adjts)
       ierr = TSGetType(adjts,&tstype);CHKERRQ(ierr);
       SETERRQ1(PetscObjectComm((PetscObject)adjts),PETSC_ERR_SUP,"Discrete adjoint not available for type %s\n",tstype);
     }
+    /* reuse KSP */
+    ierr = TSGetSNES(adj_ctx->fwdts,&snes);CHKERRQ(ierr);
+    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+    ierr = TSGetSNES(adjts,&snes);CHKERRQ(ierr);
+    ierr = SNESSetKSP(snes,ksp);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
 }
@@ -1870,6 +1877,7 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts)
       }
     }
     ierr = TSCreateAugmentedTS(adjts,1,&qts,NULL,&qup,&coup,&Ac,&Bc,PETSC_TRUE,&ats);CHKERRQ(ierr);
+
     ierr = MatDestroy(&Ac);CHKERRQ(ierr);
     ierr = MatDestroy(&Bc);CHKERRQ(ierr);
     ierr = TSDestroy(&qts);CHKERRQ(ierr);

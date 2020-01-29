@@ -540,6 +540,8 @@ PetscErrorCode TLMTSSetUpStep(TS lts)
   ierr = TSGetApplicationContext(lts,(void*)&tlm);CHKERRQ(ierr);
   if (!tlm->cstep) tlm->cstep = lts->ops->step;
   if (tlm->discrete) {
+    SNES      snes;
+    KSP       ksp;
     PetscBool rk,theta,cn;
 
     ierr = PetscObjectTypeCompare((PetscObject)lts,TSRK,&rk);CHKERRQ(ierr);
@@ -553,6 +555,11 @@ PetscErrorCode TLMTSSetUpStep(TS lts)
       ierr = TSGetType(lts,&tstype);CHKERRQ(ierr);
       SETERRQ1(PetscObjectComm((PetscObject)lts),PETSC_ERR_SUP,"Discrete TLM not available for type %s\n",tstype);
     }
+    /* reuse KSP */
+    ierr = TSGetSNES(tlm->model,&snes);CHKERRQ(ierr);
+    ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
+    ierr = TSGetSNES(lts,&snes);CHKERRQ(ierr);
+    ierr = SNESSetKSP(snes,ksp);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
 }
