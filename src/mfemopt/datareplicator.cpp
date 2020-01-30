@@ -108,7 +108,11 @@ void DataReplicator::Broadcast(const Array<bool>& x, Array<bool> &y)
 
 void DataReplicator::Broadcast(const std::string& name, const Array<bool>& x, Array<bool> &y)
 {
-   Broadcast(name,x.Size(),x.GetData(),y.Size(),y.GetData(),MPI::BOOL);
+   Array<PetscBool> xb(x.Size());
+   Array<PetscBool> yb(y.Size());
+   for (int i = 0; i < x.Size(); i++) xb[i] = x[i] ? PETSC_TRUE : PETSC_FALSE;
+   Broadcast(name,x.Size(),xb.GetData(),yb.Size(),yb.GetData(),MPIU_BOOL);
+   for (int i = 0; i < y.Size(); i++) y[i] = yb[i] ? true : false;
 }
 
 void DataReplicator::Broadcast(const Array<int>& x, Array<int> &y)
@@ -174,7 +178,11 @@ void DataReplicator::Reduce(const Array<bool>& x, Array<bool> &y, MPI_Op op)
 
 void DataReplicator::Reduce(const std::string& name, const Array<bool>& x, Array<bool> &y, MPI_Op op)
 {
-   Reduce(name,x.Size(),x.GetData(),y.Size(),y.GetData(),MPI::BOOL,op);
+   Array<PetscBool> xb(x.Size());
+   Array<PetscBool> yb(y.Size());
+   for (int i = 0; i < x.Size(); i++) xb[i] = x[i] ? PETSC_TRUE : PETSC_FALSE;
+   Reduce(name,x.Size(),xb.GetData(),y.Size(),yb.GetData(),MPIU_BOOL,op);
+   for (int i = 0; i < y.Size(); i++) y[i] = yb[i] ? true : false;
 }
 
 void DataReplicator::Reduce(const Array<int>& x, Array<int> &y, MPI_Op op)

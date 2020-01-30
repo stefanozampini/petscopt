@@ -186,7 +186,7 @@ void PDOperator::TestFDGradient(MPI_Comm comm, const Vector& xpIn, const Vector&
    ierr = MatAXPY(GExpl,-1.0,*pfdG,DIFFERENT_NONZERO_PATTERN);CCHKERRQ(comm,ierr);
    ierr = MatNorm(GExpl,NORM_INFINITY,&errfd);CCHKERRQ(comm,ierr);
    ierr = PetscPrintf(comm,"||G|| = %g, ||G^T|| = %g, ||G - (G^T)^T||/||G|| = %g, ||G_fd|| = %g, ||G_fd - G|| = %g\n",(double)normG,(double)normGT,(double)err,(double)normfd,(double)errfd);CCHKERRQ(comm,ierr);
-   ierr = MatViewFromOptions(check,NULL,"-test_pdoperatorgradient_diff_view");CCHKERRQ(comm,ierr);
+   ierr = MatViewFromOptions(GExpl,NULL,"-test_pdoperatorgradient_diff_view");CCHKERRQ(comm,ierr);
    ierr = MatDestroy(&check);CCHKERRQ(comm,ierr);
    ierr = MatDestroy(&GExpl);CCHKERRQ(comm,ierr);
    ierr = MatDestroy(&GTExpl);CCHKERRQ(comm,ierr);

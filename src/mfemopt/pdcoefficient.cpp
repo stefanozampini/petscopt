@@ -22,6 +22,7 @@ void PDCoefficient::Reset()
    pwork.SetSize(0);
    delete P;
    delete R;
+   delete trueTransfer;
    delete s_coeff;
    delete m_coeff;
    delete deriv_s_coeff;
@@ -51,6 +52,7 @@ void PDCoefficient::Reset()
    deriv_coeffgf.SetSize(0);
    deriv_work_coeffgf.SetSize(0);
    pcoeffv0.SetSize(0);
+   local_cols.SetSize(0);
    global_cols.SetSize(0);
    delete pfes;
    lsize = 0;
@@ -76,6 +78,7 @@ void PDCoefficient::Init()
    R = NULL;
    pfes = NULL;
    l2gf = NULL;
+   trueTransfer = NULL;
 }
 
 PDCoefficient::PDCoefficient()
@@ -181,6 +184,9 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
    else mfem_error("Unhandled case");
 
    pfes = new ParFiniteElementSpace(mesh,fec,1,Ordering::byVDIM);
+   { /* only relevant for refinement operations */
+      pfes->SetUpdateOperatorType(Operator::MFEM_SPARSEMAT);
+   }
 
    /* store values of projected initial coefficients
       and create actual coefficients to be used */
@@ -299,6 +305,8 @@ void PDCoefficient::SetUpOperators()
    MFEM_VERIFY(pfes,"Missing ParFiniteElementSpace()!");
    delete P;
    delete R;
+   delete trueTransfer;
+   trueTransfer = NULL;
 
    /* mask for elements that are active in the integration of forms for state variables */
    sforminteg.SetSize(pcoeffexcl.Size());
@@ -310,11 +318,13 @@ void PDCoefficient::SetUpOperators()
       sforminteg = true;
 
       P = new PetscParMatrix(pfes->Dof_TrueDof_Matrix(),Operator::PETSC_MATAIJ);
-      R = new PetscParMatrix(PETSC_COMM_SELF,pfes->GetRestrictionMatrix());
+      R = new PetscParMatrix(pfes->GetParMesh()->GetComm(),pfes->GetRestrictionMatrix(),Operator::PETSC_MATAIJ);
       PetscInt cst = P->GetColStart();
+      local_cols.SetSize(P->Width());
       global_cols.SetSize(P->Width());
       for (int i = 0; i < P->Width(); i++)
       {
+         local_cols[i] = i;
          global_cols[i] = i + cst;
       }
       pcoeffiniti.SetSize(0);
@@ -388,7 +398,7 @@ void PDCoefficient::SetUpOperators()
       /* compute dof_truedof and restriction on active dofs */
       PetscParMatrix *PT = new PetscParMatrix(pfes->Dof_TrueDof_Matrix(),Operator::PETSC_MATAIJ);
 
-      Array<PetscInt> local_cols;
+      local_cols.SetSize(0);
       local_cols.Reserve(PT->Width());
 
       global_cols.SetSize(0);
@@ -466,13 +476,8 @@ void PDCoefficient::SetUpOperators()
       }
       P = new PetscParMatrix(*PT,rows,global_cols);
       delete PT;
-
-      for (int i = 0; i < rows.Size(); i++)
-      {
-         rows[i] = i;
-      }
-      PT = new PetscParMatrix(pfes->GetRestrictionMatrix());
-      R = new PetscParMatrix(*PT,local_cols,rows);
+      PT = new PetscParMatrix(pfes->GetParMesh()->GetComm(),pfes->GetRestrictionMatrix(),Operator::PETSC_MATAIJ);
+      R = new PetscParMatrix(*PT,global_cols,rows);
       delete PT;
 
       /* store true- and v- dofs for excluded regions */
@@ -483,7 +488,7 @@ void PDCoefficient::SetUpOperators()
       for (int g = 0; g < pcoeffgf.Size(); g++)
       {
          /* vdofs */
-         Vector& vgf = (*pcoeffgf)[g];
+         Vector& vgf = *(pcoeffgf[g]);
          const int stgf = g*pcoeffiniti.Size();
          for (int i = 0; i < pcoeffiniti.Size(); i++)
          {
@@ -491,7 +496,7 @@ void PDCoefficient::SetUpOperators()
          }
 
          /* tdofs */
-         Vector& v0 = (*pcoeffv0)[g];
+         Vector& v0 = *(pcoeffv0[g]);
          const int st0 = g*piniti.Size();
          for (int i = 0; i < piniti.Size(); i++)
          {
@@ -705,7 +710,7 @@ void PDCoefficient::GetCurrentVector(Vector& m)
    MFEM_VERIFY(!usederiv,"This should not happen");
    MFEM_VERIFY(m.Size() == lsize,"Invalid Vector size " << m.Size() << "!. Should be " << lsize);
    double *data = m.GetData();
-   int n = P->Width();
+   int n = R->Height();
    for (int i=0; i<pcoeffgf.Size(); i++)
    {
       Vector pmi(data,n);
@@ -741,9 +746,10 @@ void PDCoefficient::Distribute(const Vector& m, Array<ParGridFunction*>& agf)
    MFEM_VERIFY(m.Size() == lsize,"Invalid Vector size " << m.Size() << "!. Should be " << lsize);
    for (int i = 0; i < agf.Size(); i++)
    {
+      pwork = 0.0;
       const int st1 = i*piniti.Size();
       for (int j = 0; j < piniti.Size(); j++) pwork[piniti[j]] = usederiv ? 0.0 : pinitv[st1 + j];
-      const int st2 = i*pwork.Size();
+      const int st2 = i*pactii.Size();
       for (int j = 0; j < pactii.Size(); j++) pwork[pactii[j]] = m[st2 + j];
       agf[i]->Distribute(pwork);
    }
@@ -800,6 +806,9 @@ void PDCoefficient::FillExcl()
 
 void PDCoefficient::UpdateExcl()
 {
+   ParMesh *mesh = pfes->GetParMesh();
+   pcoeffexcl.SetSize(mesh->GetNE());
+   pcoeffexcl = false;
    if (!l2gf) return;
 
    ParFiniteElementSpace *l2fes = l2gf->ParFESpace();
@@ -809,8 +818,6 @@ void PDCoefficient::UpdateExcl()
 
    l2gf->Update();
 
-   ParMesh *mesh = l2fes->GetParMesh();
-   pcoeffexcl.SetSize(mesh->GetNE());
    pcoeffexcl = true;
    Array<int> dofs;
    Vector     vals;
@@ -829,11 +836,17 @@ void PDCoefficient::UpdateExcl()
    }
 }
 
-void PDCoefficient::Update()
+void PDCoefficient::Update(bool want_true)
 {
    long fseq = pfes->GetSequence();
-   pfes->Update();
+   pfes->Update(true);
    if (fseq == pfes->GetSequence()) return;
+
+   PetscParMatrix *oP = NULL;
+   if (want_true) /* save previous dof_truedof */
+   {
+      oP = new PetscParMatrix(P,Operator::ANY_TYPE);
+   }
 
    /* Update excluded regions */
    UpdateExcl();
@@ -875,8 +888,17 @@ void PDCoefficient::Update()
       *deriv_work_coeffgf[i] = 0.0;
    }
 
-   /* SetUp operators and conforming dofs. For excl regions, also the fixed values */
+   /* SetUp operators and conforming dofs. For excl regions, also the fixed values
+      Deletes any previous P,R and trueTransfer set */
    SetUpOperators();
+
+   /* transfer operator for true data as triple matrix product (R * gftransfer * P) */
+   if (want_true)
+   {
+      PetscParMatrix pT(pfes->GetParMesh()->GetComm(),pfes->GetUpdateOperator(),Operator::PETSC_MATAIJ);
+      trueTransfer = mfem::TripleMatrixProduct(R,&pT,oP);
+   }
+   delete oP;
 
    /* No need to update s_coeff, m_coeff, deriv_s_coeff, deriv_m_coeff */
 }

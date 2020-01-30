@@ -7,52 +7,25 @@ namespace mfemopt
 {
 using namespace mfem;
 
-ReplicatedParMesh::ReplicatedParMesh(MPI_Comm comm, Mesh &mesh, int nrep, bool contig)
+ReplicatedParMesh::ReplicatedParMesh(MPI_Comm comm, Mesh &mesh, int nrep, bool contig, int **part) : drep(comm,nrep,contig)
 {
    PetscErrorCode ierr;
-   PetscSubcomm   subcomm;
-   MPI_Comm       rcomm;
-   PetscMPIInt    size,crank;
-
-   MFEM_VERIFY(nrep > 0,"Number of replicas should be positive");
-   ierr = MPI_Comm_size(comm,&size); CCHKERRQ(comm,ierr);
-   MFEM_VERIFY(!(size%nrep),"Size of comm must be a multiple of the number of replicas");
-
-   ierr = PetscSubcommCreate(comm, &subcomm); CCHKERRQ(comm,ierr);
-   ierr = PetscSubcommSetNumber(subcomm, (PetscInt)nrep); CCHKERRQ(comm,ierr);
-   ierr = PetscSubcommSetType(subcomm, contig ? PETSC_SUBCOMM_CONTIGUOUS : PETSC_SUBCOMM_INTERLACED); CCHKERRQ(comm,ierr);
-
-   color = subcomm->color;
-
-   /* original comm */
-   ierr = PetscCommDuplicate(comm,&parent_comm,NULL); CCHKERRQ(comm,ierr);
-   /* comm for replicated mesh */
-   ierr = PetscCommDuplicate(subcomm->child,&child_comm,NULL); CCHKERRQ(subcomm->child,ierr);
-   /* reduction comm */
-   ierr = MPI_Comm_rank(child_comm,&crank);CCHKERRQ(child_comm,ierr);
-   ierr = MPI_Comm_split(parent_comm,crank,color,&rcomm);CCHKERRQ(comm,ierr);
-   ierr = PetscCommDuplicate(rcomm,&red_comm,NULL); CCHKERRQ(rcomm,ierr);
-   ierr = MPI_Comm_free(&rcomm);CCHKERRQ(PETSC_COMM_SELF,ierr);
-
    PetscMPIInt child_size, parent_size;
-   ierr = MPI_Comm_size(child_comm, &child_size); CCHKERRQ(child_comm,ierr);
-   ierr = MPI_Comm_size(parent_comm, &parent_size); CCHKERRQ(parent_comm,ierr);
+   ierr = MPI_Comm_size(drep.GetChildComm(), &child_size); CCHKERRQ(drep.GetChildComm(),ierr);
+   ierr = MPI_Comm_size(drep.GetParentComm(), &parent_size); CCHKERRQ(drep.GetParentComm(),ierr);
 
+   // TODO : Get rid of stupid parent mesh
    int *child_part = mesh.GeneratePartitioning(child_size, 1);
-   child_mesh = new ParMesh(child_comm, mesh, child_part, 1);
+   child_mesh = new ParMesh(drep.GetChildComm(), mesh, child_part, 1);
    if (!contig) for (int i = 0; i < mesh.GetNE(); i++) child_part[i] *= nrep;
-   parent_mesh = new ParMesh(parent_comm, mesh, child_part, 1);
+   parent_mesh = new ParMesh(drep.GetParentComm(), mesh, child_part, 1);
 
-   delete [] child_part;
-   ierr = PetscSubcommDestroy(&subcomm); CCHKERRQ(comm,ierr);
+   if (part) *part = child_part;
+   else delete [] child_part;
 }
 
 ReplicatedParMesh::~ReplicatedParMesh()
 {
-   PetscErrorCode ierr;
-   ierr = PetscCommDestroy(&parent_comm); CCHKERRQ(PETSC_COMM_SELF,ierr);
-   ierr = PetscCommDestroy(&child_comm); CCHKERRQ(PETSC_COMM_SELF,ierr);
-   ierr = PetscCommDestroy(&red_comm); CCHKERRQ(PETSC_COMM_SELF,ierr);
    delete child_mesh;
    delete parent_mesh;
 }
@@ -306,6 +279,28 @@ void DiagonalMatrixCoefficient::Eval(DenseMatrix &K, ElementTransformation &T,
 DiagonalMatrixCoefficient::~DiagonalMatrixCoefficient()
 {
   if (own) delete VQ;
+}
+
+SymmetricSolver::SymmetricSolver(Solver *solver, bool owner) : isolver(solver), own(owner) {}
+
+void SymmetricSolver::SetOperator(const Operator &op)
+{
+  isolver->SetOperator(op);
+}
+
+void SymmetricSolver::Mult(const Vector &b, Vector& x) const
+{
+  isolver->Mult(b,x);
+}
+
+void SymmetricSolver::MultTranspose(const Vector &b, Vector& x) const
+{
+  isolver->Mult(b,x);
+}
+
+SymmetricSolver::~SymmetricSolver()
+{
+  if (own) delete isolver;
 }
 
 }

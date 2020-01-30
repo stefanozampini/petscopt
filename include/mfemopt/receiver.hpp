@@ -10,6 +10,7 @@
 #include <mfem/fem/pgridfunc.hpp>
 #include <mfem/fem/intrules.hpp>
 #include <mfem/general/array.hpp>
+#include <petscts.h>
 #include <fstream>
 #include <ostream>
 #include <vector>
@@ -29,7 +30,6 @@ protected:
       double v_z;
    };
 
-   void InterpolateLinear(struct signal_data&);
    // comparison routine for signal_data
    static inline bool ltcompare(const struct signal_data& d1, const struct signal_data& d2)
    { return d1.t < d2.t; }
@@ -38,10 +38,14 @@ private:
    mfem::Vector                    center;
    std::vector<struct signal_data> idata;             // input data
    bool                            idata_isfinalized; // if true, time is sorted
+   Vec W;
+   TS ts;
 
    void ASCIILoad(std::istream&);
    void ASCIIDump(std::ostream& = std::cout);
    void FinalizeIData();
+   void Init();
+   void SetUpData();
 
 public:
    Receiver();
@@ -55,6 +59,7 @@ public:
    mfem::Vector& Center() { return center; }
    void Dump(const std::string&,bool = false); // dump data to filename
    void Load(const std::string&,bool = false); // load data from filename
+   ~Receiver();
 };
 
 class ReceiverMonitor : public mfem::PetscSolverMonitor
@@ -78,7 +83,6 @@ public:
    ReceiverMonitor(mfem::ParGridFunction*,const mfem::DenseMatrix&,const std::string&);
    virtual void MonitorSolution(PetscInt,PetscReal,const mfem::Vector&);
    virtual ~ReceiverMonitor();
-
 };
 
 }

@@ -31,6 +31,7 @@ private:
    mfem::Coefficient*       s_coeff;
    mfem::MatrixCoefficient* m_coeff;
 
+   mfem::Array<PetscInt> local_cols;
    mfem::Array<PetscInt> global_cols;
 
    mfem::Array<bool>   pcoeffexcl;
@@ -49,6 +50,7 @@ private:
    mfem::Array<mfem::Vector*> pcoeffv0;
    mfem::PetscParMatrix* P;
    mfem::PetscParMatrix* R;
+   mfem::PetscParMatrix* trueTransfer;
 
    mfem::ParGridFunction* l2gf;
 
@@ -102,8 +104,11 @@ public:
    mfem::Array<mfem::ParGridFunction*>& GetCoeffs() { return pcoeffgf; }
    mfem::Array<mfem::ParGridFunction*>& GetDerivCoeffs() { return deriv_work_coeffgf; }
    mfem::Array<mfem::ParGridFunction*>& GetGradCoeffs() { return pgradgf; }
+   mfem::Array<PetscInt>& GetLocalCols() { return local_cols; }
    mfem::Array<PetscInt>& GetGlobalCols() { return global_cols; }
    mfem::PetscParMatrix* GetP() { return P; }
+   mfem::PetscParMatrix* GetR() { return R; }
+   mfem::PetscParMatrix* GetTrueTransferOperator() { return trueTransfer; }
    mfem::Array<bool>& GetExcludedElements() { return pcoeffexcl; }
    mfem::Array<bool>& GetActiveElements() { return sforminteg; }
    int GetLocalSize() { return lsize; }
@@ -121,7 +126,7 @@ public:
 
    mfem::PetscBCHandler* GetBCHandler() { return &bchandler; }
 
-   void Update();
+   void Update(bool=true);
    ~PDCoefficient();
 };
 

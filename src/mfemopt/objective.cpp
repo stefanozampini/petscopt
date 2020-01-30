@@ -975,10 +975,11 @@ void TVRegularizer::SetUpHessian_MM(const Vector& x,const Vector& m,double t)
    }
    else
    {
+      /* TODO: BlockOperator should use int64, as the offsets may overflow */
       Array<int> boff(nb+1);
       boff[0] = 0;
       for (int i = 0; i < nb; i++)
-         boff[i+1] = pgf[i]->ParFESpace()->TrueVSize();
+         boff[i+1] = m_pd->GetP()->Width();
       boff.PartialSum();
 
       BlockOperator bOp(boff);

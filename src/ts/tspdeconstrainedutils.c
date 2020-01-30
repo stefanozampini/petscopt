@@ -258,7 +258,6 @@ PetscErrorCode TSCreateQuadTS(MPI_Comm comm, Vec v, PetscBool diffrhs, TSQuadCtx
   Wrappers for quadrature evaluation
   XXX_FWD are evaluated during the forward run
   XXX_TLM are evaluated during the tangent linear model run within Hessian computations
-  XXX_ADJ are evaluated during the adjoint run
 */
 
 typedef struct {

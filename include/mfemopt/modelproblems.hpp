@@ -66,6 +66,7 @@ public:
    void SetRHS(mfem::VectorCoefficient*);
 
    mfem::PetscPreconditionerFactory* GetPreconditionerFactory();
+   mfem::PetscPreconditionerFactory* NewPreconditionerFactory();
 
    /* interface for mfem::TimeDependentOperator */
    virtual void Mult(const mfem::Vector&,mfem::Vector&) const

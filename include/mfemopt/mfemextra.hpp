@@ -6,6 +6,7 @@
 #if defined(PETSCOPT_HAVE_MFEMOPT)
 #include <mfemoptconf.h>
 #include <mfemopt/reducedfunctional.hpp>
+#include <mfemopt/datareplicator.hpp>
 #include <mfem/fem/pfespace.hpp>
 #include <mfem/mesh/pmesh.hpp>
 #include <mfem/fem/coefficient.hpp>
@@ -23,20 +24,18 @@ void ParMeshPrint(mfem::ParMesh& mesh, const char* filename);
 class ReplicatedParMesh
 {
 private:
-   MPI_Comm      parent_comm;
-   MPI_Comm      child_comm;
-   MPI_Comm      red_comm;
-   int           color;
+   DataReplicator drep;
    mfem::ParMesh *parent_mesh;
    mfem::ParMesh *child_mesh;
 
 public:
-   ReplicatedParMesh(MPI_Comm,mfem::Mesh&,int,bool=true);
+   ReplicatedParMesh(MPI_Comm,mfem::Mesh&,int,bool=true,int** =NULL);
    inline mfem::ParMesh* GetChild() { return child_mesh; }
    inline mfem::ParMesh* GetParent() { return parent_mesh; }
-   inline int GetColor() { return color; }
-   inline MPI_Comm GetRedComm() { return red_comm; }
-   bool IsMaster() { return color ? false : true; }
+   inline int GetColor() { return drep.GetColor(); }
+   inline MPI_Comm GetRedComm() { return drep.GetRedComm(); }
+   bool IsMaster() { return drep.GetColor() ? false : true; }
+   DataReplicator& GetReplicator() { return drep; }
    virtual ~ReplicatedParMesh();
 };
 
@@ -106,6 +105,19 @@ public:
    virtual void Eval(mfem::DenseMatrix&,mfem::ElementTransformation&,
                      const mfem::IntegrationPoint&);
    virtual ~DiagonalMatrixCoefficient();
+};
+
+class SymmetricSolver : public mfem::Solver
+{
+private:
+   mfem::Solver *isolver;
+   bool own;
+public:
+   SymmetricSolver(mfem::Solver*,bool);
+   virtual void SetOperator(const mfem::Operator &op);
+   virtual void Mult(const mfem::Vector&,mfem::Vector&) const;
+   virtual void MultTranspose(const mfem::Vector&,mfem::Vector&) const;
+   virtual ~SymmetricSolver();
 };
 
 }

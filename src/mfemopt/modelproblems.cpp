@@ -38,10 +38,16 @@ PetscPreconditionerFactory* ModelHeat::GetPreconditionerFactory()
 {
    if (!pfactory)
    {
-      pfactory = new PreconditionerFactory(*this,"heat model preconditioner factory");
+      pfactory = (*this).NewPreconditionerFactory();
    }
    return pfactory;
 }
+
+PetscPreconditionerFactory* ModelHeat::NewPreconditionerFactory()
+{
+   return new PreconditionerFactory(*this,"heat model preconditioner factory");
+}
+
 
 void ModelHeat::InitForms(Coefficient* mu, MatrixCoefficient* sigma)
 {
@@ -240,7 +246,6 @@ int ModelHeat::GetParameterSize()
 void ModelHeat::SetUpFromParameters(const Vector& p)
 {
    MFEM_VERIFY(p.Size() >= GetParameterSize(),"Invalid Vector size " << p.Size() << ", should be (at least) " << GetParameterSize());
-
    double *data = p.GetData();
    if (mu_pd_bilin)
    {
@@ -282,7 +287,6 @@ void ModelHeat::ComputeGradientAdjoint(const Vector& adj, const Vector& tdstate,
    if (mu_pd_bilin)
    {
       int ls = mu_pd_bilin->GetLocalSize();
-      //mu_pd_bilin->UpdateCoefficient(m); /* WHY THIS WAS HERE? */
       Vector pm(mdata,ls);
       Vector pg(gdata,ls);
       mu_pd_bilin->ComputeGradientAdjoint(adjgf,stgf,pm,pg);
@@ -305,7 +309,6 @@ void ModelHeat::ComputeGradient(const Vector& tdstate, const Vector& state, cons
    if (mu_pd_bilin)
    {
       int ls = mu_pd_bilin->GetLocalSize();
-      //mu_pd_bilin->UpdateCoefficient(m); /* WHY THIS WAS HERE? */
       Vector pm(mdata,ls);
       Vector ppert(pdata,ls);
       Vector po(odata,tdstate.Size());
@@ -333,7 +336,6 @@ void ModelHeat::ComputeHessian(int A,int B,const Vector& tdstate,const Vector& s
       if (mu_pd_bilin)
       {
          int ls = mu_pd_bilin->GetLocalSize();
-         //mu_pd_bilin->UpdateCoefficient(m); /* WHY THIS WAS HERE? */
          Vector pm(mdata,ls);
          Vector ppert(xdata,ls);
          Vector py(ydata,tdstate.Size());
@@ -348,7 +350,6 @@ void ModelHeat::ComputeHessian(int A,int B,const Vector& tdstate,const Vector& s
       stgf->Distribute(x);
       if (mu_pd_bilin)
       {
-         //mu_pd_bilin->UpdateCoefficient(m); /* WHY THIS WAS HERE? */
          int ls = mu_pd_bilin->GetLocalSize();
          Vector py(ydata,ls);
          Vector pm(mdata,ls);
@@ -515,7 +516,7 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
      {
         HypreBoomerAMG *t = new HypreBoomerAMG(*hA);
         t->SetPrintLevel(0);
-        solver = t;
+        solver = new SymmetricSolver(t,true);
      }
      else
      {
@@ -523,13 +524,13 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
         {
            HypreADS *t = new HypreADS(*hA,pde.fes);
            t->SetPrintLevel(0);
-           solver = t;
+           solver = new SymmetricSolver(t,true);
         }
         else
         {
            HypreAMS *t = new HypreAMS(*hA,pde.fes);
            t->SetPrintLevel(0);
-           solver = t;
+           solver = new SymmetricSolver(t,true);
         }
      }
   }
@@ -543,7 +544,7 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
      {
         HypreBoomerAMG *t = new HypreBoomerAMG(*ohA);
         t->SetPrintLevel(0);
-        solver = t;
+        solver = new SymmetricSolver(t,true);
      }
      else
      {
@@ -551,13 +552,13 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
         {
            HypreADS *t = new HypreADS(*ohA,pde.fes);
            t->SetPrintLevel(0);
-           solver = t;
+           solver = new SymmetricSolver(t,true);
         }
         else
         {
            HypreAMS *t = new HypreAMS(*ohA,pde.fes);
            t->SetPrintLevel(0);
-           solver = t;
+           solver = new SymmetricSolver(t,true);
         }
      }
   }
@@ -589,13 +590,13 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
         {
            HypreADS *t = new HypreADS(*hA,pde.fes);
            t->SetPrintLevel(0);
-           solver = t;
+           solver = new SymmetricSolver(t,true);
         }
         else
         {
            HypreAMS *t = new HypreAMS(*hA,pde.fes);
            t->SetPrintLevel(0);
-           solver = t;
+           solver = new SymmetricSolver(t,true);
         }
 #else
         solver = new PetscPreconditioner(*pA);

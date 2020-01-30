@@ -127,7 +127,9 @@ void ReducedFunctional::TestFDHessian(MPI_Comm comm, const Vector& mIn)
    PetscParMatrix *pH = new PetscParMatrix(comm,&H,Operator::PETSC_MATAIJ);
    if (verbose)
    {
+      ierr = PetscPrintf(comm,"FINITE DIFFERENCE\n");CCHKERRQ(comm,ierr);
       pfdH->Print();
+      ierr = PetscPrintf(comm,"COMPUTED\n");CCHKERRQ(comm,ierr);
       pH->Print();
    }
    PetscReal nrm,nrmd,nrminf;
@@ -136,6 +138,7 @@ void ReducedFunctional::TestFDHessian(MPI_Comm comm, const Vector& mIn)
    *diff -= *pfdH;
    if (verbose)
    {
+      ierr = PetscPrintf(comm,"DIFFERENCE\n");CCHKERRQ(comm,ierr);
       diff->Print();
    }
    ierr = MatNorm(*pH,NORM_INFINITY,&nrm);CCHKERRQ(comm,ierr);
@@ -199,6 +202,7 @@ void ReducedFunctional::TestTaylor(MPI_Comm comm, const Vector& mIn, const Vecto
 
       tG[i] = std::abs(hobj-obj-h*v1);
 
+      tH[i] = 0.0;
       if (testhess)
       {
          tH[i] = std::abs(hobj-obj-h*v1-h*h*v2/2.);
