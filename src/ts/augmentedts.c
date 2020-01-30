@@ -154,7 +154,7 @@ static PetscErrorCode KSPView_AugTriangular(KSP aksp, PetscViewer viewer)
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode KSPSolveFWD_AugTriangular(KSP aksp, Vec x, Vec y)
+static PetscErrorCode KSPSolve_AugTriangular_Private(KSP aksp, Vec x, Vec y, PetscBool trans)
 {
   TS             ats;
   TSAugCtx       *actx;
@@ -172,7 +172,8 @@ static PetscErrorCode KSPSolveFWD_AugTriangular(KSP aksp, Vec x, Vec y)
   ierr = KSPGetApplicationContext(aksp,(void**)&ats);CHKERRQ(ierr);
   PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
-  if (actx->adjoint) SETERRQ(PetscObjectComm((PetscObject)aksp),PETSC_ERR_SUP,"Not implemented");
+  if (!trans && actx->adjoint) SETERRQ(PetscObjectComm((PetscObject)aksp),PETSC_ERR_SUP,"KSPSolve + adjoint not implemented");
+  if (trans && !actx->adjoint) SETERRQ(PetscObjectComm((PetscObject)aksp),PETSC_ERR_SUP,"KSPSolveTranspose + !adjoint not implemented");
   ierr = KSPGetOperators(aksp,&A,&P);CHKERRQ(ierr);
   ierr = KSPGetPC(aksp,&pc);CHKERRQ(ierr);
   ierr = PCGetReusePreconditioner(pc,&reuse);CHKERRQ(ierr);
@@ -186,7 +187,11 @@ static PetscErrorCode KSPSolveFWD_AugTriangular(KSP aksp, Vec x, Vec y)
   ierr = MatNestGetSubMat(P,0,0,&Psub);CHKERRQ(ierr);
   ierr = KSPSetOperators(ksp,Asub,Psub);CHKERRQ(ierr);
   ierr = KSPSetReusePreconditioner(ksp,reuse);CHKERRQ(ierr);
-  ierr = KSPSolve(ksp,actx->F[0],actx->U[0]);CHKERRQ(ierr);
+  if (!trans) {
+    ierr = KSPSolve(ksp,actx->F[0],actx->U[0]);CHKERRQ(ierr);
+  } else {
+    ierr = KSPSolveTranspose(ksp,actx->F[0],actx->U[0]);CHKERRQ(ierr);
+  }
   ierr = KSPGetIterationNumber(ksp,&aksp->its);CHKERRQ(ierr);
   ierr = KSPGetConvergedReason(ksp,&aksp->reason);CHKERRQ(ierr);
   if (aksp->reason <=0) {
@@ -199,66 +204,17 @@ static PetscErrorCode KSPSolveFWD_AugTriangular(KSP aksp, Vec x, Vec y)
     Vec d;
     DM  qdm;
 
-    ierr = MatNestGetSubMat(A,i+1,0,&Asub);CHKERRQ(ierr);
-    if (Asub) {
-      ierr = MatMult(Asub,actx->U[0],actx->U[i+1]);CHKERRQ(ierr);
-      ierr = VecAYPX(actx->U[i+1],-1.,actx->F[i+1]);CHKERRQ(ierr);
+    if (!trans) {
+      ierr = MatNestGetSubMat(A,i+1,0,&Asub);CHKERRQ(ierr);
     } else {
-      ierr = VecCopy(actx->F[i+1],actx->U[i+1]);CHKERRQ(ierr);
+      ierr = MatNestGetSubMat(A,0,i+1,&Asub);CHKERRQ(ierr);
     }
-    ierr = MatNestGetSubMat(A,i+1,i+1,&Asub);CHKERRQ(ierr);
-    ierr = TSGetDM(actx->qts[i],&qdm);CHKERRQ(ierr);
-    ierr = DMGetGlobalVector(qdm,&d);CHKERRQ(ierr);
-    ierr = MatGetDiagonal(Asub,d);CHKERRQ(ierr);
-    ierr = VecPointwiseDivide(actx->U[i+1],actx->U[i+1],d);CHKERRQ(ierr);
-    ierr = DMRestoreGlobalVector(qdm,&d);CHKERRQ(ierr);
-  }
-  ierr = DMCompositeRestoreAccessArray(dm,x,actx->nqts + 1,NULL,actx->F);CHKERRQ(ierr);
-  ierr = DMCompositeRestoreAccessArray(dm,y,actx->nqts + 1,NULL,actx->U);CHKERRQ(ierr);
-  ierr = VecLockReadPop(x);CHKERRQ(ierr);
-  PetscFunctionReturn(0);
-}
-
-static PetscErrorCode KSPSolveTranspose_AugTriangular(KSP aksp, Vec x, Vec y)
-{
-  TS             ats;
-  TSAugCtx       *actx;
-  SNES           snes;
-  KSP            ksp;
-  Mat            A;
-  DM             dm;
-  PetscInt       i;
-  PetscErrorCode ierr;
-
-  PetscFunctionBegin;
-  ierr = KSPGetApplicationContext(aksp,(void**)&ats);CHKERRQ(ierr);
-  PetscCheckAugmentedTS(ats);
-  ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
-  if (!actx->adjoint) SETERRQ(PetscObjectComm((PetscObject)aksp),PETSC_ERR_SUP,"Not implemented");
-  ierr = TSGetSNES(actx->model,&snes);CHKERRQ(ierr);
-  ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-  ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
-  ierr = VecLockReadPush(x);CHKERRQ(ierr);
-  ierr = DMCompositeGetAccessArray(dm,x,actx->nqts + 1,NULL,actx->F);CHKERRQ(ierr);
-  ierr = DMCompositeGetAccessArray(dm,y,actx->nqts + 1,NULL,actx->U);CHKERRQ(ierr);
-  ierr = KSPSolveTranspose(ksp,actx->F[0],actx->U[0]);CHKERRQ(ierr);
-  ierr = KSPGetOperators(aksp,&A,NULL);CHKERRQ(ierr);
-  ierr = KSPGetIterationNumber(ksp,&aksp->its);CHKERRQ(ierr);
-  ierr = KSPGetConvergedReason(ksp,&aksp->reason);CHKERRQ(ierr);
-  if (aksp->reason <=0) {
-    ierr = DMCompositeRestoreAccessArray(dm,x,actx->nqts + 1,NULL,actx->F);CHKERRQ(ierr);
-    ierr = DMCompositeRestoreAccessArray(dm,y,actx->nqts + 1,NULL,actx->U);CHKERRQ(ierr);
-    ierr = VecLockReadPop(x);CHKERRQ(ierr);
-    PetscFunctionReturn(0);
-  }
-  for (i=0;i<actx->nqts;i++) {
-    Mat Asub;
-    Vec d;
-    DM  qdm;
-
-    ierr = MatNestGetSubMat(A,0,i+1,&Asub);CHKERRQ(ierr);
     if (Asub) {
-      ierr = MatMultTranspose(Asub,actx->U[0],actx->U[i+1]);CHKERRQ(ierr);
+      if (!trans) {
+        ierr = MatMult(Asub,actx->U[0],actx->U[i+1]);CHKERRQ(ierr);
+      } else {
+        ierr = MatMultTranspose(Asub,actx->U[0],actx->U[i+1]);CHKERRQ(ierr);
+      }
       ierr = VecAYPX(actx->U[i+1],-1.,actx->F[i+1]);CHKERRQ(ierr);
     } else {
       ierr = VecCopy(actx->F[i+1],actx->U[i+1]);CHKERRQ(ierr);
@@ -281,11 +237,7 @@ static PetscErrorCode KSPSolve_AugTriangular(KSP ksp)
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  if (ksp->transpose_solve) {
-    ierr = KSPSolveTranspose_AugTriangular(ksp,ksp->vec_rhs,ksp->vec_sol);CHKERRQ(ierr);
-  } else {
-    ierr = KSPSolveFWD_AugTriangular(ksp,ksp->vec_rhs,ksp->vec_sol);CHKERRQ(ierr);
-  }
+  ierr = KSPSolve_AugTriangular_Private(ksp,ksp->vec_rhs,ksp->vec_sol,ksp->transpose_solve);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -779,6 +731,7 @@ static PetscErrorCode AugmentedTSRHSFunction(TS ats, PetscReal time, Vec U, Vec 
   PetscFunctionReturn(0);
 }
 
+/* XXX update mat status? */
 static PetscErrorCode AugmentedTSRHSJacobian(TS ats, PetscReal time, Vec U, Mat A, Mat P, void *ctx)
 {
   PetscErrorCode ierr;
@@ -939,6 +892,17 @@ PetscErrorCode AugmentedTSInitialize(TS ats)
     TSEvent mevent = actx->model->event;
 
     ierr = TSSetEventHandler(ats,mevent->nevents,mevent->direction,mevent->terminate,AugmentedTSEventHandler,AugmentedTSPostEvent,NULL);CHKERRQ(ierr);
+  }
+
+  /* */
+  if (actx->model->snes) {
+    SNES     snes;
+    PetscInt lag;
+
+    ierr = SNESGetLagPreconditioner(actx->model->snes,&lag);CHKERRQ(ierr);
+    if (lag < 0) lag = -2;
+    ierr = TSGetSNES(ats,&snes);CHKERRQ(ierr);
+    ierr = SNESSetLagPreconditioner(snes,lag);CHKERRQ(ierr);
   }
 
   /* compose callbacks for discrete adjoint */
