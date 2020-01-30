@@ -542,6 +542,7 @@ PetscErrorCode TLMTSSetUpStep(TS lts)
   if (tlm->discrete) {
     SNES      snes;
     KSP       ksp;
+    PetscInt  lag;
     PetscBool rk,theta,cn;
 
     ierr = PetscObjectTypeCompare((PetscObject)lts,TSRK,&rk);CHKERRQ(ierr);
@@ -557,8 +558,11 @@ PetscErrorCode TLMTSSetUpStep(TS lts)
     }
     /* reuse KSP */
     ierr = TSGetSNES(tlm->model,&snes);CHKERRQ(ierr);
+    ierr = SNESGetLagPreconditioner(snes,&lag);CHKERRQ(ierr);
+    if (lag < 0) lag = -2;
     ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
     ierr = TSGetSNES(lts,&snes);CHKERRQ(ierr);
+    ierr = SNESSetLagPreconditioner(snes,lag);CHKERRQ(ierr);
     ierr = SNESSetKSP(snes,ksp);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
@@ -702,11 +706,16 @@ PetscErrorCode TSCreateTLMTS(TS ts, TS* lts)
 
   /* tangent linear model linear solver -> propagate KSP info of the forward model but use a different object */
   if (ts->snes) {
+    PetscInt lag;
+
     ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
+    ierr = SNESGetLagPreconditioner(snes,&lag);CHKERRQ(ierr);
+    if (lag < 0) lag = -2;
     ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
     ierr = KSPGetType(ksp,&ksptype);CHKERRQ(ierr);
     ierr = KSPGetTolerances(ksp,&rtol,&atol,&dtol,&maxits);CHKERRQ(ierr);
     ierr = TSGetSNES(*lts,&snes);CHKERRQ(ierr);
+    ierr = SNESSetLagPreconditioner(snes,lag);CHKERRQ(ierr);
     ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
     if (ksptype) { ierr = KSPSetType(ksp,ksptype);CHKERRQ(ierr); }
     ierr = KSPSetTolerances(ksp,rtol,atol,dtol,maxits);CHKERRQ(ierr);
