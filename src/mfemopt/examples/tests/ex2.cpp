@@ -619,6 +619,7 @@ MultiSourceMisfitHessian::MultiSourceMisfitHessian(const MultiSourceMisfit* _mso
       /* we create new solvers to not interfere with the gradient solver */
       PetscODESolver *odesolver = new PetscODESolver(comm,"worker_");
       odesolver->Init(*(msobj->heat),PetscODESolver::ODE_SOLVER_LINEAR);
+      odesolver->SetJacobianType(Operator::ANY_TYPE);
       odesolver->SetBCHandler(msobj->bchandler);
       odesolver->SetPreconditionerFactory(msobj->heat->GetPreconditionerFactory());
 
@@ -1262,7 +1263,7 @@ int main(int argc, char *argv[])
 
    FECType   s_fec_type = FEC_H1;
    PetscInt  s_ord = 1;
-   OIDType   s_oid_type = OID_MATAIJ, s_jid_type = OID_MATAIJ;
+   OIDType   s_oid_type = OID_MATAIJ;
 
    FECType   mu_fec_type = FEC_H1;
    PetscInt  mu_ord = 1;
@@ -1296,7 +1297,6 @@ int main(int argc, char *argv[])
 
       /* Simulation parameters */
       ierr = PetscOptionsEnum("-state_oid_type","Operator::Type for state",NULL,OIDTypes,(PetscEnum)s_oid_type,(PetscEnum*)&s_oid_type,NULL);CHKERRQ(ierr);
-      ierr = PetscOptionsEnum("-state_jid_type","Operator::Type for state jacobian",NULL,OIDTypes,(PetscEnum)s_jid_type,(PetscEnum*)&s_jid_type,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsInt("-state_ord","Polynomial order approximation for state variables",NULL,s_ord,&s_ord,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsEnum("-state_fec_type","FEC for state","",FECTypes,(PetscEnum)s_fec_type,(PetscEnum*)&s_fec_type,NULL);CHKERRQ(ierr);
       ierr = PetscOptionsString("-scratch","Location where to put temporary data (must be present)",NULL,scratchdir,scratchdir,sizeof(scratchdir),NULL);CHKERRQ(ierr);
@@ -1367,7 +1367,8 @@ int main(int argc, char *argv[])
 
       ierr = PetscOptionsEnd();CHKERRQ(ierr);
    }
-   Operator::Type oid,jid;
+   Operator::Type jid = Operator::ANY_TYPE; // ModelHead uses shell mult + jacobian construction on the fly for the preconditioner
+   Operator::Type oid;
    switch (s_oid_type)
    {
       case OID_MATAIJ:
@@ -1385,25 +1386,6 @@ int main(int argc, char *argv[])
       case OID_ANY:
       default:
          oid = Operator::ANY_TYPE;
-         break;
-   }
-   switch (s_jid_type)
-   {
-      case OID_MATAIJ:
-         jid = Operator::PETSC_MATAIJ;
-         break;
-      case OID_MATIS:
-         jid = Operator::PETSC_MATIS;
-         break;
-      case OID_MATHYPRE:
-         jid = Operator::PETSC_MATHYPRE;
-         break;
-      case OID_HYPRE:
-         jid = Operator::Hypre_ParCSR;
-         break;
-      case OID_ANY:
-      default:
-         jid = Operator::ANY_TYPE;
          break;
    }
 
@@ -1616,7 +1598,7 @@ int main(int argc, char *argv[])
          ReceiverMonitor *rmonitor = new ReceiverMonitor(u,recpoints,tmp2.str());
 
          ModelHeat *heat;
-         if (exact_sample) heat =new ModelHeat(mu,sigma,s_fes,oid);
+         if (exact_sample) heat = new ModelHeat(mu,sigma,s_fes,oid);
          else heat = new ModelHeat(mu_pd,sigma,s_fes,oid);
          heat->SetBCHandler(bchandler); /* XXX so many times setting the object -> add specialized constructor for odesolver? */
 
@@ -2106,7 +2088,7 @@ int main(int argc, char *argv[])
      filter: sed -e "s/-nan/nan/g"
      timeoutfactor: 3
      nsize: 2
-     args: -scratch ./ -test_partitioning -meshfile ${petscopt_dir}/share/petscopt/meshes/segment-m5-5.mesh -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -test_newton
+     args: -scratch ./ -test_partitioning -meshfile ${petscopt_dir}/share/petscopt/meshes/segment-m5-5.mesh -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -test_newton -tsgradient_adjoint_worker_reuseksp  -tshessian_foadjoint_worker_reuseksp -tshessian_tlm_worker_reuseksp -tshessian_soadjoint_worker_reuseksp
      test:
        suffix: null_test
        args: -test_null -test_misfit_internal -test_misfit 1 -test_misfit_reg 1 -test_progress 0 -tv_alpha 0 -newton_pc_type none -newton_snes_atol 1.e-8 -glvis 0
