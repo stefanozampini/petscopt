@@ -596,7 +596,7 @@ static PetscErrorCode TLMTSSetUp(TS lts)
 .  lts - the new TS context for the Tangent Linear Model DAE
 
    Options Database Keys:
-+  -tlm_userijacobian <0> - use the user-callback to compute the IJacobian. Defaults to TSComputeIJacobianWithSplits_Private()
++  -tlm_userijacobian <1> - use the user-callback to compute the IJacobian. If 0, uses TSComputeIJacobianWithSplits_Private()
 .  -tlm_constjacobians <0> - if the Jacobians are constant
 -  -tlm_reuseksp <0> - if the TLMTS should reuse the same KSP object used to solve the model DAE
 
@@ -652,8 +652,9 @@ PetscErrorCode TSCreateTLMTS(TS ts, TS* lts)
   ierr = PetscNew(&tlm_ctx);CHKERRQ(ierr);
   ierr = TSSetApplicationContext(*lts,(void *)tlm_ctx);CHKERRQ(ierr);
   ierr = PetscObjectReference((PetscObject)ts);CHKERRQ(ierr);
-  tlm_ctx->model = ts;
-  tlm_ctx->setup = (*lts)->ops->setup;
+  tlm_ctx->model     = ts;
+  tlm_ctx->setup     = (*lts)->ops->setup;
+  tlm_ctx->userijac  = PETSC_TRUE;
   (*lts)->ops->setup = TLMTSSetUp;
 
   /* wrap application context in a container, so that it will be destroyed when calling TSDestroy on lts */

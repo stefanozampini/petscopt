@@ -6,6 +6,7 @@
 
 typedef struct {
   Vec            design;      /* design vector (fixed) */
+  PetscBool      userijac;    /* use userdefined IJacobian routine */
   TS             fwdts;       /* forward solver */
   TSObj          tsobj;       /* Objective functions linked list */
   PetscReal      t0,tf;       /* time limits, for forward time recovery */

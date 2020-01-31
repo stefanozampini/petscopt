@@ -122,6 +122,8 @@ PetscErrorCode TSGetSplitJacobians(TS ts, Mat* JU, Mat* pJU, Mat *JUdot, Mat* pJ
     ierr = PetscObjectCompose((PetscObject)ts,"_ts_splitJac",(PetscObject)c);CHKERRQ(ierr);
     ierr = PetscObjectDereference((PetscObject)c);CHKERRQ(ierr);
   }
+  if (!JU && !pJU && !JUdot && !pJUdot) PetscFunctionReturn(0);
+
   ierr = PetscContainerGetPointer(c,(void**)&splitJ);CHKERRQ(ierr);
   ierr = TSGetIJacobian(ts,&A,&B,NULL,NULL);CHKERRQ(ierr);
   if (JU) {

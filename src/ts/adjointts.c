@@ -237,7 +237,16 @@ static PetscErrorCode AdjointTSIJacobian(TS adjts, PetscReal time, Vec U, Vec Ud
   PetscCheckAdjointTS(adjts);
   ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
   if (!adj_ctx->discrete) {
-    ierr = TSComputeIJacobianWithSplits_Private(adj_ctx->fwdts,time,U,Udot,shift,A,B,ctx);CHKERRQ(ierr);
+    if (adj_ctx->userijac) {
+      Vec       W[2];
+      PetscReal fwdt = adj_ctx->tf - time + adj_ctx->t0;
+
+      ierr = TSTrajectoryGetUpdatedHistoryVecs(adj_ctx->fwdts->trajectory,adj_ctx->fwdts,fwdt,&W[0],&W[1]);CHKERRQ(ierr);
+      ierr = TSComputeIJacobian(adj_ctx->fwdts,fwdt,W[0],W[1],shift,A,B,PETSC_FALSE);CHKERRQ(ierr);
+      ierr = TSTrajectoryRestoreUpdatedHistoryVecs(adj_ctx->fwdts->trajectory,&W[0],&W[1]);CHKERRQ(ierr);
+    } else {
+      ierr = TSComputeIJacobianWithSplits_Private(adj_ctx->fwdts,time,NULL,NULL,shift,A,B,ctx);CHKERRQ(ierr);
+    }
   } else {
     ierr = TSComputeIJacobian(adj_ctx->fwdts,time,U,Udot,shift,A,B,PETSC_FALSE);CHKERRQ(ierr);
   }
@@ -455,7 +464,8 @@ PetscErrorCode AdjointTSIsDiscrete(TS adjts, PetscBool *flg)
 -  adjts - the new TS context for the adjoint DAE
 
    Options Database Keys:
-+  -adjoint_constjacobians <0> - if the Jacobians are constant
++  -adjoint_userijacobian <1> - use the user-callback to compute the IJacobian. If 0, uses TSComputeIJacobianWithSplits_Private()
+.  -adjoint_constjacobians <0> - if the Jacobians are constant
 -  -adjoint_reuseksp <0> - if the AdjointTS should reuse the same KSP object used to solve the model DAE
 
    Notes: Given the DAE in implicit form F(t,x,xdot) = 0, the AdjointTS solves the linear DAE F_xdot^T L_dot + (F_x - d/dt F_xdot)^T L + forcing = 0.
@@ -529,8 +539,9 @@ PetscErrorCode TSCreateAdjointTS(TS ts, TS* adjts)
   ierr = PetscNew(&adj);CHKERRQ(ierr);
   ierr = TSSetApplicationContext(*adjts,(void *)adj);CHKERRQ(ierr);
   ierr = PetscObjectReference((PetscObject)ts);CHKERRQ(ierr);
-  adj->fwdts = ts;
-  adj->setup = (*adjts)->ops->setup;
+  adj->fwdts    = ts;
+  adj->setup    = (*adjts)->ops->setup;
+  adj->userijac = PETSC_TRUE;
   (*adjts)->ops->setup = AdjointTSSetUp;
 
   /* TODO: this needs a better sharing mechanism */
