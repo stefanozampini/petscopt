@@ -136,7 +136,6 @@ void DataReplicator::Broadcast(const std::string& name, int nin, const void* dat
    it = sfmap.find(name);
    if (it == sfmap.end())
    {
-
       nroots = IsMaster() ? nin : 0;
       nleaves = nout;
       sf = NewSF(red_comm,name,nroots,nleaves);

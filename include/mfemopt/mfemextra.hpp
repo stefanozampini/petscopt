@@ -111,10 +111,12 @@ class SymmetricSolver : public mfem::Solver
 {
 private:
    mfem::Solver *isolver;
-   bool own;
+   bool ownsolver;
+   mfem::Operator *iop;
+   bool ownop;
 public:
-   SymmetricSolver(mfem::Solver*,bool);
-   virtual void SetOperator(const mfem::Operator &op);
+   SymmetricSolver(mfem::Solver*,bool,mfem::Operator*,bool);
+   virtual void SetOperator(const mfem::Operator&);
    virtual void Mult(const mfem::Vector&,mfem::Vector&) const;
    virtual void MultTranspose(const mfem::Vector&,mfem::Vector&) const;
    virtual ~SymmetricSolver();

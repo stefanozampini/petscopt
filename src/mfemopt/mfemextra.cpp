@@ -281,11 +281,20 @@ DiagonalMatrixCoefficient::~DiagonalMatrixCoefficient()
   if (own) delete VQ;
 }
 
-SymmetricSolver::SymmetricSolver(Solver *solver, bool owner) : isolver(solver), own(owner) {}
+SymmetricSolver::SymmetricSolver(Solver *solver, bool owner, Operator* op, bool opowner)
+{
+  height = solver->Height();
+  width = solver->Width();
+  isolver = solver;
+  ownsolver = owner;
+  if (op) MFEM_VERIFY(height == op->Height() && width == op->Width(),"Invalid operator sizes: height " << height << " " << op->Height() << ", width " << width << " " << op->Width());
+  iop = op;
+  ownop = opowner;
+}
 
 void SymmetricSolver::SetOperator(const Operator &op)
 {
-  isolver->SetOperator(op);
+  mfem_error("SymmetricSolver::SetOperator(const Operator &op) is not intended to be used");
 }
 
 void SymmetricSolver::Mult(const Vector &b, Vector& x) const
@@ -300,7 +309,8 @@ void SymmetricSolver::MultTranspose(const Vector &b, Vector& x) const
 
 SymmetricSolver::~SymmetricSolver()
 {
-  if (own) delete isolver;
+  if (ownop) delete iop;
+  if (ownsolver) delete isolver;
 }
 
 }

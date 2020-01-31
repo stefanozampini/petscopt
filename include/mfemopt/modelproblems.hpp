@@ -12,6 +12,7 @@
 #include <mfem/fem/plinearform.hpp>
 #include <mfem/fem/pbilinearform.hpp>
 #include <mfem/linalg/petsc.hpp>
+#include <map>
 
 namespace mfemopt
 {
@@ -37,7 +38,21 @@ private:
 
    mutable mfem::ParLinearForm  *rhsform;
    mutable mfem::PetscParVector *rhsvec;
-   mutable mfem::Operator       *Jacobian;
+   class MFJac : public mfem::Operator
+   {
+private:
+     const ModelHeat &heat;
+     double s;
+
+     void Mult_Private(const mfem::Vector&,mfem::Vector&,bool) const;
+public:
+     MFJac(const ModelHeat&);
+     virtual void Mult(const mfem::Vector&,mfem::Vector&) const;
+     virtual void MultTranspose(const mfem::Vector&,mfem::Vector&) const;
+     void SetShift(double);
+     double GetShift();
+   };
+   mutable std::map<double,MFJac*> Jacobians; // PETSC_MATSHELL does not take ownership of the operators
 
    mfem::ParGridFunction *adjgf,*stgf;
 
@@ -56,6 +71,7 @@ private:
    void InitForms(PDCoefficient*,mfem::Coefficient*);
    void UpdateStiffness();
    void UpdateMass();
+   void DeleteJacobians();
 
 public:
    ModelHeat(mfem::Coefficient*,mfem::Coefficient*,mfem::ParFiniteElementSpace*,mfem::Operator::Type);
@@ -78,13 +94,12 @@ public:
    class PreconditionerFactory : public mfem::PetscPreconditionerFactory
    {
    private:
-      ModelHeat& pde;
-      mfem::HypreParMatrix *hA;
+      const ModelHeat& pde;
 
    public:
-      PreconditionerFactory(ModelHeat& _pde, const std::string& name = std::string()): mfem::PetscPreconditionerFactory(name), pde(_pde), hA(NULL) {};
+      PreconditionerFactory(const ModelHeat& _pde, const std::string& name = std::string()): mfem::PetscPreconditionerFactory(name), pde(_pde) {}
       virtual mfem::Solver* NewPreconditioner(const mfem::OperatorHandle&);
-      virtual ~PreconditionerFactory() { delete hA;}
+      virtual ~PreconditionerFactory() {}
    };
 
    /* interface for mfemopt::PDOperator */

@@ -7,12 +7,69 @@ namespace mfemopt
 
 using namespace mfem;
 
+ModelHeat::MFJac::MFJac(const ModelHeat& h) : heat(h), s(0.0)
+{
+   height = heat.Height();
+   width  = heat.Width();
+}
+
+void ModelHeat::MFJac::SetShift(double shift) { s = shift; }
+double ModelHeat::MFJac::GetShift() { return s; }
+
+void ModelHeat::MFJac::Mult_Private(const mfem::Vector& x,mfem::Vector& y,bool trans) const
+{
+   Operator *M,*K;
+   heat.Mh->Get(M);
+   heat.Kh->Get(K);
+   if (!s)
+   {
+      if (trans)
+      {
+         K->MultTranspose(x,y);
+      }
+      else
+      {
+         K->Mult(x,y);
+      }
+   }
+   else
+   {
+      if (trans)
+      {
+         M->MultTranspose(x, y);
+      }
+      else
+      {
+         M->Mult(x, y);
+      }
+      y *= s;
+      if (trans)
+      {
+         K->MultTranspose(x,*heat.rhsvec);
+      }
+      else
+      {
+         K->Mult(x,*heat.rhsvec);
+      }
+      y += *heat.rhsvec;
+   }
+};
+
+void ModelHeat::MFJac::Mult(const mfem::Vector& x,mfem::Vector& y) const
+{
+   Mult_Private(x,y,false);
+}
+
+void ModelHeat::MFJac::MultTranspose(const mfem::Vector& x,mfem::Vector& y) const
+{
+   Mult_Private(x,y,true);
+}
+
 void ModelHeat::Init(ParFiniteElementSpace *_fe, Operator::Type _oid)
 {
    Mh = NULL;
    Kh = NULL;
    rhsform = NULL;
-   Jacobian = NULL;
 
    rhs = NULL;
    vrhs = NULL;
@@ -426,48 +483,35 @@ void ModelHeat::ImplicitMult(const Vector &x, const Vector &xdot, Vector &y) con
 /* PETSc expects the Jacobian of the ODE as shift * F_xdot + F_x */
 Operator& ModelHeat::GetImplicitGradient(const Vector &x, const Vector &xdot, double shift) const
 {
-   switch (Mh->Type())
+   MFJac* Jacobian = NULL;
+   std::map<double,MFJac*>::iterator it = Jacobians.find(shift);
+   if (it == Jacobians.end())
    {
-      case Operator::Hypre_ParCSR:
-      {
-         if (!Jacobian)
-         {
-            Jacobian = Add(shift,*(Mh->As<HypreParMatrix>()),1.0,*(Kh->As<HypreParMatrix>()));
-         }
-         else
-         {
-            HypreParMatrix *hJacobian = dynamic_cast<HypreParMatrix *>(Jacobian);
-            *hJacobian = 0.0;
-            hJacobian->Add(shift,*(Mh->As<HypreParMatrix>()));
-            hJacobian->Add(1.0,*(Kh->As<HypreParMatrix>()));
-         }
-         break;
-      }
-      case Operator::PETSC_MATHYPRE:
-      case Operator::PETSC_MATAIJ:
-      case Operator::PETSC_MATIS:
-      {
-         if (!Jacobian) Jacobian = new PetscParMatrix();
-         PetscParMatrix *pJacobian = dynamic_cast<PetscParMatrix *>(Jacobian);
-         *pJacobian  = *(Mh->As<PetscParMatrix>());
-         *pJacobian *= shift;
-         *pJacobian += *(Kh->As<PetscParMatrix>());
-         break;
-      }
-      default:
-      {
-         MFEM_ABORT("To be implemented");
-         break;
-      }
+      Jacobian = new MFJac(*this);
+      Jacobian->SetShift(shift);
+      Jacobians.insert(std::pair<double,MFJac*>(shift,Jacobian));
+   }
+   else
+   {
+      Jacobian = it->second;
    }
    return *Jacobian;
+}
+
+void ModelHeat::DeleteJacobians()
+{
+   std::map<double,MFJac*>::iterator it;
+   for (it=Jacobians.begin(); it!=Jacobians.end(); ++it)
+   {
+      delete it->second;
+   }
 }
 
 ModelHeat::~ModelHeat()
 {
    delete Mh;
    delete Kh;
-   delete Jacobian;
+   DeleteJacobians();
    delete rhsform;
    delete rhsvec;
    delete m;
@@ -482,130 +526,115 @@ ModelHeat::~ModelHeat()
 #include "petscmathypre.h"
 #endif
 
+/* XXX */
+typedef struct
+{
+   Operator *op;
+} __mfem_mat_shell_ctx;
+
 Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle& oh)
 {
   Solver *solver = NULL;
   PetscErrorCode ierr;
 
-  if (oh.Type() == Operator::PETSC_MATIS)
+  if (oh.Type() == Operator::PETSC_MATSHELL)
   {
-     PetscParMatrix *pA;
-     oh.Get(pA);
-     MatSetOption(*pA,MAT_SPD,PETSC_TRUE);
-     PetscBDDCSolverParams opts;
-     opts.SetSpace(pde.fes);
-     if (pde.bc)
-     {
-        Array<int>& ess = pde.bc->GetTDofs();
-        opts.SetEssBdrDofs(&ess);
-     }
-     solver = new PetscBDDCSolver(*pA,opts);
-  }
-#if defined(PETSC_HAVE_HYPRE)
-  else if (oh.Type() == Operator::PETSC_MATHYPRE)
-  {
-     PetscParMatrix *pA;
-     oh.Get(pA);
-     MatSetOption(*pA,MAT_SPD,PETSC_TRUE);
+     PetscParMatrix *oJ;
+     oh.Get(oJ);
 
-     hypre_ParCSRMatrix *parcsr;
-     ierr = MatHYPREGetParCSR(*pA,&parcsr); PCHKERRQ(*pA,ierr);
-     delete hA;
-     hA = new HypreParMatrix(parcsr,false);
-     if (pde.fe_range == FiniteElement::SCALAR)
+     __mfem_mat_shell_ctx *sctx;
+     ierr = MatShellGetContext(*oJ,&sctx); PCHKERRQ(*oJ,ierr);
+     ModelHeat::MFJac *J = dynamic_cast<ModelHeat::MFJac *>(sctx->op);
+     MFEM_VERIFY(J,"Not a ModelHeat::MFJac operator");
+     double s = J->GetShift();
+
+     Operator *M,*K;
+     pde.Mh->Get(M);
+     pde.Kh->Get(K);
+     HypreParMatrix *hK = dynamic_cast<HypreParMatrix *>(K);
+     HypreParMatrix *hM = dynamic_cast<HypreParMatrix *>(M);
+     PetscParMatrix *pK = dynamic_cast<PetscParMatrix *>(K);
+     PetscParMatrix *pM = dynamic_cast<PetscParMatrix *>(M);
+     // this matrix will be owned by the solver
+     HypreParMatrix *hA = NULL;
+     if (hK && hM) // When using HypreParMatrix, take advantage of the solvers
      {
-        HypreBoomerAMG *t = new HypreBoomerAMG(*hA);
-        t->SetPrintLevel(0);
-        solver = new SymmetricSolver(t,true);
-     }
-     else
-     {
+        hA = Add(s,*hM,1.0,*hK);
+        if (pde.bc)
+        {
+           HypreParVector X(*hA,false);
+           HypreParVector B(*hA,true);
+           X = 0.0;
+           hA->EliminateRowsCols(pde.bc->GetTDofs(),X,B);
+        }
         if (pde.fe_deriv == FiniteElement::DIV)
         {
            HypreADS *t = new HypreADS(*hA,pde.fes);
            t->SetPrintLevel(0);
-           solver = new SymmetricSolver(t,true);
+           solver = new SymmetricSolver(t,true,hA,true);
         }
-        else
+        else if (pde.fe_deriv == FiniteElement::CURL)
         {
            HypreAMS *t = new HypreAMS(*hA,pde.fes);
            t->SetPrintLevel(0);
-           solver = new SymmetricSolver(t,true);
-        }
-     }
-  }
-#endif
-  else if (oh.Type() == Operator::Hypre_ParCSR)
-  {
-     HypreParMatrix *ohA;
-     oh.Get(ohA);
-
-     if (pde.fe_range == FiniteElement::SCALAR)
-     {
-        HypreBoomerAMG *t = new HypreBoomerAMG(*ohA);
-        t->SetPrintLevel(0);
-        solver = new SymmetricSolver(t,true);
-     }
-     else
-     {
-        if (pde.fe_deriv == FiniteElement::DIV)
-        {
-           HypreADS *t = new HypreADS(*ohA,pde.fes);
-           t->SetPrintLevel(0);
-           solver = new SymmetricSolver(t,true);
+           solver = new SymmetricSolver(t,true,hA,true);
         }
         else
         {
-           HypreAMS *t = new HypreAMS(*ohA,pde.fes);
+           HypreBoomerAMG *t = new HypreBoomerAMG(*hA);
            t->SetPrintLevel(0);
-           solver = new SymmetricSolver(t,true);
+           solver = new SymmetricSolver(t,true,hA,true);
         }
      }
-  }
-  else if (oh.Type() == Operator::PETSC_MATAIJ)
-  {
-     PetscParMatrix *pA;
-     oh.Get(pA);
-     ierr = MatSetOption(*pA,MAT_SPD,PETSC_TRUE); PCHKERRQ(*pA,ierr);
-
-     if (pde.fe_range == FiniteElement::SCALAR)
+     else if (pK && pM) // When using PetscParMatrix, either use BDDC (PETSC_MATIS), or test command line preconditioners (all the other types)
      {
-        solver = new PetscPreconditioner(*pA);
-     }
-     else
-     {
-#if defined(PETSC_HAVE_HYPRE)
-        // convert and attach the converted Mat to the original one so that it will get destroyed
-        Mat tA;
-        ierr = MatConvert(*pA,MATHYPRE,MAT_INITIAL_MATRIX,&tA); PCHKERRQ(*pA,ierr);
-        ierr = PetscObjectCompose(*pA,"__mfemopt_temporary_convmat",(PetscObject)tA); PCHKERRQ(*pA,ierr);
-        ierr = PetscObjectDereference((PetscObject)tA); PCHKERRQ(*pA,ierr);
+        PetscBool ismatis;
+        Mat       pJ;
 
-        delete hA;
-        hypre_ParCSRMatrix *parcsr;
-        ierr = MatHYPREGetParCSR(tA,&parcsr); PCHKERRQ(*pA,ierr);
-        hA = new HypreParMatrix(parcsr,false);
-
-        if (pde.fe_deriv == FiniteElement::DIV)
+        ierr = MatDuplicate(*pK,MAT_COPY_VALUES,&pJ); PCHKERRQ(*pK,ierr);
+        ierr = MatAXPY(pJ,s,*pM,SAME_NONZERO_PATTERN); PCHKERRQ(*pK,ierr);
+        if (s > 0.0) { ierr = MatSetOption(pJ,MAT_SPD,PETSC_TRUE); PCHKERRQ(*pK,ierr); }
+        PetscParMatrix ppJ(pJ,false); // Do not take reference, since the Mat will be owned by the preconditioner
+        if (pde.bc)
         {
-           HypreADS *t = new HypreADS(*hA,pde.fes);
-           t->SetPrintLevel(0);
-           solver = new SymmetricSolver(t,true);
+           PetscParVector dummy(PetscObjectComm((PetscObject)pJ),0);
+           ppJ.EliminateRowsCols(pde.bc->GetTDofs(),dummy,dummy);
+        }
+        ierr = PetscObjectTypeCompare((PetscObject)pJ,MATIS,&ismatis); PCHKERRQ(*pK,ierr);
+        if (ismatis)
+        {
+           PetscBDDCSolverParams opts;
+           opts.SetSpace(pde.fes);
+           if (pde.bc)
+           {
+              Array<int>& ess = pde.bc->GetTDofs();
+              opts.SetEssBdrDofs(&ess);
+           }
+           solver = new PetscBDDCSolver(ppJ,opts);
         }
         else
         {
-           HypreAMS *t = new HypreAMS(*hA,pde.fes);
-           t->SetPrintLevel(0);
-           solver = new SymmetricSolver(t,true);
+           solver = new PetscPreconditioner(ppJ,"heat_");
         }
-#else
-        solver = new PetscPreconditioner(*pA);
-#endif
-    }
+     }
+     else
+     {
+        std::ostringstream errstr;
+        errstr << "Invalid combination: K ";
+        errstr << (hK ? "HypreParMatrix" : (pK ? "PetscParMatrix" : "not recognized"));
+        errstr << ", M ";
+        errstr << (hM ? "HypreParMatrix" : (pM ? "PetscParMatrix" : "not recognized"));
+        mfem_error(errstr.str().c_str());
+     }
   }
   else
   {
-     mfem_error("Unhandled operator type");
+     std::ostringstream errstr;
+     errstr << "Unhandled operator type ";
+     errstr << oh.Type();
+     errstr << ". Run using PetscODESolver::SetJacobianType(Operator::ANY_TYPE);";
+     errstr << " and using your favourite OperatorType in the ModelHeat constructor.";
+     mfem_error(errstr.str().c_str());
   }
   return solver;
 }
