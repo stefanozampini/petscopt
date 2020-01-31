@@ -501,7 +501,7 @@ static PetscErrorCode JacCouplingMult_TLM(Mat A, Vec x, Vec y)
   TSTrajectory   tj,atj = NULL;
   TSOpt          tsopt;
   Vec            FWDH[2],FOAH = NULL;
-  PetscBool      AXPY;
+  PetscBool      AXPY = PETSC_FALSE;
   PetscBool      Hhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
                                {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
                                {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
