@@ -526,12 +526,6 @@ ModelHeat::~ModelHeat()
 #include "petscmathypre.h"
 #endif
 
-/* XXX */
-typedef struct
-{
-   Operator *op;
-} __mfem_mat_shell_ctx;
-
 Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle& oh)
 {
   Solver *solver = NULL;
@@ -542,12 +536,11 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
      PetscParMatrix *oJ;
      oh.Get(oJ);
 
-     __mfem_mat_shell_ctx *sctx;
-     ierr = MatShellGetContext(*oJ,&sctx); PCHKERRQ(*oJ,ierr);
-     ModelHeat::MFJac *J = dynamic_cast<ModelHeat::MFJac *>(sctx->op);
+     Operator* ctx;
+     ierr = MatShellGetContext(*oJ,&ctx); PCHKERRQ(*oJ,ierr);
+     ModelHeat::MFJac *J = dynamic_cast<ModelHeat::MFJac *>(ctx);
      MFEM_VERIFY(J,"Not a ModelHeat::MFJac operator");
      double s = J->GetShift();
-
      Operator *M,*K;
      pde.Mh->Get(M);
      pde.Kh->Get(K);

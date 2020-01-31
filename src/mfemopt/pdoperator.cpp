@@ -267,19 +267,14 @@ PetscErrorCode mfemopt_setupts(TS ts,Vec X0,Vec M,void* ctx)
    PetscFunctionReturn(0);
 }
 
-typedef struct
-{
-   mfem::Operator *op;
-} __mfem_mat_shell_ctx;
-
 PetscErrorCode mfemopt_gradientdae(TS ts,PetscReal t,Vec X,Vec Xdot,Vec M,Mat A,void* ctx)
 {
-   PetscErrorCode       ierr;
-   __mfem_mat_shell_ctx *mctx;
+   PetscErrorCode ierr;
+   mfem::Operator *op;
 
    PetscFunctionBeginUser;
-   ierr = MatShellGetContext(A,(void*)&mctx);CHKERRQ(ierr);
-   mfemopt::PDOperatorGradient *gop = mfemopt::mi_void_safe_cast<mfemopt::PDOperatorGradient,mfem::Operator>(mctx->op);
+   ierr = MatShellGetContext(A,&op);CHKERRQ(ierr);
+   mfemopt::PDOperatorGradient *gop = mfemopt::mi_void_safe_cast<mfemopt::PDOperatorGradient,mfem::Operator>(op);
    if (!gop) SETERRQ(PetscObjectComm((PetscObject)A),PETSC_ERR_USER,"Missing PDOperatorGradient");
    mfem::PetscParVector x(X,true);
    mfem::PetscParVector xdot(Xdot,true);
@@ -291,7 +286,6 @@ PetscErrorCode mfemopt_gradientdae(TS ts,PetscReal t,Vec X,Vec Xdot,Vec M,Mat A,
 /* f_xtm  : Y = (Ldot^T \otimes I_N)*F_UdotM*R */
 PetscErrorCode mfemopt_hessiandae_xtm(TS ts,PetscReal t,Vec u,Vec u_t,Vec M,Vec Ldot,Vec R,Vec Y,void *ctx)
 {
-
    PetscFunctionBeginUser;
    mfemopt::PDOperator *pdop = mfemopt::mi_void_safe_cast<mfemopt::PDOperator,mfem::TimeDependentOperator>(ctx);
    if (!pdop) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_USER,"Missing PDOperator");
