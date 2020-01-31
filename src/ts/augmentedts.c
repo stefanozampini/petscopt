@@ -89,24 +89,12 @@ static PetscErrorCode PetscOptInitializePackage(void)
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode KSPReset_AugTriangular(KSP ksp)
-{
-  TS             ats;
-  PetscErrorCode ierr;
-
-  PetscFunctionBegin;
-  ierr = KSPGetApplicationContext(ksp,(void**)&ats);CHKERRQ(ierr);
-  ierr = TSDestroy(&ats);CHKERRQ(ierr);
-  ierr = KSPSetApplicationContext(ksp,NULL);CHKERRQ(ierr);
-  PetscFunctionReturn(0);
-}
-
 static PetscErrorCode KSPDestroy_AugTriangular(KSP ksp)
 {
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  ierr = KSPReset_AugTriangular(ksp);CHKERRQ(ierr);
+  ierr = KSPSetApplicationContext(ksp,NULL);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -258,7 +246,7 @@ static PetscErrorCode KSPCreate_AugTriangular(KSP ksp)
   ksp->ops->solve          = KSPSolve_AugTriangular;
   ksp->ops->view           = KSPView_AugTriangular;
   ksp->ops->setup          = KSPSetUp_AugTriangular;
-  ksp->ops->reset          = KSPReset_AugTriangular;
+  ksp->ops->reset          = NULL;
   ksp->ops->destroy        = KSPDestroy_AugTriangular;
   ksp->ops->buildsolution  = KSPBuildSolutionDefault;
   ksp->ops->buildresidual  = KSPBuildResidualDefault;
@@ -1210,7 +1198,6 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
     /* XXX */
     ierr = PetscOptInitializePackage();CHKERRQ(ierr);
     ierr = KSPSetType(ksp,KSPAUGTRIANGULAR);CHKERRQ(ierr);
-    ierr = PetscObjectReference((PetscObject)*ats);CHKERRQ(ierr);
     ierr = KSPSetApplicationContext(ksp,*ats);CHKERRQ(ierr);
   }
 
