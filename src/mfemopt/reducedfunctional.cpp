@@ -16,6 +16,27 @@ namespace mfemopt
 
 using namespace mfem;
 
+void ReducedFunctional::ComputeGradient(const mfem::Vector& m,mfem::Vector& g) const
+{
+   if (objgradcalled)
+   {
+      mfem_error("ReducedFunctional::ComputeGradient not overloaded!");
+   }
+   else
+   {
+      double f;
+      ComputeObjectiveAndGradient(m,&f,g);
+   }
+}
+
+void ReducedFunctional::ComputeObjectiveAndGradient(const mfem::Vector& m,double *f,mfem::Vector& g) const
+{
+   ComputeObjective(m,f);
+   objgradcalled = true;
+   ComputeGradient(m,g);
+   objgradcalled = false;
+}
+
 void ReducedFunctional::ComputeGuess(mfem::Vector& m) const
 {
    Vector l,u;
