@@ -260,7 +260,6 @@ public:
    void RunTests(bool=true);
 
    virtual void ComputeObjective(const Vector&,double*) const;
-   virtual void ComputeGradient(const Vector&,Vector&) const;
    virtual void ComputeObjectiveAndGradient(const Vector&,double*,Vector&) const;
 
    virtual Operator& GetHessian(const Vector&) const;
@@ -486,56 +485,6 @@ void MultiSourceMisfit::ComputeObjective(const Vector& m, double *f) const
    ierr = PetscLogStagePop(); CCHKERRQ(PETSC_COMM_SELF,ierr);
 }
 
-void MultiSourceMisfit::ComputeGradient(const Vector& m, Vector& g) const
-{
-   PetscErrorCode ierr;
-   ierr = PetscLogStagePush(stages[1]); CCHKERRQ(PETSC_COMM_SELF,ierr);
-   odesolver->Init(*heat,PetscODESolver::ODE_SOLVER_LINEAR);
-
-   /* Specify callbacks for the purpose of computing the gradient (wrt the model parameters) of the residual function */
-   PetscParMatrix *A = new PetscParMatrix(comm,heat->GetGradientOperator(),Operator::PETSC_MATSHELL);
-   ierr = TSSetGradientDAE(*odesolver,*A,mfemopt_gradientdae,NULL);PCHKERRQ(*odesolver,ierr);
-   delete A;
-
-   ierr = TSSetSetUpFromDesign(*odesolver,mfemopt_setupts,heat);PCHKERRQ(*odesolver,ierr);
-   ierr = TSSetFromOptions(*odesolver);PCHKERRQ(*odesolver,ierr);
-
-   g.SetSize(heat->GetParameterSize());
-   g = 0.0;
-   M->PlaceArray(m.GetData());
-
-   /* Loop over least-squares objectives */
-   for (int i = 0; i < lsobj.Size(); i++)
-   {
-      ierr = TSResetObjective(*odesolver);PCHKERRQ(*odesolver,ierr);
-      ierr = TSAddObjective(*odesolver,PETSC_MIN_REAL,
-                            mfemopt_eval_tdobj,
-                            mfemopt_eval_tdobj_x,NULL,
-                            NULL,NULL,NULL,NULL,NULL,NULL,lsobj[i]);PCHKERRQ(*odesolver,ierr);
-
-      if (sources.Size())
-      {
-         heat->SetRHS(sources[i]);
-      }
-      else if (vsources.Size())
-      {
-         heat->SetRHS(vsources[i]);
-      }
-
-      ierr = TSComputeObjectiveAndGradient(*odesolver,t0,dt,tf,*U,*M,*G,NULL); //PCHKERRQ(*odesolver,ierr);
-      if (ierr) /* TODO report NAN? */
-      {
-         *G = NAN;
-      }
-      g += *G;
-   }
-
-   g *= scale_ls;
-
-   M->ResetArray();
-   ierr = PetscLogStagePop(); CCHKERRQ(PETSC_COMM_SELF,ierr);
-}
-
 void MultiSourceMisfit::ComputeObjectiveAndGradient(const Vector& m, double *f, Vector& g) const
 {
    PetscErrorCode ierr;
@@ -550,7 +499,7 @@ void MultiSourceMisfit::ComputeObjectiveAndGradient(const Vector& m, double *f, 
    ierr = TSSetSetUpFromDesign(*odesolver,mfemopt_setupts,heat);PCHKERRQ(*odesolver,ierr);
    ierr = TSSetFromOptions(*odesolver);PCHKERRQ(*odesolver,ierr);
 
-   *f = 0.0;
+   if (f) *f = 0.0;
 
    g.SetSize(heat->GetParameterSize());
    g = 0.0;
@@ -576,17 +525,17 @@ void MultiSourceMisfit::ComputeObjectiveAndGradient(const Vector& m, double *f, 
       }
 
       PetscReal rf;
-      ierr = TSComputeObjectiveAndGradient(*odesolver,t0,dt,tf,*U,*M,*G,&rf); //PCHKERRQ(*odesolver,ierr);
+      ierr = TSComputeObjectiveAndGradient(*odesolver,t0,dt,tf,*U,*M,*G,f ? &rf : NULL); //PCHKERRQ(*odesolver,ierr);
       if (ierr) /* TODO report NAN? */
       {
          rf = NAN;
          *G = NAN;
       }
-      *f += rf;
+      if (f) *f += rf;
       g += *G;
    }
 
-   *f *= scale_ls;
+   if (f) *f *= scale_ls;
    g *= scale_ls;
 
    M->ResetArray();
@@ -2087,67 +2036,76 @@ int main(int argc, char *argv[])
    testset:
      filter: sed -e "s/-nan/nan/g"
      timeoutfactor: 3
-     nsize: 2
      args: -scratch ./ -test_partitioning -meshfile ${petscopt_dir}/share/petscopt/meshes/segment-m5-5.mesh -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -test_newton -tsgradient_adjoint_worker_reuseksp  -tshessian_foadjoint_worker_reuseksp -tshessian_tlm_worker_reuseksp -tshessian_soadjoint_worker_reuseksp
      test:
+       nsize: 1
        suffix: null_test
-       args: -test_null -test_misfit_internal -test_misfit 1 -test_misfit_reg 1 -test_progress 0 -tv_alpha 0 -newton_pc_type none -newton_snes_atol 1.e-8 -glvis 0
+       args: -test_null -test_misfit_internal -test_misfit 1 -test_misfit_reg 1 -test_progress 0 -tv_alpha 0 -newton_pc_type none -newton_snes_atol 1.e-8 -glvis 0 -heat_pc_type lu
      test:
+       nsize: 2
        suffix: null_test_bddc
-       args: -test_null -test_misfit_internal -test_misfit 1 -test_misfit_reg 1 -test_progress 0 -tv_alpha 0 -newton_pc_type none -newton_snes_atol 1.e-8 -glvis 0 -state_oid_type PETSC_MATIS
+       args: -test_null -test_misfit_internal -test_misfit 1 -test_misfit_reg 1 -test_progress 0 -tv_alpha 0 -newton_pc_type none -newton_snes_atol 1.e-8 -glvis 0 -state_oid_type PETSC_MATIS -worker_ksp_rtol 1.e-8
      test:
+       nsize: 2
        suffix: null_test_hypre
-       args: -test_null -test_misfit_internal -test_misfit 1 -test_misfit_reg 1 -test_progress 0 -tv_alpha 0 -newton_pc_type none -newton_snes_atol 1.e-8 -glvis 0 -state_oid_type Hypre_ParCSR
+       args: -test_null -test_misfit_internal -test_misfit 1 -test_misfit_reg 1 -test_progress 0 -tv_alpha 0 -newton_pc_type none -newton_snes_atol 1.e-8 -glvis 0 -state_oid_type Hypre_ParCSR -worker_ksp_rtol 1.e-8
      test:
+       nsize: 1
        suffix: newton_test
-       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 1 -newton_snes_test_jacobian -newton_snes_rtol 1.e-6 -newton_snes_atol 1.e-6 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude_fn -ncrl 1
+       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 1 -newton_snes_test_jacobian -newton_snes_rtol 1.e-6 -newton_snes_atol 1.e-6 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude_fn -ncrl 1 -heat_pc_type lu
      test:
+       nsize: 1
        suffix: newton_full
        filter: sed -e "s/lit=4/lit=3/g"
-       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 10 -newton_snes_rtol 1.e-4 -newton_snes_atol 1.e-5 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1
+       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 10 -newton_snes_rtol 1.e-4 -newton_snes_atol 1.e-5 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1 -heat_pc_type lu
      test:
+       nsize: 1
        suffix: taonewton_full
        filter: sed -e "s/lit=4/lit=3/g"
-       args: -glvis 0 -test_newton 0 -test_opt -opt_tao_converged_reason -opt_tao_max_it 10 -opt_tao_gttol 1.e-4 -opt_tao_gatol 1.e-5 -opt_tao_type nls -opt_tao_nls_ksp_type fgmres -opt_tao_nls_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1
+       args: -glvis 0 -test_newton 0 -test_opt -opt_tao_converged_reason -opt_tao_max_it 10 -opt_tao_gttol 1.e-4 -opt_tao_gatol 1.e-5 -opt_tao_type nls -opt_tao_nls_ksp_type fgmres -opt_tao_nls_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1 -heat_pc_type lu
 
    testset:
      filter: sed -e "s/-nan/nan/g"
      timeoutfactor: 3
-     nsize: 2
      args: -scratch ./ -test_partitioning -meshfile ${petscopt_dir}/share/petscopt/meshes/segment-m5-5.mesh -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -test_newton
      test:
+       nsize: 1
        suffix: null_test_discrete
-       args: -test_null -test_misfit_internal -test_misfit 1 -test_misfit_reg 1 -test_progress 0 -tv_alpha 0 -newton_pc_type none -newton_snes_atol 1.e-8 -glvis 0 -tsgradient_adjoint_worker_discrete -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -worker_tshessian_gn {{0 1}separate output}
+       args: -test_null -test_misfit_internal -test_misfit 1 -test_misfit_reg 1 -test_progress 0 -tv_alpha 0 -newton_pc_type none -newton_snes_atol 1.e-8 -glvis 0 -tsgradient_adjoint_worker_discrete -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -worker_tshessian_gn {{0 1}separate output} -heat_pc_type lu
      test:
+       nsize: 1
        suffix: newton_test_discrete
-       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 1 -newton_snes_test_jacobian -newton_snes_rtol 1.e-6 -newton_snes_atol 1.e-6 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude_fn -ncrl 1 -tsgradient_adjoint_worker_discrete -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete
+       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 1 -newton_snes_test_jacobian -newton_snes_rtol 1.e-6 -newton_snes_atol 1.e-6 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude_fn -ncrl 1 -tsgradient_adjoint_worker_discrete -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -heat_pc_type lu
      test:
+       nsize: 1
        suffix: newton_full_discrete
        filter: sed -e "s/lit=4/lit=3/g"
-       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 10 -newton_snes_rtol 1.e-4 -newton_snes_atol 1.e-5 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1 -tsgradient_adjoint_worker_discrete -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -newton_snes_test_jacobian -tv_pd 0
+       args: -glvis 0 -newton_snes_converged_reason -newton_snes_max_it 10 -newton_snes_rtol 1.e-4 -newton_snes_atol 1.e-5 -newton_ksp_type fgmres -newton_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1 -tsgradient_adjoint_worker_discrete -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -newton_snes_test_jacobian -tv_pd 0 -heat_pc_type lu
      test:
+       nsize: 1
        suffix: taonewton_full_discrete
        filter: sed -e "s/lit=4/lit=3/g"
-       args: -glvis 0 -test_newton 0 -test_opt -opt_tao_converged_reason -opt_tao_max_it 10 -opt_tao_gttol 1.e-4 -opt_tao_gatol 1.e-5 -opt_tao_type nls -opt_tao_nls_ksp_type fgmres -opt_tao_nls_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1 -tsgradient_adjoint_worker_discrete -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -opt_tao_test_hessian -tv_pd 0
+       args: -glvis 0 -test_newton 0 -test_opt -opt_tao_converged_reason -opt_tao_max_it 10 -opt_tao_gttol 1.e-4 -opt_tao_gatol 1.e-5 -opt_tao_type nls -opt_tao_nls_ksp_type fgmres -opt_tao_nls_pc_type none -mu_jumps -tv_alpha 0.01 -mu_exclude 2 -ncrl 1 -tsgradient_adjoint_worker_discrete -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -opt_tao_test_hessian -tv_pd 0 -heat_pc_type lu
 
    test:
       filter: sed -e "s/-nan/nan/g"
       suffix: em_test
       timeoutfactor: 3
       nsize: 1
-      args: -newton_snes_max_it 4 -signal_scale 1.0 -scratch ./ -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad_testem.mesh -dt 0.01 -tf 1 -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -state_fec_type HCURL -test_progress 0 -test_misfit_internal -test_misfit 1,0,0 -ls_scale 1.e12 -tv_alpha 1.e-12 -tv_beta 1.e-6 -test_newton -test_newton_noise 0.0 -newton_pc_type none -newton_snes_atol 1.e-6 -newton_snes_converged_reason -test_null 0 -mu_const_val 0.9 -mu_exclude_fn_bb 3000,7000,4000,8000 -mu_exclude_fn  -grid_src_n 1 -grid_src_bb 5000,7000,5000,7000 -grid_rcv_n 4,1 -grid_rcv_bb 5500,6500,5800,5800 -glvis 0
+      args: -newton_snes_max_it 4 -signal_scale 1.0 -scratch ./ -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad_testem.mesh -dt 0.01 -tf 1 -ts_trajectory_type memory -ts_trajectory_reconstruction_order 2 -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -state_fec_type HCURL -test_progress 0 -test_misfit_internal -test_misfit 1,0,0 -ls_scale 1.e12 -tv_alpha 1.e-12 -tv_beta 1.e-6 -test_newton -test_newton_noise 0.0 -newton_pc_type none -newton_snes_atol 1.e-6 -newton_snes_converged_reason -test_null 0 -mu_const_val 0.9 -mu_exclude_fn_bb 3000,7000,4000,8000 -mu_exclude_fn  -grid_src_n 1 -grid_src_bb 5000,7000,5000,7000 -grid_rcv_n 4,1 -grid_rcv_bb 5500,6500,5800,5800 -glvis 0 -tsgradient_adjoint_worker_reuseksp  -tshessian_foadjoint_worker_reuseksp -tshessian_tlm_worker_reuseksp -tshessian_soadjoint_worker_reuseksp -heat_pc_type lu
 
    test:
       filter: sed -e "s/-nan/nan/g"
       suffix: em_test_discrete
       timeoutfactor: 3
       nsize: 1
-      args: -newton_snes_max_it 1 -signal_scale 1.0 -scratch ./ -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad_testem.mesh -dt 0.125 -tf 1.0 -ts_trajectory_type memory -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -state_fec_type HCURL -test_progress 0 -ls_scale 1.e12 -tv_alpha 1.e-12 -tv_beta 1.e-6 -test_newton -test_newton_noise 0.0 -newton_pc_type none -test_null 0 -mu_const_val 0.9 -mu_exclude_fn_bb 3000,7000,4000,8000 -mu_exclude_fn  -grid_src_n 1 -grid_src_bb 5000,7000,5000,7000 -grid_rcv_n 4,1 -grid_rcv_bb 5500,6500,5800,5800 -glvis 0 -tsgradient_adjoint_worker_discrete  -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -test_misfit_reg 0,0,1 -newton_snes_test_jacobian -tsgradient_adjoint_worker_discrete  -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -test_misfit_reg 0,0,1 -newton_snes_test_jacobian
+      args: -newton_snes_max_it 1 -signal_scale 1.0 -scratch ./ -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad_testem.mesh -dt 0.125 -tf 1.0 -ts_trajectory_type memory -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -state_fec_type HCURL -test_progress 0 -ls_scale 1.e12 -tv_alpha 1.e-12 -tv_beta 1.e-6 -test_newton -test_newton_noise 0.0 -newton_pc_type none -test_null 0 -mu_const_val 0.9 -mu_exclude_fn_bb 3000,7000,4000,8000 -mu_exclude_fn  -grid_src_n 1 -grid_src_bb 5000,7000,5000,7000 -grid_rcv_n 4,1 -grid_rcv_bb 5500,6500,5800,5800 -glvis 0 -tsgradient_adjoint_worker_discrete  -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -test_misfit_reg 0,0,1 -newton_snes_test_jacobian -tsgradient_adjoint_worker_discrete  -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -test_misfit_reg 0,0,1 -newton_snes_test_jacobian -heat_pc_type lu
 
    test:
       filter: sed -e "s/-nan/nan/g"
       suffix: em_test_discrete_gn
       timeoutfactor: 3
       nsize: 1
-      args: -newton_snes_max_it 1 -signal_scale 1.0 -scratch ./ -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad_testem.mesh -dt 0.125 -tf 1.0 -ts_trajectory_type memory -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -state_fec_type HCURL -test_progress 0 -ls_scale 1.e12 -tv_alpha 1.e-12 -tv_beta 1.e-6 -test_newton -test_newton_noise 0.0 -newton_pc_type none -test_null 0 -mu_const_val 0.9 -mu_exclude_fn_bb 3000,7000,4000,8000 -mu_exclude_fn  -grid_src_n 1 -grid_src_bb 5000,7000,5000,7000 -grid_rcv_n 4,1 -grid_rcv_bb 5500,6500,5800,5800 -glvis 0 -tsgradient_adjoint_worker_discrete  -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -test_misfit_reg 0,0,1 -newton_snes_test_jacobian -tsgradient_adjoint_worker_discrete  -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -test_misfit_reg 0,0,1 -newton_snes_test_jacobian -test_null -worker_tshessian_gn
+      args: -newton_snes_max_it 1 -signal_scale 1.0 -scratch ./ -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad_testem.mesh -dt 0.125 -tf 1.0 -ts_trajectory_type memory -mfem_use_splitjac -model_ts_type cn -model_ksp_type cg -worker_ts_max_snes_failures -1 -worker_ts_type cn -worker_ksp_type cg -state_fec_type HCURL -test_progress 0 -ls_scale 1.e12 -tv_alpha 1.e-12 -tv_beta 1.e-6 -test_newton -test_newton_noise 0.0 -newton_pc_type none -test_null 0 -mu_const_val 0.9 -mu_exclude_fn_bb 3000,7000,4000,8000 -mu_exclude_fn  -grid_src_n 1 -grid_src_bb 5000,7000,5000,7000 -grid_rcv_n 4,1 -grid_rcv_bb 5500,6500,5800,5800 -glvis 0 -tsgradient_adjoint_worker_discrete  -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -test_misfit_reg 0,0,1 -newton_snes_test_jacobian -tsgradient_adjoint_worker_discrete  -tshessian_tlm_worker_discrete  -tshessian_foadjoint_worker_discrete -tshessian_soadjoint_worker_discrete -test_misfit_reg 0,0,1 -newton_snes_test_jacobian -test_null -worker_tshessian_gn -heat_pc_type lu
+
 TEST*/

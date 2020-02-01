@@ -10,28 +10,28 @@ ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing state gradient
 ||g|| = 2.90873, ||g_fd|| = 2.90873, ||g - g_fd|| = 2.77616e-10, ||g-g_fd||/||g_fd|| = 9.54422e-11, cos() = 1.
 ObjectiveFunction::TestFDHessian state x state
-||H||_inf = 1., ||H_fd||_inf = 1., ||H - H_fd||_inf = 2.8481e-09, ||H-H_fd||_inf/||H_fd||_inf = 2.8481e-09
+||H||_inf = 1., ||H_fd||_inf = 1., ||H - H_fd||_inf = 6.57681e-09, ||H-H_fd||_inf/||H_fd||_inf = 6.57681e-09
 ---------------------------------------
 PDOperator::TestFDGradient wrt design
-||G|| = 0.738006, ||G^T|| = 0.738006, ||G - (G^T)^T||/||G|| = 3.76089e-17, ||G_fd|| = 0.738006, ||G_fd - G|| = 9.67902e-09
+||G|| = 0.820918, ||G^T|| = 0.820918, ||G - (G^T)^T||/||G|| = 1.69052e-17, ||G_fd|| = 0.820918, ||G_fd - G|| = 1.27369e-08
 ---------------------------------------
 Misfit objective 0.
 ReducedFunctional::TestFDGradient, delta: 1e-08
 -> hang tight while computing state gradient
-||g|| = 2.17176e-12, ||g_fd|| = 3.83323e-12, ||g - g_fd|| = 4.79769e-12, ||g-g_fd||/||g_fd|| = 1.2516, cos() = -0.216678
+||g|| = 2.16965e-12, ||g_fd|| = 3.83323e-12, ||g - g_fd|| = 4.79636e-12, ||g-g_fd||/||g_fd|| = 1.25126, cos() = -0.216672
 ReducedFunctional::TestFDHessian
-||H||_inf = 6.60925, ||H_fd||_inf = 6.61478, ||H - H_fd||_inf = 0.00553744, ||H-H_fd||_inf/||H_fd||_inf = 0.00083713
+||H||_inf = 6.60925, ||H_fd||_inf = 6.61478, ||H - H_fd||_inf = 0.0055365, ||H-H_fd||_inf/||H_fd||_inf = 0.000836989
 Regularized objective 0. (LS 0., TV 0.)
-Regularized gradient norm 2.17176e-12 (LS 2.17176e-12, TV 0.)
+Regularized gradient norm 2.16965e-12 (LS 2.16965e-12, TV 0.)
 -------------------------- ReducedFunctional::TestTaylor ---------------------------
 		Gradient				Hessian
 --------------------------------------------------------------------------
-0.0430547	0.00000 	0	0.00330403	0.00000 	0
-0.0111776	1.94556 	2	0.000412064	3.00329 	3
-0.00284741	1.97289 	2	5.00090e-05	3.04261 	3
-0.000718557	1.98647 	2	5.79716e-06	3.10877 	3
+0.0418405	0.00000 	0	0.00299801	0.00000 	0
+0.0108374	1.94888 	2	0.000372218	3.00979 	3
+0.00275744	1.97462 	2	4.49693e-05	3.04913 	3
+0.000695427	1.98736 	2	5.17462e-06	3.11942 	3
 =======================================
 NC 0 -> Number of dofs 11
 Initial objective 0. (LS 0., TV 0.)
-it=0	lit=0	obj=0.000000e+00	(g,du)=-0.000000e+00	||g||=2.171756e-12	step=1.000000e+00
+it=0	lit=0	obj=0.000000e+00	(g,du)=-0.000000e+00	||g||=2.169655e-12	step=1.000000e+00
 Final objective (SNES) 0. (LS 0., TV 0.)
