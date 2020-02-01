@@ -11,10 +11,10 @@ Receivers matrix
 -------------------------- ReducedFunctional::TestTaylor ---------------------------
 		Gradient				Hessian
 --------------------------------------------------------------------------
-0.00815578	0.00000 	0	0.000326714	0.00000 	0
-0.00207974	1.97142 	2	4.08817e-05	2.99850 	3
-0.000525043	1.98590 	2	5.11269e-06	2.99930 	3
-0.000131900	1.99300 	2	6.39438e-07	2.99920 	3
+0.00815579	0.00000 	0	0.000326713	0.00000 	0
+0.00207974	1.97142 	2	4.08811e-05	2.99852 	3
+0.000525044	1.98590 	2	5.11239e-06	2.99936 	3
+0.000131900	1.99300 	2	6.39288e-07	2.99946 	3
 =======================================
 NC 0 -> Number of dofs 20
 Initial objective 0.0213234 (LS 0.0213234, TV 2.7e-08)
@@ -24,6 +24,6 @@ it=0	lit=0	obj=2.132344e-02	(g,du)=-0.000000e+00	||g||=1.967407e-01	step=1.00000
     of hand-coded and finite difference Jacobian entries greater than <threshold>.
   Testing hand-coded Jacobian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Jacobian is probably correct.
-  ||J - Jfd||_F/||J||_F = 4.08203e-07, ||J - Jfd||_F = 3.57769e-07
-it=1	lit=19	obj=7.185762e-04	(g,du)=-4.744868e-02	||g||=3.885645e-02	step=1.000000e+00
-Final objective (SNES) 0.000718576 (LS 0.000718547, TV 2.89687e-08)
+  ||J - Jfd||_F/||J||_F = 3.44413e-07, ||J - Jfd||_F = 3.0186e-07
+it=1	lit=19	obj=7.185768e-04	(g,du)=-4.744868e-02	||g||=3.885646e-02	step=1.000000e+00
+Final objective (SNES) 0.000718577 (LS 0.000718548, TV 2.89687e-08)
