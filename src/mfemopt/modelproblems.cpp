@@ -552,7 +552,8 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
      HypreParMatrix *hA = NULL;
      if (hK && hM) // When using HypreParMatrix, take advantage of the solvers
      {
-        hA = Add(s,*hM,1.0,*hK);
+        if (s != 0.0) hA = Add(s,*hM,1.0,*hK);
+        else hA = new HypreParMatrix(*hM);
         if (pde.bc)
         {
            HypreParVector X(*hA,false);
@@ -584,9 +585,16 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
         PetscBool ismatis;
         Mat       pJ;
 
-        ierr = MatDuplicate(*pK,MAT_COPY_VALUES,&pJ); PCHKERRQ(*pK,ierr);
-        ierr = MatAXPY(pJ,s,*pM,SAME_NONZERO_PATTERN); PCHKERRQ(*pK,ierr);
-        if (s > 0.0) { ierr = MatSetOption(pJ,MAT_SPD,PETSC_TRUE); PCHKERRQ(*pK,ierr); }
+        if (s != 0.0)
+        {
+           ierr = MatDuplicate(*pK,MAT_COPY_VALUES,&pJ); PCHKERRQ(*pK,ierr);
+           ierr = MatAXPY(pJ,s,*pM,SAME_NONZERO_PATTERN); PCHKERRQ(*pK,ierr);
+        }
+        else
+        {
+           ierr = MatDuplicate(*pM,MAT_COPY_VALUES,&pJ); PCHKERRQ(*pK,ierr);
+        }
+        if (s >= 0.0) { ierr = MatSetOption(pJ,MAT_SPD,PETSC_TRUE); PCHKERRQ(*pK,ierr); }
         PetscParMatrix ppJ(pJ,false); // Do not take reference, since the Mat will be owned by the preconditioner
         if (pde.bc)
         {
