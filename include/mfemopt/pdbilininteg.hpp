@@ -43,6 +43,7 @@ public:
    void ComputeHessian_XM(mfem::ParGridFunction*,const mfem::Vector&,const mfem::Vector&,mfem::Vector&);
    void ComputeHessian_MX(mfem::ParGridFunction*,mfem::ParGridFunction*,const mfem::Vector&,mfem::Vector&);
 
+   /* these belongs to the integrator, above to the form -> TODO: Split */
    /* Default integration rule: specific implementations are copy-and-pasted from MFEM code */
    virtual const mfem::IntegrationRule* GetDefaultIntRule(const mfem::FiniteElement&,const mfem::FiniteElement&,mfem::ElementTransformation&,int)
    { mfem::mfem_error("PDBilinearFormIntegrator::GetDefaultIntRule not overloaded!"); return NULL; }
@@ -58,11 +59,34 @@ public:
                                        mfem::ElementTransformation&,
                                        mfem::DenseMatrix&)
    { mfem::mfem_error("PDBilinearFormIntegrator::AssembleElementMatrix2 not overloaded!"); }
+   virtual void ComputeElementGradientAdjoint(const mfem::FiniteElement*,
+                                              const mfem::Vector&,
+                                              const mfem::FiniteElement*,
+                                              const mfem::Vector&,
+                                              mfem::ElementTransformation*,
+                                              int,mfem::Vector&);
+   virtual void ComputeElementGradient(const mfem::FiniteElement*,const mfem::Vector&,
+                                       mfem::ElementTransformation*,const mfem::Vector&,int,
+                                       mfem::Vector&);
+   virtual void ComputeElementHessian(const mfem::FiniteElement*,const mfem::Vector&,
+                                       mfem::ElementTransformation*,const mfem::Vector&,int,
+                                       mfem::Vector&);
    ~PDBilinearFormIntegrator();
+
+protected:
+   virtual void ComputeElementGradient_Internal(const mfem::FiniteElement*,const mfem::Vector&,
+                                                mfem::ElementTransformation*,const mfem::Vector&,int,
+                                                mfem::Vector&,bool);
+
 };
 
 class PDMassIntegrator : public mfem::MassIntegrator, public PDBilinearFormIntegrator
 {
+private:
+#ifndef MFEM_THREAD_SAFE
+   mfem::Vector pshape; // TODO: this should probably belong to the PDCoefficient class (which should know how to evaluate itself)
+#endif
+
 public:
    PDMassIntegrator(PDCoefficient& _pdcoeff) : PDBilinearFormIntegrator(_pdcoeff) {}
    virtual const mfem::IntegrationRule* GetDefaultIntRule(const mfem::FiniteElement&,const mfem::FiniteElement&,mfem::ElementTransformation&,int);
@@ -73,10 +97,26 @@ public:
                                        const mfem::FiniteElement&,
                                        mfem::ElementTransformation&,
                                        mfem::DenseMatrix&);
+   virtual void ComputeElementGradientAdjoint(const mfem::FiniteElement*,
+                                              const mfem::Vector&,
+                                              const mfem::FiniteElement*,
+                                              const mfem::Vector&,
+                                              mfem::ElementTransformation*,
+                                              int,mfem::Vector&);
+private:
+   virtual void ComputeElementGradient_Internal(const mfem::FiniteElement*,const mfem::Vector&,
+                                                mfem::ElementTransformation*,const mfem::Vector&,int,
+                                                mfem::Vector&,bool);
 };
 
 class PDVectorFEMassIntegrator : public mfem::VectorFEMassIntegrator, public PDBilinearFormIntegrator
 {
+private:
+#ifndef MFEM_THREAD_SAFE
+   mfem::DenseMatrix svshape,avshape;
+   mfem::Vector pshape; // TODO: this should probably belong to the PDCoefficient class (which should know how to evaluate itself)
+#endif
+
 public:
    PDVectorFEMassIntegrator(PDCoefficient& _pdcoeff) : PDBilinearFormIntegrator(_pdcoeff) {}
    virtual const mfem::IntegrationRule* GetDefaultIntRule(const mfem::FiniteElement&,const mfem::FiniteElement&,mfem::ElementTransformation&,int);
@@ -87,6 +127,16 @@ public:
                                        const mfem::FiniteElement&,
                                        mfem::ElementTransformation&,
                                        mfem::DenseMatrix&);
+   virtual void ComputeElementGradientAdjoint(const mfem::FiniteElement*,
+                                              const mfem::Vector&,
+                                              const mfem::FiniteElement*,
+                                              const mfem::Vector&,
+                                              mfem::ElementTransformation*,
+                                              int,mfem::Vector&);
+private:
+   virtual void ComputeElementGradient_Internal(const mfem::FiniteElement*,const mfem::Vector&,
+                                                mfem::ElementTransformation*,const mfem::Vector&,int,
+                                                mfem::Vector&,bool);
 };
 
 }
