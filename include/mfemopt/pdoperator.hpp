@@ -83,7 +83,8 @@ public:
    PDOperatorGradient* GetGradientOperator();
    /* Given a parameter dependent F(xdot,x,t;m) residual equation, implements the action of
         Y = (L^T \otimes I_A)*F_AB*X -> Y = (\sum_k L_k*F^k_AB)*X
-      with A,B = {xdot|x|m}, L the adjoint state and F^k the k-th residual equation. \otimes the Kronecker product
+      with A,B = {x|xdot|m}, L the adjoint state and F^k the k-th residual equation. \otimes the Kronecker product
+      GetHessianOperator(1,2) corrensponds to A = xdot and B = m
    */
    PDOperatorHessian* GetHessianOperator(int,int);
 
