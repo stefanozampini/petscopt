@@ -10,17 +10,17 @@ ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing state gradient
 ||g|| = 2.90873, ||g_fd|| = 2.90873, ||g - g_fd|| = 3.11705e-10, ||g-g_fd||/||g_fd|| = 1.07162e-10, cos() = 1.
 ObjectiveFunction::TestFDHessian state x state
-||H||_inf = 1., ||H_fd||_inf = 1., ||H - H_fd||_inf = 2.8481e-09, ||H-H_fd||_inf/||H_fd||_inf = 2.8481e-09
+||H||_F = 1., ||H_fd||_F = 1., ||H - H_fd||_F = 2.8481e-09, ||H-H_fd||_F/||H_fd||_F = 2.8481e-09
 ---------------------------------------
 PDOperator::TestFDGradient wrt design
-||G|| = 0.738006, ||G^T|| = 0.738006, ||G - (G^T)^T||/||G|| = 3.76089e-17, ||G_fd|| = 0.738006, ||G_fd - G|| = 9.67902e-09
+||G|| = 0.912295, ||G^T|| = 0.912295, ||G - (G^T)^T||/||G|| = 1.46316e-16, ||G_fd|| = 0.912295, ||G_fd - G|| = 7.71815e-09
 ---------------------------------------
 Misfit objective 7.67615e-17
 ReducedFunctional::TestFDGradient, delta: 1e-08
 -> hang tight while computing state gradient
 ||g|| = 1.48636e-08, ||g_fd|| = 1.48559e-08, ||g - g_fd|| = 1.79746e-11, ||g-g_fd||/||g_fd|| = 0.00120992, cos() = 0.999999
 ReducedFunctional::TestFDHessian
-||H||_inf = 6.60925, ||H_fd||_inf = 6.61478, ||H - H_fd||_inf = 0.0055366, ||H-H_fd||_inf/||H_fd||_inf = 0.000837004
+||H||_F = 5.22615, ||H_fd||_F = 5.23043, ||H - H_fd||_F = 0.00428005, ||H-H_fd||_F/||H_fd||_F = 0.000818298
 Regularized objective 7.67615e-17 (LS 7.67615e-17, TV 0.)
 Regularized gradient norm 1.48636e-08 (LS 1.48636e-08, TV 0.)
 -------------------------- ReducedFunctional::TestTaylor ---------------------------

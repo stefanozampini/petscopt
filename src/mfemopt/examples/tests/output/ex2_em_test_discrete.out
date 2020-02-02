@@ -24,6 +24,6 @@ it=0	lit=0	obj=2.132345e-02	(g,du)=-0.000000e+00	||g||=1.967407e-01	step=1.00000
     of hand-coded and finite difference Jacobian entries greater than <threshold>.
   Testing hand-coded Jacobian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Jacobian is probably correct.
-  ||J - Jfd||_F/||J||_F = 1.09465e-07, ||J - Jfd||_F = 9.59403e-08
+  ||J - Jfd||_F/||J||_F = 1.1127e-07, ||J - Jfd||_F = 9.75228e-08
 it=1	lit=19	obj=7.185756e-04	(g,du)=-4.744868e-02	||g||=3.885645e-02	step=1.000000e+00
 Final objective (SNES) 0.000718576 (LS 0.000718547, TV 2.89685e-08)

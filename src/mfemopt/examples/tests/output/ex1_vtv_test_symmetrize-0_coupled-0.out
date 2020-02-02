@@ -5,7 +5,7 @@ ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing design gradient
 ||g|| = 0.00154236, ||g_fd|| = 0.00154236, ||g - g_fd|| = 7.33503e-12, ||g-g_fd||/||g_fd|| = 4.75571e-09, cos() = 1.
 ObjectiveFunction::TestFDHessian design x design
-||H||_inf = 0.00160447, ||H_fd||_inf = 0.00160447, ||H - H_fd||_inf = 1.68112e-10, ||H-H_fd||_inf/||H_fd||_inf = 1.04777e-07
+||H||_F = 0.00530276, ||H_fd||_F = 0.00530276, ||H - H_fd||_F = 3.18115e-10, ||H-H_fd||_F/||H_fd||_F = 5.99905e-08
 ---------------------------------------
 Tikhonov tests
 Obj 0.210439
@@ -13,7 +13,7 @@ ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing design gradient
 ||g|| = 0.0423127, ||g_fd|| = 0.0423127, ||g - g_fd|| = 2.31654e-10, ||g-g_fd||/||g_fd|| = 5.47483e-09, cos() = 1.
 ObjectiveFunction::TestFDHessian design x design
-||H||_inf = 0.00694444, ||H_fd||_inf = 0.00694444, ||H - H_fd||_inf = 9.24945e-12, ||H-H_fd||_inf/||H_fd||_inf = 1.33192e-09
+||H||_F = 0.0564733, ||H_fd||_F = 0.0564733, ||H - H_fd||_F = 2.03424e-11, ||H-H_fd||_F/||H_fd||_F = 3.60213e-10
 ---------------------------------------
 Image tests
 Obj 0.217725
@@ -21,7 +21,7 @@ ReducedFunctional::TestFDGradient, delta: 1e-06
 -> hang tight while computing state gradient
 ||g|| = 0.0427075, ||g_fd|| = 0.0427075, ||g - g_fd|| = 2.60992e-10, ||g-g_fd||/||g_fd|| = 6.11114e-09, cos() = 1.
 ReducedFunctional::TestFDHessian
-||H||_inf = 0.00754532, ||H_fd||_inf = 0.00754532, ||H - H_fd||_inf = 2.69999e-10, ||H-H_fd||_inf/||H_fd||_inf = 3.57837e-08
+||H||_F = 0.0597881, ||H_fd||_F = 0.0597881, ||H - H_fd||_F = 4.3203e-10, ||H-H_fd||_F/||H_fd||_F = 7.22601e-09
 ---------------------------------------
 it=0	lit=0	obj=6.928711e-01	(g,du)=-0.000000e+00	||g||=7.994422e-02	step=1.000000e+00
 it=0	lit=0	obj=6.928711e-01	(g,du)=-0.000000e+00	||g||=7.994422e-02	step=1.000000e+00
