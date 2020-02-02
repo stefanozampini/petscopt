@@ -148,7 +148,7 @@ void PDOperator::TestFDGradient(MPI_Comm comm, const Vector& xpIn, const Vector&
       ierr = PetscObjectSetName((PetscObject)T,"G_fd");CCHKERRQ(comm,ierr);
    }
    ierr = MatViewFromOptions(*pfdG,NULL,"-test_pdoperatorgradient_Gfd_view");CCHKERRQ(comm,ierr);
-   ierr = MatNorm(*pfdG,NORM_INFINITY,&normfd);CCHKERRQ(comm,ierr);
+   ierr = MatNorm(*pfdG,NORM_FROBENIUS,&normfd);CCHKERRQ(comm,ierr);
 
    PDOperatorGradient *G = (*this).GetGradientOperator();
    PetscParMatrix *pG = new PetscParMatrix(comm,G,Operator::PETSC_MATSHELL);
@@ -156,14 +156,14 @@ void PDOperator::TestFDGradient(MPI_Comm comm, const Vector& xpIn, const Vector&
 
    ierr = MatComputeOperator(*pG,MATAIJ,&GExpl);CCHKERRQ(comm,ierr);
    ierr = MatConvert(GExpl,size > 1 ? MATMPIAIJ : MATSEQAIJ,MAT_INPLACE_MATRIX,&GExpl);CCHKERRQ(comm,ierr);
-   ierr = MatNorm(GExpl,NORM_INFINITY,&normG);CCHKERRQ(comm,ierr);
+   ierr = MatNorm(GExpl,NORM_FROBENIUS,&normG);CCHKERRQ(comm,ierr);
    ierr = PetscObjectSetName((PetscObject)GExpl,"G");CCHKERRQ(comm,ierr);
    ierr = MatViewFromOptions(GExpl,NULL,"-test_pdoperatorgradient_G_view");CCHKERRQ(comm,ierr);
 
    ierr = MatCreateTranspose(*pG,&GT);CCHKERRQ(comm,ierr);
    ierr = MatComputeOperator(GT,MATAIJ,&GTExpl);CCHKERRQ(comm,ierr);
    ierr = MatConvert(GTExpl,size > 1 ? MATMPIAIJ : MATSEQAIJ,MAT_INPLACE_MATRIX,&GTExpl);CCHKERRQ(comm,ierr);
-   ierr = MatNorm(GTExpl,NORM_INFINITY,&normGT);CCHKERRQ(comm,ierr);
+   ierr = MatNorm(GTExpl,NORM_FROBENIUS,&normGT);CCHKERRQ(comm,ierr);
 
    ierr = MatTranspose(GTExpl,MAT_INITIAL_MATRIX,&check);CCHKERRQ(comm,ierr);
    { /* XXX */
@@ -181,10 +181,10 @@ void PDOperator::TestFDGradient(MPI_Comm comm, const Vector& xpIn, const Vector&
    ierr = MatScale(check,1./normG);CCHKERRQ(comm,ierr);
    ierr = PetscObjectSetName((PetscObject)check,"||G - (G^T)^T||/||G||");CCHKERRQ(comm,ierr);
    ierr = MatViewFromOptions(check,NULL,"-test_pdoperatorgradient_check_view");CCHKERRQ(comm,ierr);
-   ierr = MatNorm(check,NORM_INFINITY,&err);CCHKERRQ(comm,ierr);
+   ierr = MatNorm(check,NORM_FROBENIUS,&err);CCHKERRQ(comm,ierr);
 
    ierr = MatAXPY(GExpl,-1.0,*pfdG,DIFFERENT_NONZERO_PATTERN);CCHKERRQ(comm,ierr);
-   ierr = MatNorm(GExpl,NORM_INFINITY,&errfd);CCHKERRQ(comm,ierr);
+   ierr = MatNorm(GExpl,NORM_FROBENIUS,&errfd);CCHKERRQ(comm,ierr);
    ierr = PetscPrintf(comm,"||G|| = %g, ||G^T|| = %g, ||G - (G^T)^T||/||G|| = %g, ||G_fd|| = %g, ||G_fd - G|| = %g\n",(double)normG,(double)normGT,(double)err,(double)normfd,(double)errfd);CCHKERRQ(comm,ierr);
    ierr = MatViewFromOptions(GExpl,NULL,"-test_pdoperatorgradient_diff_view");CCHKERRQ(comm,ierr);
    ierr = MatDestroy(&check);CCHKERRQ(comm,ierr);

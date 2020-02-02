@@ -235,14 +235,14 @@ void ObjectiveFunction::TestFDHessian(MPI_Comm comm, const Vector& xIn, const Ve
          pfdH->Print();
          pH->Print();
       }
-      PetscReal nrm,nrmd,nrminf;
+      PetscReal nrm,nrmd,nrmdd;
       PetscParMatrix *diff = new PetscParMatrix();
       *diff = *pH;
       *diff -= *pfdH;
-      ierr = MatNorm(*pH,NORM_INFINITY,&nrm);CCHKERRQ(comm,ierr);
-      ierr = MatNorm(*pfdH,NORM_INFINITY,&nrmd);CCHKERRQ(comm,ierr);
-      ierr = MatNorm(*diff,NORM_INFINITY,&nrminf);CCHKERRQ(comm,ierr);
-      ierr = PetscPrintf(comm,"||H||_inf = %g, ||H_fd||_inf = %g, ||H - H_fd||_inf = %g, ||H-H_fd||_inf/||H_fd||_inf = %g\n",nrm,nrmd,nrminf,nrminf/nrmd);CCHKERRQ(comm,ierr);
+      ierr = MatNorm(*pH,NORM_FROBENIUS,&nrm);CCHKERRQ(comm,ierr);
+      ierr = MatNorm(*pfdH,NORM_FROBENIUS,&nrmd);CCHKERRQ(comm,ierr);
+      ierr = MatNorm(*diff,NORM_FROBENIUS,&nrmdd);CCHKERRQ(comm,ierr);
+      ierr = PetscPrintf(comm,"||H||_F = %g, ||H_fd||_F = %g, ||H - H_fd||_F = %g, ||H-H_fd||_F/||H_fd||_F = %g\n",nrm,nrmd,nrmdd,nrmdd/nrmd);CCHKERRQ(comm,ierr);
       delete diff;
       delete pH;
       delete pfdH;
@@ -261,7 +261,7 @@ void ObjectiveFunction::TestFDHessian(MPI_Comm comm, const Vector& xIn, const Ve
          pfdH->Print();
          pH->Print();
       }
-      PetscReal nrm,nrmd,nrminf;
+      PetscReal nrm,nrmd,nrmdd;
       PetscParMatrix *diff = new PetscParMatrix();
       *diff = *pH;
       *diff -= *pfdH;
@@ -269,10 +269,10 @@ void ObjectiveFunction::TestFDHessian(MPI_Comm comm, const Vector& xIn, const Ve
       {
          diff->Print();
       }
-      ierr = MatNorm(*pH,NORM_INFINITY,&nrm);CCHKERRQ(comm,ierr);
-      ierr = MatNorm(*pfdH,NORM_INFINITY,&nrmd);CCHKERRQ(comm,ierr);
-      ierr = MatNorm(*diff,NORM_INFINITY,&nrminf);CCHKERRQ(comm,ierr);
-      ierr = PetscPrintf(comm,"||H||_inf = %g, ||H_fd||_inf = %g, ||H - H_fd||_inf = %g, ||H-H_fd||_inf/||H_fd||_inf = %g\n",nrm,nrmd,nrminf,nrminf/nrmd);CCHKERRQ(comm,ierr);
+      ierr = MatNorm(*pH,NORM_FROBENIUS,&nrm);CCHKERRQ(comm,ierr);
+      ierr = MatNorm(*pfdH,NORM_FROBENIUS,&nrmd);CCHKERRQ(comm,ierr);
+      ierr = MatNorm(*diff,NORM_FROBENIUS,&nrmdd);CCHKERRQ(comm,ierr);
+      ierr = PetscPrintf(comm,"||H||_F = %g, ||H_fd||_F = %g, ||H - H_fd||_F = %g, ||H-H_fd||_F/||H_fd||_F = %g\n",nrm,nrmd,nrmdd,nrmdd/nrmd);CCHKERRQ(comm,ierr);
       delete diff;
       delete pH;
       delete pfdH;
