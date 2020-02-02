@@ -57,6 +57,7 @@ void PDCoefficient::Reset()
    delete pfes;
    lsize = 0;
    order = -1;
+   ngf = 0;
    for (unsigned int i=0; i<souts.size(); i++)
    {
       delete souts[i];
@@ -161,7 +162,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
 
    /* store values of projected initial coefficients
       and create actual coefficients to be used */
-   int ngf = 0;
+   ngf = 0;
    if (MQ) { mfem_error("Not yet implemented"); }
    else if (VQ)
    {

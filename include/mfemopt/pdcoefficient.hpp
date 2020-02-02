@@ -19,6 +19,7 @@ class PDCoefficient
 private:
    int lsize;
    int order;
+   int ngf;
    bool usederiv;
    bool usefuncs;
    bool incl_bdr; /* XXX custom */
@@ -101,6 +102,7 @@ public:
    mfem::Coefficient * GetActiveCoefficient();
    mfem::MatrixCoefficient * GetActiveMatrixCoefficient();
 
+   mfem::ParFiniteElementSpace* GetPFES() { return pfes; }
    mfem::Array<mfem::ParGridFunction*>& GetCoeffs() { return pcoeffgf; }
    mfem::Array<mfem::ParGridFunction*>& GetDerivCoeffs() { return deriv_work_coeffgf; }
    mfem::Array<mfem::ParGridFunction*>& GetGradCoeffs() { return pgradgf; }
@@ -113,6 +115,7 @@ public:
    mfem::Array<bool>& GetActiveElements() { return sforminteg; }
    int GetLocalSize() { return lsize; }
    int GetOrder() { return order; }
+   int GetComponents() { return ngf; }
    void GetCurrentVector(mfem::Vector&);
    void GetInitialVector(mfem::Vector&);
    void SetUseDerivCoefficients(bool=true);
