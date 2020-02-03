@@ -197,8 +197,9 @@ void ReducedFunctional::TestTaylor(MPI_Comm comm, const Vector& mIn, const Vecto
    double *tH = new double[n];
 
    double obj;
+   (*this).ComputeObjective(mIn,&obj);
    Vector g(mIn.Size());
-   (*this).ComputeObjectiveAndGradient(mIn,&obj,g);
+   (*this).ComputeGradient(mIn,g);
 
    double v1,v2 = 0.0;
    v1 = InnerProduct(comm,g,dmIn);
