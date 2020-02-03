@@ -818,6 +818,21 @@ static PetscErrorCode AugmentedTSIJacobian(TS ats, PetscReal time, Vec U, Vec Ud
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode AugmentedTSMonitor(TS ats, PetscInt s, PetscReal t, Vec U, void* ctx)
+{
+  TSAugCtx       *actx;
+  PetscErrorCode ierr;
+  Vec            mU;
+
+  PetscFunctionBegin;
+  PetscCheckAugmentedTS(ats);
+  ierr = AugmentedTSUpdateModelSolution(ats);CHKERRQ(ierr);
+  ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
+  ierr = TSGetSolution(actx->model,&mU);CHKERRQ(ierr);
+  ierr = TSMonitor(actx->model,s,t,mU);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
 PetscErrorCode AugmentedTSInitialize(TS ats)
 {
   TSAugCtx               *actx;
@@ -1207,5 +1222,6 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
   ierr = TSSetPreStep(*ats,AugmentedTSPreStep);CHKERRQ(ierr);
   ierr = TSSetPostEvaluate(*ats,AugmentedTSPostEvaluate);CHKERRQ(ierr);
   ierr = TSSetPostStep(*ats,AugmentedTSPostStep);CHKERRQ(ierr);
+  ierr = TSMonitorSet(*ats,AugmentedTSMonitor,NULL,NULL);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
