@@ -231,13 +231,14 @@ void ReducedFunctional::TestTaylor(MPI_Comm comm, const Vector& mIn, const Vecto
       }
    }
 
-   ierr = PetscPrintf(comm,"-------------------------- ReducedFunctional::TestTaylor ---------------------------\n"); CCHKERRQ(comm,ierr);
+   ierr = PetscPrintf(comm,"--------------------- ReducedFunctional::TestTaylor ----------------------\n"); CCHKERRQ(comm,ierr);
    ierr = PetscPrintf(comm,"\t\tGradient"); CCHKERRQ(comm,ierr);
    if (testhess) {
      ierr = PetscPrintf(comm,"\t\t\t\tHessian"); CCHKERRQ(comm,ierr);
    } else {
      ierr = PetscPrintf(comm,"\t\t\tHessian not tested"); CCHKERRQ(comm,ierr);
    }
+
    ierr = PetscPrintf(comm,"\n--------------------------------------------------------------------------\n"); CCHKERRQ(comm,ierr);
    for (PetscInt i = 0; i < n; i++) {
      PetscReal rate;

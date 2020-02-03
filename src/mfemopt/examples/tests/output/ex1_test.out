@@ -23,7 +23,7 @@ ReducedFunctional::TestFDGradient, delta: 1e-06
 ReducedFunctional::TestFDHessian
 ||H||_F = 0.0347264, ||H_fd||_F = 0.0347264, ||H - H_fd||_F = 4.51738e-09, ||H-H_fd||_F/||H_fd||_F = 1.30085e-07
 ---------------------------------------
--------------------------- ReducedFunctional::TestTaylor ---------------------------
+--------------------- ReducedFunctional::TestTaylor ----------------------
 		Gradient				Hessian
 --------------------------------------------------------------------------
 0.00139246	0.00000 	0	5.25871e-09	0.00000 	0

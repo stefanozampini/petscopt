@@ -23,7 +23,7 @@ ReducedFunctional::TestFDHessian
 ||H||_F = 5.22615, ||H_fd||_F = 5.23043, ||H - H_fd||_F = 0.00428005, ||H-H_fd||_F/||H_fd||_F = 0.000818298
 Regularized objective 7.67615e-17 (LS 7.67615e-17, TV 0.)
 Regularized gradient norm 1.48636e-08 (LS 1.48636e-08, TV 0.)
--------------------------- ReducedFunctional::TestTaylor ---------------------------
+--------------------- ReducedFunctional::TestTaylor ----------------------
 		Gradient				Hessian
 --------------------------------------------------------------------------
 0.0430547	0.00000 	0	0.00330403	0.00000 	0
