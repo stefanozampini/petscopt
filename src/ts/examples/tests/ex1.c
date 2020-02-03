@@ -942,7 +942,7 @@ int main(int argc, char* argv[])
   PetscInt       dsize;
   PetscErrorCode ierr;
 
-  ierr = PetscInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
+  ierr = PetscOptInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
   ierr = MPI_Comm_size(PETSC_COMM_WORLD,&np);CHKERRQ(ierr);
 
   t0             = 0.0;
@@ -1426,7 +1426,7 @@ int main(int argc, char* argv[])
   ierr = MatDestroy(&G_M);CHKERRQ(ierr);
   ierr = MatDestroy(&G_X);CHKERRQ(ierr);
   ierr = MatDestroy(&F_M);CHKERRQ(ierr);
-  ierr = PetscFinalize();
+  ierr = PetscOptFinalize();
   return ierr;
 }
 

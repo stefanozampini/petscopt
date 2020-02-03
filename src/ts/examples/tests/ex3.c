@@ -580,7 +580,7 @@ int main(int argc,char **argv)
   PetscBool      wsnes = PETSC_TRUE, test[2] = { PETSC_TRUE, PETSC_FALSE };
   PetscErrorCode ierr;
 
-  ierr = PetscInitialize(&argc,&argv,NULL,help);
+  ierr = PetscOptInitialize(&argc,&argv,NULL,help);
   if (ierr) return ierr;
 
   appctx.A[0][0] = Ain[0][0] = -1.0;
@@ -705,7 +705,7 @@ int main(int argc,char **argv)
   ierr = VecDestroy(&G);CHKERRQ(ierr);
   ierr = VecDestroy(&M);CHKERRQ(ierr);
   ierr = TSDestroy(&ts);CHKERRQ(ierr);
-  ierr = PetscFinalize();
+  ierr = PetscOptFinalize();
   return ierr;
 }
 

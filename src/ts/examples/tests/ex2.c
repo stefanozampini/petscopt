@@ -176,7 +176,7 @@ int main(int argc, char* argv[])
   TSProblemType  ptype;
   PetscErrorCode ierr;
 
-  ierr = PetscInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
+  ierr = PetscOptInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
   params[0] = 8./3.; 
   params[1] = 10;
   params[2] = 28;
@@ -325,7 +325,7 @@ int main(int argc, char* argv[])
   ierr = MatDestroy(&PhiT);CHKERRQ(ierr);
   ierr = MatDestroy(&P);CHKERRQ(ierr);
   ierr = MatDestroy(&J);CHKERRQ(ierr);
-  ierr = PetscFinalize();
+  ierr = PetscOptFinalize();
   return ierr;
 }
 

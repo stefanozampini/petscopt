@@ -1,11 +1,8 @@
+#include <petscopt/private/petscoptimpl.h>
 #include <petscopt/private/tsobjimpl.h>
 #include <petsc/private/petscimpl.h>
 
 /* ------------------ Helper routines for PDE-constrained support to evaluate objective functions, gradients and Hessian terms ----------------------- */
-
-PetscLogEvent TSOPT_Obj_Eval = 0;
-PetscBool TSOPT_ObjPackageInitialized = PETSC_FALSE;
-
 
 /* Evaluates objective functions of the type f(state,design,t) */
 PetscErrorCode TSObjEval(TSObj funchead, Vec state, Vec design, PetscReal time, PetscReal *val)
@@ -854,37 +851,6 @@ PetscErrorCode TSGetTSObj(TS ts, TSObj *obj)
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode TSObjFinalizePackage(void)
-{
-  PetscFunctionBegin;
-  TSOPT_ObjPackageInitialized = PETSC_FALSE;
-  PetscFunctionReturn(0);
-}
-
-static PetscErrorCode TSObjInitializePackage(void)
-{
-  char           logList[256];
-  PetscBool      opt,pkg;
-  PetscErrorCode ierr;
-
-  PetscFunctionBegin;
-  if (TSOPT_ObjPackageInitialized) PetscFunctionReturn(0);
-  TSOPT_ObjPackageInitialized = PETSC_TRUE;
-  /* Register Events */
-  ierr = PetscLogEventRegister("TSOptObjEval",0,&TSOPT_Obj_Eval);CHKERRQ(ierr);
-  /* Process summary exclusions */
-  ierr = PetscOptionsGetString(NULL,NULL,"-log_exclude",logList,sizeof(logList),&opt);CHKERRQ(ierr);
-  /* LCOV_EXCL_START */
-  if (opt) {
-    ierr = PetscStrInList("tsobj",logList,',',&pkg);CHKERRQ(ierr);
-    if (pkg) {ierr = PetscLogEventDeactivate(TSOPT_Obj_Eval);CHKERRQ(ierr);}
-  }
-  /* LCOV_EXCL_STOP */
-  /* Register package finalizer */
-  ierr = PetscRegisterFinalize(TSObjFinalizePackage);CHKERRQ(ierr);
-  PetscFunctionReturn(0);
-}
-
 /*@C
    TSAddObjective - Sets a cost functional callback together with its gradient and Hessian terms.
 
@@ -956,7 +922,7 @@ PetscErrorCode TSAddObjective(TS ts, PetscReal fixtime, TSEvalObjective f,
   PetscFunctionBegin;
   PetscValidHeaderSpecific(ts,TS_CLASSID,1);
   PetscValidLogicalCollectiveReal(ts,fixtime,2);
-  ierr = TSObjInitializePackage();CHKERRQ(ierr);
+  ierr = PetscOptInitializePackage();CHKERRQ(ierr);
   if (f_XX) {
     PetscValidHeaderSpecific(f_XX,MAT_CLASSID,9);
     PetscCheckSameComm(ts,1,f_XX,9);

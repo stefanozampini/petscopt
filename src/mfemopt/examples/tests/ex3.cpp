@@ -200,7 +200,7 @@ static void RunTest(ParFiniteElementSpace *fes, BilinearFormIntegrator *bilin, P
 
 int main(int argc, char *argv[])
 {
-   MFEMInitializePetsc(&argc,&argv,NULL,help);
+   MFEMOptInitialize(&argc,&argv,NULL,help);
 
    char meshfile[PETSC_MAX_PATH_LEN] = "../../../../share/petscopt/meshes/inline_quad.mesh";
    PetscInt srl = 0, prl = 0, ncrl = 0;
@@ -434,7 +434,7 @@ int main(int argc, char *argv[])
    delete s_fec;
    delete pmesh;
 
-   MFEMFinalizePetsc();
+   MFEMOptFinalize();
    return 0;
 }
 

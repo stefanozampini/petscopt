@@ -1180,7 +1180,7 @@ public:
 
 int main(int argc, char *argv[])
 {
-   MFEMInitializePetsc(&argc,&argv,NULL,help);
+   MFEMOptInitialize(&argc,&argv,NULL,help);
    {
       PetscErrorCode ierr;
       ierr = PetscLogDefaultBegin(); CCHKERRQ(PETSC_COMM_SELF,ierr);
@@ -2025,7 +2025,7 @@ int main(int argc, char *argv[])
    delete s_fes;
    delete pmesh;
 
-   MFEMFinalizePetsc();
+   MFEMOptFinalize();
    return 0;
 }
 

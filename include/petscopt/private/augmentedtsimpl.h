@@ -3,6 +3,8 @@
 
 #include <petscts.h>
 
+PETSC_INTERN PetscErrorCode KSPCreate_AugTriangular(KSP);
+
 typedef struct {
   TS             model;
   PetscInt       nqts;

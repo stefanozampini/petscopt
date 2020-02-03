@@ -24,10 +24,16 @@ typedef struct _TSOpt *TSOpt;
 
 PETSC_EXTERN PetscLogEvent TSOPT_Opt_Eval_Grad_DAE;
 PETSC_EXTERN PetscLogEvent TSOPT_Opt_Eval_Grad_IC;
-PETSC_EXTERN PetscLogEvent TSOPT_Opt_Eval_Hess_DAE;
-PETSC_EXTERN PetscLogEvent TSOPT_Opt_Eval_Hess_IC;
+PETSC_EXTERN PetscLogEvent TSOPT_Opt_Eval_Hess_DAE[3][3];
+PETSC_EXTERN PetscLogEvent TSOPT_Opt_Eval_Hess_IC[2][2];
 PETSC_EXTERN PetscLogEvent TSOPT_Opt_SetUp;
-PETSC_EXTERN PetscBool TSOPT_OptPackageInitialized;
+PETSC_EXTERN PetscLogEvent TSOPT_API_Obj;
+PETSC_EXTERN PetscLogEvent TSOPT_API_ObjGrad;
+PETSC_EXTERN PetscLogEvent TSOPT_API_Grad;
+PETSC_EXTERN PetscLogEvent TSOPT_API_HSetUp;
+PETSC_EXTERN PetscLogEvent TSOPT_API_HMult;
+PETSC_EXTERN PetscLogEvent TSOPT_API_HMultTLM;
+PETSC_EXTERN PetscLogEvent TSOPT_API_HMultSOA;
 
 PETSC_INTERN PetscErrorCode TSGetTSOpt(TS,TSOpt*);
 PETSC_INTERN PetscErrorCode TSSetTSOpt(TS,TSOpt);

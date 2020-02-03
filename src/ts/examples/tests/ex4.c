@@ -395,7 +395,7 @@ int main(int argc, char* argv[])
   PetscBool      flg, testmffdic = PETSC_FALSE, testtao = PETSC_FALSE, testtlm = PETSC_FALSE, testtaylor = PETSC_FALSE, testtaylorgn = PETSC_FALSE;
   PetscErrorCode ierr;
 
-  ierr = PetscInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
+  ierr = PetscOptInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
 
   /* Command line options */
   t0   =  0.0;
@@ -694,7 +694,7 @@ int main(int argc, char* argv[])
   ierr = VecDestroy(&Uobj);CHKERRQ(ierr);
 
   ierr = TSDestroy(&ts);CHKERRQ(ierr);
-  ierr = PetscFinalize();
+  ierr = PetscOptFinalize();
   return ierr;
 }
 

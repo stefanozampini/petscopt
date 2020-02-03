@@ -119,7 +119,7 @@ int main(int argc,char **argv)
   /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
      Initialize program
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-  ierr = PetscInitialize(&argc,&argv,NULL,help);CHKERRQ(ierr);
+  ierr = PetscOptInitialize(&argc,&argv,NULL,help);CHKERRQ(ierr);
   ierr = MPI_Comm_size(PETSC_COMM_WORLD,&size);CHKERRQ(ierr);
   if (size != 1) SETERRQ(PETSC_COMM_SELF,1,"This is a uniprocessor example only!");
 
@@ -244,7 +244,7 @@ int main(int argc,char **argv)
   ierr = VecDestroy(&user.lambda[0]);CHKERRQ(ierr);
 
   ierr = VecDestroy(&ic);CHKERRQ(ierr);
-  ierr = PetscFinalize();
+  ierr = PetscOptFinalize();
   return ierr;
 }
 

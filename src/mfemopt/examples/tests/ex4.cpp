@@ -36,7 +36,7 @@ void Ev_fun(const Vector &x, Vector &E)
 
 int main(int argc, char *argv[])
 {
-   MFEMInitializePetsc(&argc,&argv,NULL,help);
+   MFEMOptInitialize(&argc,&argv,NULL,help);
 
    char      meshfile[PETSC_MAX_PATH_LEN] = "../../../../share/petscopt/meshes/inline_quad.mesh";
    PetscInt  srl = 0, nrep = 1;
@@ -214,7 +214,7 @@ int main(int argc, char *argv[])
    delete pfes;
    delete fec;
    delete pmesh;
-   MFEMFinalizePetsc();
+   MFEMOptFinalize();
    return 0;
 }
 

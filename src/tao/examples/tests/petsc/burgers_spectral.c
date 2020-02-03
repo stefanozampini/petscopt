@@ -113,7 +113,7 @@ int main(int argc,char **argv)
      - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
   PetscFunctionBegin;
 
-  ierr = PetscInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
+  ierr = PetscOptInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
 
   /*initialize parameters */
   appctx.param.N    = 10;  /* order of the spectral element */
@@ -292,12 +292,12 @@ int main(int argc,char **argv)
   ierr = TSDestroy(&appctx.ts);CHKERRQ(ierr);
 
   /*
-     Always call PetscFinalize() before exiting a program.  This routine
+     Always call PetscOptFinalize() before exiting a program.  This routine
        - finalizes the PETSc libraries as well as MPI
        - provides summary and diagnostic information if certain runtime
          options are chosen (e.g., -log_summary).
   */
-  ierr = PetscFinalize();
+  ierr = PetscOptFinalize();
   return ierr;
 }
 

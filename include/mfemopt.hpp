@@ -3,6 +3,7 @@
 
 #include <petscoptconf.h>
 #include <mfemoptconf.h>
+#include <mfemopt/mfemopt.hpp>
 #include <mfemopt/reducedfunctional.hpp>
 #include <mfemopt/objective.hpp>
 #include <mfemopt/parametermap.hpp>

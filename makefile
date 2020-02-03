@@ -91,8 +91,8 @@ endif
 
 generated := $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib/petscopt/conf/files
 
-spkgs := ts,tao,mfemopt
-pkgs := ts tao mfemopt
+spkgs := sys,ts,tao,mfemopt
+pkgs := sys ts tao mfemopt
 langs := c cpp
 
 $(generated) : $(config-confheader) $(petscconf) $(petscvariables) $(PETSC_DIR)/config/gmakegen.py | $$(@D)/.DIR

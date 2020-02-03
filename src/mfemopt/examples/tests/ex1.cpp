@@ -491,7 +491,7 @@ void ImageFunctional::PostCheck(const Vector& X, Vector& Y, Vector &W, bool& cy,
 /* the main routine */
 int main(int argc, char* argv[])
 {
-   MFEMInitializePetsc(&argc,&argv,NULL,help);
+   MFEMOptInitialize(&argc,&argv,NULL,help);
 
    /* process options */
    PetscErrorCode ierr;
@@ -641,7 +641,7 @@ int main(int argc, char* argv[])
 
       delete imgpd;
    }
-   MFEMFinalizePetsc();
+   MFEMOptFinalize();
    return 0;
 }
 

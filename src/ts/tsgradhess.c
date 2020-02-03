@@ -61,6 +61,7 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
+  ierr = PetscLogEventBegin(TSOPT_API_HMult,0,0,0,0);CHKERRQ(ierr);
   ierr = VecSet(y,0.0);CHKERRQ(ierr);
   ierr = PetscObjectQuery((PetscObject)H,"_ts_hessian_ctx",(PetscObject*)&c);CHKERRQ(ierr);
   if (!c) SETERRQ(PetscObjectComm((PetscObject)H),PETSC_ERR_PLIB,"Not a valid Hessian matrix");
@@ -75,6 +76,7 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   ierr = TSSetUpFromDesign(tshess->model,tshess->x0,tshess->design);CHKERRQ(ierr);
 
   /* solve tangent linear model */
+  ierr = PetscLogEventBegin(TSOPT_API_HMultTLM,0,0,0,0);CHKERRQ(ierr);
   ierr = AdjointTSIsDiscrete(tshess->soats,&soadisc);CHKERRQ(ierr);
   ierr = TSTrajectoryDestroy(&tshess->tlmts->trajectory);CHKERRQ(ierr); /* XXX add Reset method to TSTrajectory */
   ierr = TSTrajectoryCreate(PetscObjectComm((PetscObject)tshess->tlmts),&tshess->tlmts->trajectory);CHKERRQ(ierr);
@@ -114,8 +116,10 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   ierr = TSSolveWithQuadrature_Private(tshess->tlmts,NULL,tshess->design,x,y,NULL);CHKERRQ(ierr);
   ierr = PetscObjectCompose((PetscObject)tshess->model,"_ts_hessian_foats",NULL);CHKERRQ(ierr);
   ierr = TLMTSSetPerturbationVec(tshess->tlmts,NULL);CHKERRQ(ierr);
+  ierr = PetscLogEventEnd(TSOPT_API_HMultTLM,0,0,0,0);CHKERRQ(ierr);
 
   /* second-order adjoint solve */
+  ierr = PetscLogEventBegin(TSOPT_API_HMultSOA,0,0,0,0);CHKERRQ(ierr);
   ierr = AdjointTSSetTimeLimits(tshess->soats,tshess->t0,tshess->tf);CHKERRQ(ierr);
   ierr = AdjointTSSetDirectionVec(tshess->soats,x);CHKERRQ(ierr);
   ierr = AdjointTSSetTLMTSAndFOATS(tshess->soats,tshess->tlmts,tshess->GN ? NULL : tshess->foats);CHKERRQ(ierr);
@@ -149,11 +153,13 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   }
   ierr = AdjointTSSolveWithQuadrature_Private(tshess->soats);CHKERRQ(ierr);
   ierr = AdjointTSFinalizeQuadrature(tshess->soats);CHKERRQ(ierr);
-
   ierr = AdjointTSSetQuadratureVec(tshess->soats,NULL);CHKERRQ(ierr);
   ierr = AdjointTSSetDirectionVec(tshess->soats,NULL);CHKERRQ(ierr);
+  ierr = PetscLogEventEnd(TSOPT_API_HMultSOA,0,0,0,0);CHKERRQ(ierr);
+
   ierr = TSTrajectoryDestroy(&tshess->tlmts->trajectory);CHKERRQ(ierr); /* XXX add Reset method to TSTrajectory */
   tshess->model->trajectory = otrj;
+  ierr = PetscLogEventEnd(TSOPT_API_HMult,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -165,18 +171,22 @@ static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec de
   PetscReal      t0,tf,dt;
   PetscContainer c;
   PetscErrorCode ierr;
+  PetscLogEvent  loge;
 
   PetscFunctionBegin;
   if (gradient) {
     ierr = VecSet(gradient,0.0);CHKERRQ(ierr);
   }
   if (val) *val = 0.0;
+  if (!val && !gradient) PetscFunctionReturn(0);
   ierr = PetscObjectQuery((PetscObject)ts,"_ts_obj_ctx",(PetscObject*)&c);CHKERRQ(ierr);
   if (!c) PetscFunctionReturn(0);
   if (!X) {
     ierr = TSGetSolution(ts,&X);CHKERRQ(ierr);
     if (!X) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_USER,"Missing solution vector");
   }
+  loge = val ? (gradient ? TSOPT_API_ObjGrad : TSOPT_API_Obj) : TSOPT_API_Grad;
+  ierr = PetscLogEventBegin(loge,0,0,0,0);CHKERRQ(ierr);
   ierr = TSSetUpFromDesign(ts,X,design);CHKERRQ(ierr);
   otrj = ts->trajectory;
   ts->trajectory = NULL;
@@ -236,6 +246,7 @@ static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec de
     ierr = AdjointTSSolveWithQuadrature_Private(adjts);CHKERRQ(ierr);
     ierr = AdjointTSFinalizeQuadrature(adjts);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(loge,0,0,0,0);CHKERRQ(ierr);
   ierr = TSDestroy(&adjts);CHKERRQ(ierr);
   /* restore TS to its original state */
   ierr = TSTrajectoryDestroy(&ts->trajectory);CHKERRQ(ierr);
@@ -630,11 +641,13 @@ PetscErrorCode TSComputeHessian(TS ts, PetscReal t0, PetscReal dt, PetscReal tf,
 
   mffd = PETSC_FALSE;
   ierr = PetscOptionsGetBool(((PetscObject)ts)->options,((PetscObject)ts)->prefix,"-tshessian_mffd",&mffd,NULL);CHKERRQ(ierr);
+  ierr = PetscLogEventBegin(TSOPT_API_HSetUp,0,0,0,0);CHKERRQ(ierr);
   if (mffd) {
     ierr = TSComputeHessian_MFFD(ts,t0,dt,tf,X,design,H);CHKERRQ(ierr);
   } else {
     ierr = TSComputeHessian_Private(ts,t0,dt,tf,X,design,H);CHKERRQ(ierr);
   }
+  ierr = PetscLogEventEnd(TSOPT_API_HSetUp,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 

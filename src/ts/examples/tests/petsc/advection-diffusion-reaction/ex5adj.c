@@ -87,7 +87,7 @@ int main(int argc,char **argv)
   Vec            lambda[1];
   PetscBool      forwardonly=PETSC_FALSE,implicitform=PETSC_TRUE;
 
-  ierr = PetscInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
+  ierr = PetscOptInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
   ierr = PetscOptionsGetBool(NULL,NULL,"-forwardonly",&forwardonly,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsGetBool(NULL,NULL,"-implicitform",&implicitform,NULL);CHKERRQ(ierr);
   appctx.aijpc = PETSC_FALSE;
@@ -220,7 +220,7 @@ int main(int argc,char **argv)
   ierr = VecDestroy(&x);CHKERRQ(ierr);
   ierr = TSDestroy(&ts);CHKERRQ(ierr);
   ierr = DMDestroy(&da);CHKERRQ(ierr);
-  ierr = PetscFinalize();
+  ierr = PetscOptFinalize();
   return ierr;
 }
 

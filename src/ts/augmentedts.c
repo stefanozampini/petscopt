@@ -1,4 +1,5 @@
 #include <petscopt/augmentedts.h>
+#include <petscopt/petscopt.h>
 #include <petscopt/adjointts.h>
 #include <petscopt/tlmts.h>
 #include <petscopt/tsutils.h>
@@ -66,28 +67,6 @@ static PetscErrorCode MatMissingDiagonal_Nest(Mat mat,PetscBool *missing,PetscIn
 #endif
 
 #include <petsc/private/kspimpl.h>
-#define KSPAUGTRIANGULAR "augtriangular"
-static PetscErrorCode KSPCreate_AugTriangular(KSP);
-static PetscBool PetscOptPackageInitialized = PETSC_FALSE;
-
-static PetscErrorCode PetscOptFinalizePackage(void)
-{
-  PetscFunctionBegin;
-  PetscOptPackageInitialized = PETSC_FALSE;
-  PetscFunctionReturn(0);
-}
-
-static PetscErrorCode PetscOptInitializePackage(void)
-{
-  PetscErrorCode ierr;
-
-  PetscFunctionBegin;
-  if (PetscOptPackageInitialized) PetscFunctionReturn(0);
-  PetscOptPackageInitialized = PETSC_TRUE;
-  ierr = KSPRegister(KSPAUGTRIANGULAR,KSPCreate_AugTriangular);CHKERRQ(ierr);
-  ierr = PetscRegisterFinalize(PetscOptFinalizePackage);CHKERRQ(ierr);
-  PetscFunctionReturn(0);
-}
 
 static PetscErrorCode KSPDestroy_AugTriangular(KSP ksp)
 {
@@ -229,7 +208,7 @@ static PetscErrorCode KSPSolve_AugTriangular(KSP ksp)
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode KSPCreate_AugTriangular(KSP ksp)
+PetscErrorCode KSPCreate_AugTriangular(KSP ksp)
 {
   PetscErrorCode ierr;
 
@@ -1210,8 +1189,6 @@ PetscErrorCode TSCreateAugmentedTS(TS ts, PetscInt n, TS qts[], PetscBool qactiv
 
     ierr = TSGetSNES(*ats,&snes);CHKERRQ(ierr);
     ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-    /* XXX */
-    ierr = PetscOptInitializePackage();CHKERRQ(ierr);
     ierr = KSPSetType(ksp,KSPAUGTRIANGULAR);CHKERRQ(ierr);
     ierr = KSPSetApplicationContext(ksp,*ats);CHKERRQ(ierr);
   }

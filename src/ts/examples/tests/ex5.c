@@ -300,7 +300,7 @@ int main(int argc, char* argv[])
   PetscBool      testhistory = PETSC_FALSE, flg, check_hessian_dae = PETSC_FALSE;
   PetscErrorCode ierr;
 
-  ierr = PetscInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
+  ierr = PetscOptInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
 
   /* Command line options */
   t0   = 0.0;
@@ -532,7 +532,7 @@ int main(int argc, char* argv[])
   ierr = VecDestroy(&M);CHKERRQ(ierr);
   ierr = VecDestroy(&Uobj);CHKERRQ(ierr);
   ierr = TSDestroy(&ts);CHKERRQ(ierr);
-  ierr = PetscFinalize();
+  ierr = PetscOptFinalize();
   return ierr;
 }
 
