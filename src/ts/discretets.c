@@ -591,6 +591,7 @@ PetscErrorCode TSStep_TLM_Theta(TS ts)
     if (flg) {
       ierr = VecAXPY(F,-1.0,F2);CHKERRQ(ierr);
     }
+    ierr = LinearTSKSPReusePC(ts);CHKERRQ(ierr);
     ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
     ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
     ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
@@ -618,6 +619,7 @@ PetscErrorCode TSStep_TLM_Theta(TS ts)
     ierr = VecScale(F,-1.0);CHKERRQ(ierr);
     s    = 1.0/(h*theta);
     ierr = TSComputeIJacobian(ts,stage_time,fwdU,fwdYdot,s,J,Jp,PETSC_FALSE);CHKERRQ(ierr);
+    ierr = LinearTSKSPReusePC(ts);CHKERRQ(ierr);
     ierr = TSGetSNES(ts,&snes);CHKERRQ(ierr);
     ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
     ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
