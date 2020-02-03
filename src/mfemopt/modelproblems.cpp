@@ -611,7 +611,7 @@ Solver* ModelHeat::PreconditionerFactory::NewPreconditioner(const OperatorHandle
               Array<int>& ess = pde.bc->GetTDofs();
               opts.SetEssBdrDofs(&ess);
            }
-           solver = new PetscBDDCSolver(ppJ,opts);
+           solver = new PetscBDDCSolver(ppJ,opts,"heat_");
         }
         else
         {
