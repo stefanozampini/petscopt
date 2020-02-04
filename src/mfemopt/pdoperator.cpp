@@ -170,6 +170,7 @@ void PDOperator::TestFDGradient(MPI_Comm comm, const Vector& xpIn, const Vector&
       PetscParMatrix TT(check,true);
       TT.EliminateRows(hbc.GetTDofs());
    }
+   ierr = MatNorm(check,NORM_FROBENIUS,&normGT);CCHKERRQ(comm,ierr);
    ierr = MatDestroy(&GTExpl);CCHKERRQ(comm,ierr);
    ierr = MatTranspose(check,MAT_INITIAL_MATRIX,&GTExpl);CCHKERRQ(comm,ierr);
    ierr = PetscObjectSetName((PetscObject)GTExpl,"GT");CCHKERRQ(comm,ierr);
