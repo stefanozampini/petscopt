@@ -492,7 +492,7 @@ void TDLeastSquares::Eval(const Vector& state, const Vector& m, double time, dou
 void TDLeastSquares::InitDeltaCoefficients()
 {
    InitReceivers();
-   if (deltacoeffs_x.Size() == receivers_eid.Size()) return;
+   if (deltacoeffs_x.Size() && deltacoeffs_x.Size() == receivers_eid.Size()) return;
    ResetDeltaCoefficients();
 
    ParFiniteElementSpace *fes = u->ParFESpace();
