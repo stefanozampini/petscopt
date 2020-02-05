@@ -88,52 +88,53 @@ PDCoefficient::PDCoefficient()
 }
 
 PDCoefficient::PDCoefficient(Coefficient& Q, ParMesh *mesh, const FiniteElementCollection *fec,
-               const Array<bool>& excl)
+               const Array<bool>& excl, bool incl_bdr)
 {
-   Init(&Q,NULL,NULL,mesh,fec,excl);
+   Init(&Q,NULL,NULL,mesh,fec,excl,incl_bdr);
 }
 
 PDCoefficient::PDCoefficient(Coefficient& Q, ParMesh *mesh, const FiniteElementCollection *fec,
-                             bool (*excl_fn)(const Vector&))
+                             bool (*excl_fn)(const Vector&), bool incl_bdr)
 {
    Array<bool> excl;
    MeshGetElementsTagged(mesh,excl_fn,excl);
-   Init(&Q,NULL,NULL,mesh,fec,excl);
+   Init(&Q,NULL,NULL,mesh,fec,excl,incl_bdr);
 }
 
 PDCoefficient::PDCoefficient(Coefficient& Q, ParMesh *mesh, const FiniteElementCollection *fec,
-               const Array<int>& excl_tag)
+               const Array<int>& excl_tag, bool incl_bdr)
 {
    Array<bool> excl;
    MeshGetElementsTagged(mesh,excl_tag,excl);
-   Init(&Q,NULL,NULL,mesh,fec,excl);
+   Init(&Q,NULL,NULL,mesh,fec,excl,incl_bdr);
 }
 
 PDCoefficient::PDCoefficient(VectorCoefficient& Q, ParMesh *mesh, const FiniteElementCollection *fec,
-               const Array<bool>& excl)
+               const Array<bool>& excl, bool incl_bdr)
 {
-   Init(NULL,&Q,NULL,mesh,fec,excl);
+   Init(NULL,&Q,NULL,mesh,fec,excl,incl_bdr);
 }
 
 PDCoefficient::PDCoefficient(VectorCoefficient& Q, ParMesh *mesh, const FiniteElementCollection *fec,
-                             bool (*excl_fn)(const Vector&))
+                             bool (*excl_fn)(const Vector&), bool incl_bdr)
 {
    Array<bool> excl;
    MeshGetElementsTagged(mesh,excl_fn,excl);
-   Init(NULL,&Q,NULL,mesh,fec,excl);
+   Init(NULL,&Q,NULL,mesh,fec,excl,incl_bdr);
 }
 
 PDCoefficient::PDCoefficient(VectorCoefficient& Q, ParMesh *mesh, const FiniteElementCollection *fec,
-               const Array<int>& excl_tag)
+               const Array<int>& excl_tag,bool incl_bdr)
 {
    Array<bool> excl;
    MeshGetElementsTagged(mesh,excl_tag,excl);
-   Init(NULL,&Q,NULL,mesh,fec,excl);
+   Init(NULL,&Q,NULL,mesh,fec,excl,incl_bdr);
 }
 
-void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficient *MQ, ParMesh *mesh, const FiniteElementCollection *fec, const Array<bool>& excl)
+void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficient *MQ, ParMesh *mesh, const FiniteElementCollection *fec, const Array<bool>& excl, bool include_bdr)
 {
    Init();
+   incl_bdr = include_bdr;
    const FiniteElement *fe = NULL;
    if (mesh->GetNE())
    {
@@ -295,9 +296,6 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
 }
 
 /*
-   if incl_bdr == false -> dofs at the boundary of active regions are fixed
-   if incl_bdr == true  -> dofs at the boundary of active regions are allowed to vary
-   XXX TODO: incl_bdr for no l2gf case?
    XXX This assumes pcoeffv0 and pcoeffgf are initialized with proper initial values
        when excluded regions are present
 */

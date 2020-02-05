@@ -22,7 +22,9 @@ private:
    int ngf;
    bool usederiv;
    bool usefuncs;
-   bool incl_bdr; /* XXX custom */
+   /*  false -> dofs at the boundary of active regions are fixed
+       true  -> dofs at the boundary of active regions are allowed to vary */
+   bool incl_bdr;
 
    mfem::ParFiniteElementSpace* pfes;
 
@@ -74,7 +76,7 @@ private:
    std::vector<mfem::socketstream*> souts;
 
    void Init();
-   void Init(mfem::Coefficient*,mfem::VectorCoefficient*,mfem::MatrixCoefficient*,mfem::ParMesh*,const mfem::FiniteElementCollection*,const mfem::Array<bool>&);
+   void Init(mfem::Coefficient*,mfem::VectorCoefficient*,mfem::MatrixCoefficient*,mfem::ParMesh*,const mfem::FiniteElementCollection*,const mfem::Array<bool>&,bool);
    void Reset();
    void SetUpOperators();
    void FillExcl();
@@ -87,17 +89,17 @@ protected:
 public:
    PDCoefficient();
    PDCoefficient(mfem::Coefficient&,mfem::ParMesh*,const mfem::FiniteElementCollection*,
-                 const mfem::Array<int>&);
+                 const mfem::Array<int>&,bool=true);
    PDCoefficient(mfem::Coefficient&,mfem::ParMesh*,const mfem::FiniteElementCollection*,
-                 const mfem::Array<bool>& = mfem::Array<bool>());
+                 const mfem::Array<bool>& = mfem::Array<bool>(),bool=true);
    PDCoefficient(mfem::Coefficient&,mfem::ParMesh*,const mfem::FiniteElementCollection*,
-                 bool (*excl_fn)(const mfem::Vector&));
+                 bool (*excl_fn)(const mfem::Vector&),bool=true);
    PDCoefficient(mfem::VectorCoefficient&,mfem::ParMesh*,const mfem::FiniteElementCollection*,
-                 const mfem::Array<int>&);
+                 const mfem::Array<int>&,bool=true);
    PDCoefficient(mfem::VectorCoefficient&,mfem::ParMesh*,const mfem::FiniteElementCollection*,
-                 const mfem::Array<bool>& = mfem::Array<bool>());
+                 const mfem::Array<bool>& = mfem::Array<bool>(),bool=true);
    PDCoefficient(mfem::VectorCoefficient&,mfem::ParMesh*,const mfem::FiniteElementCollection*,
-                 bool (*excl_fn)(const mfem::Vector&));
+                 bool (*excl_fn)(const mfem::Vector&),bool=true);
 
    mfem::Coefficient * GetActiveCoefficient();
    mfem::MatrixCoefficient * GetActiveMatrixCoefficient();
