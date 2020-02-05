@@ -37,16 +37,7 @@ VTVIntegrator::~VTVIntegrator()
 const IntegrationRule* VTVIntegrator::GetIntRule(const FiniteElement& el)
 {
    if (IntRule) return IntRule;
-   const int dim = el.GetDim();
-   int order;
-   if (el.Space() == FunctionSpace::Pk)
-   {
-      order = 2*el.GetOrder(); /* fine in 2D for order 1,2 , check in 3D */
-   }
-   else
-   {
-      order = 2*el.GetOrder() + dim - 1;
-   }
+   int order = 2*el.GetOrder();
 
    if (el.Space() == FunctionSpace::rQk)
    {
