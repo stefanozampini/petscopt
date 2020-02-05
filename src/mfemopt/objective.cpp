@@ -695,7 +695,7 @@ void TVRegularizer::UpdateDual(const Vector& m, const Vector& dm, double lambda,
    Array<int> vdofs,dvdofs,ipiv;
 
    if (!WQ.Size() || !m_pd) return;
-   Array<ParGridFunction*> &pgf  = m_pd->GetDerivCoeffs();
+   Array<ParGridFunction*> &pgf  = m_pd->GetCoeffs();
    Array<ParGridFunction*> &pgf2 = m_pd->GetGradCoeffs();
    if (!pgf.Size()) return;
 
@@ -714,9 +714,13 @@ void TVRegularizer::UpdateDual(const Vector& m, const Vector& dm, double lambda,
       dwks[i] = new Vector();
    }
 
+   /* there is some issue with incl_bdr = false */
+   /* the dual update is not properly computed */
+   m_pd->SetUseDerivCoefficients(false);
    m_pd->Distribute(m,pgf);
+   m_pd->SetUseDerivCoefficients(true);
    m_pd->Distribute(dm,pgf2);
-
+   m_pd->SetUseDerivCoefficients(false);
    Array<bool>& integ_exclude = m_pd->GetExcludedElements();
    double llopt = std::numeric_limits<double>::max(), lopt = 0.0;
    ParMesh *mesh = pgf[0]->ParFESpace()->GetParMesh();
@@ -837,10 +841,10 @@ void TVRegularizer::Eval(const Vector& state, const Vector& m, double time, doub
 
    *f = 0.0;
    if (!m_pd) return;
-   Array<ParGridFunction*> pgf;
-   pgf = m_pd->GetDerivCoeffs();
+   Array<ParGridFunction*> pgf = m_pd->GetCoeffs();
    if (!pgf.Size()) return;
 
+   m_pd->SetUseDerivCoefficients(false);
    m_pd->Distribute(m,pgf);
 
    double lf = 0.0;
@@ -870,9 +874,10 @@ void TVRegularizer::EvalGradient_M(const Vector& state, const Vector& m, double 
 
    g = 0.0;
    if (!m_pd) return;
-   Array<ParGridFunction*> &pgf = m_pd->GetDerivCoeffs();
+   Array<ParGridFunction*> &pgf = m_pd->GetCoeffs();
    if (!pgf.Size()) return;
 
+   m_pd->SetUseDerivCoefficients(false);
    m_pd->Distribute(m,pgf);
 
    Array<ParGridFunction*> &pgradgf = m_pd->GetGradCoeffs();
@@ -910,9 +915,10 @@ void TVRegularizer::SetUpHessian_MM(const Vector& x,const Vector& m,double t)
    Array<int> vdofs,rvdofs,cvdofs;
 
    if (!m_pd) return;
-   Array<ParGridFunction*> &pgf = m_pd->GetDerivCoeffs();
+   Array<ParGridFunction*> &pgf = m_pd->GetCoeffs();
    if (!pgf.Size()) return;
 
+   m_pd->SetUseDerivCoefficients(false);
    m_pd->Distribute(m,pgf);
    int nb = pgf.Size();
 
