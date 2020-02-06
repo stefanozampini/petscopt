@@ -926,6 +926,12 @@ PetscErrorCode AugmentedTSInitialize(TS ats)
   }
   ierr = TSSetUp(actx->model);CHKERRQ(ierr);
   ierr = TSEventInitialize(actx->model->event,actx->model,t0,actx->model->vec_sol);CHKERRQ(ierr);
+
+  if (actx->model->max_snes_failures != 1) { /* one is the default */
+    ierr = TSSetMaxSNESFailures(ats,actx->model->max_snes_failures);CHKERRQ(ierr);
+  } else { /* we always attempt to recovery */
+    ierr = TSSetMaxSNESFailures(ats,-1);CHKERRQ(ierr);
+  }
   PetscFunctionReturn(0);
 }
 
