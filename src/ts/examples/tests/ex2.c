@@ -257,10 +257,12 @@ int main(int argc, char* argv[])
     ierr = MatAssemblyBegin(P,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
     ierr = MatAssemblyEnd(P,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
     ierr = VecSetRandom(U0,NULL);CHKERRQ(ierr);
+    ierr = VecRealPart(U0);CHKERRQ(ierr);
     ierr = MatDiagonalSet(P,U0,INSERT_VALUES);CHKERRQ(ierr);
   }
 
   ierr = VecSetRandom(U0,NULL);CHKERRQ(ierr);
+  ierr = VecRealPart(U0);CHKERRQ(ierr);
   ierr = TSCreatePropagatorMat(ts,t0,dt,tf,U0,NULL,P,&Phi);CHKERRQ(ierr);
   ierr = TSGetProblemType(ts,&ptype);CHKERRQ(ierr);
   if (ptype == TS_LINEAR) { /* For linear problems Phi should give the ODE itself */

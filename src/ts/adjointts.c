@@ -1728,7 +1728,7 @@ static PetscErrorCode JacCoupling(TS qts, PetscReal t, Vec L, Vec Ldot, PetscRea
 
   PetscFunctionBegin;
   ierr = TSGetApplicationContext(qts,(void*)&qctx);CHKERRQ(ierr);
-  adjq = qctx->evalquadctx;
+  adjq = (AdjEvalQuadCtx*)qctx->evalquadctx;
   ierr = AdjointTSIsDiscrete(adjq->adjts,&flg);CHKERRQ(ierr);
   if (flg) SETERRQ(PetscObjectComm((PetscObject)qts),PETSC_ERR_PLIB,"This should not happen");
   ierr = MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
@@ -1799,7 +1799,7 @@ PetscErrorCode MatCreateShellWithMat(Mat A, PetscBool trans, Mat *B)
   } else {
     ierr = MatCreateShell(PetscObjectComm((PetscObject)A),m,n,M,N,A,B);CHKERRQ(ierr);
   }
-  for (i=0;i<sizeof(ops)/sizeof(MatOperation);i++) {
+  for (i=0;i<(PetscInt)(sizeof(ops)/sizeof(MatOperation));i++) {
     ierr = MatShellSetOperation(*B,ops[i],trans ? t[i] : f[i]);CHKERRQ(ierr);
   }
   ierr = MatSetUp(*B);CHKERRQ(ierr);

@@ -117,7 +117,7 @@ PetscErrorCode PetscOptInitialize(int *argc,char ***args,const char file[],const
   PetscErrorCode ierr;
 
   if (PetscOptInitializeCalled) return 0;
-  PetscOptFinalizePetsc = !PetscInitializeCalled;
+  PetscOptFinalizePetsc = (PetscBool)!PetscInitializeCalled;
   ierr = PetscInitialize(argc,args,file,help); if (ierr) return ierr;
   PetscFunctionBegin;
   PetscOptInitializeCalled = PETSC_TRUE;
