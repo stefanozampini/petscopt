@@ -201,7 +201,7 @@ int main(int argc, char *argv[])
    drep->Reduce(f1,&norm);
    norm = drep->IsMaster() ? norm - work.FNorm2() : 0.0;
    norm = std::abs(norm);
-   MFEM_VERIFY(norm < PETSC_SMALL,"Error split " << norm);
+   MFEM_VERIFY(norm < 10*PETSC_SMALL,"Error split " << norm);
 
    delete drep;
 
