@@ -1605,6 +1605,6 @@ int main(int argc, char* argv[])
   test:
     requires: !complex
     suffix: recovery
-    args: -t0 0 -dt 0.1 -tf 0.2 -test_recovery -ts_type {{rk cn bdf theta}} -malloc -malloc_dump -malloc_debug
+    args: -t0 0 -dt 0.1 -tf 0.2 -test_recovery -ts_type {{rk cn theta}} -malloc -malloc_dump -malloc_debug
 
 TEST*/
