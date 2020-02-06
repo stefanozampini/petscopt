@@ -44,6 +44,6 @@ typedef struct {
   } while (0)
 #endif
 
-PETSC_INTERN PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS);
+PETSC_INTERN PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS,PetscBool*);
 
 #endif

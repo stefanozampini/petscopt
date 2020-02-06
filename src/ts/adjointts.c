@@ -1829,15 +1829,18 @@ PetscErrorCode AdjointTSComputeQuadrature(TS ts, PetscReal t, Vec U, Vec Udot, V
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts)
+PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts,PetscBool *done)
 {
-  AdjointCtx     *adj_ctx;
-  TSOpt          tsopt;
-  PetscBool      flg;
-  PetscErrorCode ierr;
+  AdjointCtx        *adj_ctx;
+  TSOpt             tsopt;
+  PetscBool         flg;
+  TSConvergedReason reason = TS_CONVERGED_ITERATING;
+  PetscErrorCode    ierr;
 
   PetscFunctionBegin;
   PetscCheckAdjointTS(adjts);
+  PetscValidPointer(done,2);
+  *done = PETSC_FALSE;
   ierr = TSSetUp(adjts);CHKERRQ(ierr);
   ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
   ierr = TSGetTSOpt(adj_ctx->fwdts,&tsopt);CHKERRQ(ierr);
@@ -1907,12 +1910,21 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts)
     ierr = TSSetFromOptions(ats);CHKERRQ(ierr);
     ierr = AugmentedTSInitialize(ats);CHKERRQ(ierr);
     ierr = TSSolve(ats,NULL);CHKERRQ(ierr);
+    ierr = TSGetConvergedReason(ats,&reason);CHKERRQ(ierr);
     ierr = AugmentedTSFinalize(ats);CHKERRQ(ierr);
     ierr = TSDestroy(&ats);CHKERRQ(ierr);
     ierr = VecDestroy(&adjq.work1);CHKERRQ(ierr);
     ierr = VecDestroy(&adjq.work2);CHKERRQ(ierr);
   } else {
     ierr = TSSolve(adjts,NULL);CHKERRQ(ierr);
+    ierr = TSGetConvergedReason(adjts,&reason);CHKERRQ(ierr);
   }
+  if (reason <= TS_CONVERGED_ITERATING) {
+    Vec lambda;
+
+    if (adj_ctx->quadvec) { ierr = VecSetInf(adj_ctx->quadvec);CHKERRQ(ierr); }
+    ierr = TSGetSolution(adjts,&lambda);CHKERRQ(ierr);
+    ierr = VecSetInf(lambda);CHKERRQ(ierr);
+  } else *done = PETSC_TRUE;
   PetscFunctionReturn(0);
 }

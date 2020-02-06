@@ -639,25 +639,26 @@ PetscErrorCode TSLinearizedICApply_Private(TS ts, PetscReal t0, Vec x0, Vec desi
 }
 
 /* auxiliary function to solve a forward model with a quadrature */
-PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direction, Vec quadvec, PetscReal *quadscalar)
+PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direction, Vec quadvec, PetscReal *quadscalar, PetscBool *done)
 {
-  TS             ats,model = NULL;
-  TS             qts[] = {NULL,NULL}, aqts[] = {NULL,NULL};
-  TSQuadCtx      qctxs[2];
-  Vec            U;
-  PetscReal      t0,tf,tfup,dt;
-  PetscBool      fidt,stop,diffrhs;
-  FWDEvalQuadCtx qfwd;
-  TLMEvalQuadCtx qtlm;
-  TSObj          funchead;
-  PetscInt       i,nq,anq;
-  PetscErrorCode ierr;
-  PetscErrorCode (*qup[])(TS,Vec,Vec) = {QuadTSUpdateStates,QuadTSUpdateStates};
-  Vec            qvec_fixed[]= {NULL,NULL};
-  QuadEval       squad,squad_fixed,vquad,vquad_fixed;
-  TSIJacobian    jaccoup[] = {NULL,NULL};
-  Mat            Acoup[] = {NULL,NULL}, Bcoup[] = {NULL,NULL};
-  void           *squad_ctx,*vquad_ctx;
+  TS                ats,model = NULL;
+  TS                qts[] = {NULL,NULL}, aqts[] = {NULL,NULL};
+  TSQuadCtx         qctxs[2];
+  Vec               U;
+  PetscReal         t0,tf,tfup,dt;
+  PetscBool         fidt,stop,diffrhs;
+  FWDEvalQuadCtx    qfwd;
+  TLMEvalQuadCtx    qtlm;
+  TSObj             funchead;
+  PetscInt          i,nq,anq;
+  PetscErrorCode    ierr;
+  PetscErrorCode    (*qup[])(TS,Vec,Vec) = {QuadTSUpdateStates,QuadTSUpdateStates};
+  Vec               qvec_fixed[]= {NULL,NULL};
+  QuadEval          squad,squad_fixed,vquad,vquad_fixed;
+  TSIJacobian       jaccoup[] = {NULL,NULL};
+  Mat               Acoup[] = {NULL,NULL}, Bcoup[] = {NULL,NULL};
+  void              *squad_ctx,*vquad_ctx;
+  TSConvergedReason reason = TS_CONVERGED_ITERATING;
 
   PetscFunctionBegin;
   if (direction) {
@@ -668,6 +669,9 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     PetscValidHeaderSpecific(quadvec,VEC_CLASSID,5);
     PetscCheckSameComm(ts,1,quadvec,5);
   }
+  PetscValidPointer(done,7);
+  *done = PETSC_FALSE;
+
   if (direction && !quadvec) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Cannot compute Hessian without quadrature vector");
   if (direction) { /* when the direction is present, the ts need to be a TLMTS */
     ierr = TLMTSGetModelTS(ts,&model);CHKERRQ(ierr);
@@ -949,6 +953,10 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     ierr = TSSetMaxTime(ats,tfup);CHKERRQ(ierr);
     ierr = TSSolve(ats,NULL);CHKERRQ(ierr);
 
+    /* determine if something went wrong and attempt recovery */
+    ierr = TSGetConvergedReason(ats,&reason);CHKERRQ(ierr);
+    if (reason <= TS_CONVERGED_ITERATING) goto cleanup;
+
     /* determine if TS finished before the max time requested */
     ierr = TSGetTime(ats,&tfup);CHKERRQ(ierr);
     stop = (PetscAbsReal(tt-tfup) < PETSC_SMALL) ? PETSC_FALSE : PETSC_TRUE;
@@ -970,27 +978,38 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     }
   } while (PetscAbsReal(tfup - tf) > PETSC_SMALL && !stop);
 
+cleanup:
   ierr = AugmentedTSFinalize(ats);CHKERRQ(ierr);
-  for (i=0;i<nq;i++) {
-    DM  dm;
-    Vec v;
+  if (reason > TS_CONVERGED_ITERATING) {
+    for (i=0;i<nq;i++) {
+      Vec v;
 
-    ierr = TSGetSolution(qts[i],&v);CHKERRQ(ierr);
-    ierr = VecAXPY(v,1.0,qvec_fixed[i]);CHKERRQ(ierr);
+      ierr = TSGetSolution(qts[i],&v);CHKERRQ(ierr);
+      ierr = VecAXPY(v,1.0,qvec_fixed[i]);CHKERRQ(ierr);
+    }
+    if (quadscalar && (squad || squad_fixed)) {
+      Vec         v;
+      PetscScalar *a;
+      PetscInt    n;
+
+      ierr = TSGetSolution(qts[0],&v);CHKERRQ(ierr);
+      ierr = VecGetArray(v,&a);CHKERRQ(ierr);
+      ierr = VecGetLocalSize(v,&n);CHKERRQ(ierr);
+      if (n) *quadscalar = PetscRealPart(a[0]);
+      ierr = MPI_Bcast(quadscalar,1,MPIU_REAL,0,PetscObjectComm((PetscObject)ts));CHKERRQ(ierr);
+      ierr = VecRestoreArray(v,&a);CHKERRQ(ierr);
+    }
+    *done = PETSC_TRUE;
+  } else {
+    PetscReal zero=0.0,one=1.0,inf=one/zero;
+    if (quadscalar) *quadscalar = inf;
+    if (quadvec) { ierr = VecSetInf(quadvec);CHKERRQ(ierr); }
+  }
+  for (i=0;i<nq;i++) {
+    DM dm;
+
     ierr = TSGetDM(qts[i],&dm);CHKERRQ(ierr);
     ierr = DMRestoreGlobalVector(dm,&qvec_fixed[i]);CHKERRQ(ierr);
-  }
-  if (quadscalar && (squad || squad_fixed)) {
-    Vec         v;
-    PetscScalar *a;
-    PetscInt    n;
-
-    ierr = TSGetSolution(qts[0],&v);CHKERRQ(ierr);
-    ierr = VecGetArray(v,&a);CHKERRQ(ierr);
-    ierr = VecGetLocalSize(v,&n);CHKERRQ(ierr);
-    if (n) *quadscalar = PetscRealPart(a[0]);
-    ierr = MPI_Bcast(quadscalar,1,MPIU_REAL,0,PetscObjectComm((PetscObject)ts));CHKERRQ(ierr);
-    ierr = VecRestoreArray(v,&a);CHKERRQ(ierr);
   }
   ierr = TSDestroy(&qts[0]);CHKERRQ(ierr);
   ierr = TSDestroy(&qts[1]);CHKERRQ(ierr);

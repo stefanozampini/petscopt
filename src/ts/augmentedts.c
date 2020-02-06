@@ -555,8 +555,9 @@ static PetscErrorCode AugmentedTSPreStep(TS ats)
   ierr = AugmentedTSUpdateModelTS(ats);CHKERRQ(ierr);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   if (actx->model->prestep) {
-    Vec              mU;
-    PetscObjectState sprev,spost;
+    Vec               mU;
+    PetscObjectState  sprev,spost;
+    TSConvergedReason reason;
 
     ierr = AugmentedTSUpdateModelSolution(ats);CHKERRQ(ierr);
     ierr = TSGetSolution(actx->model,&mU);CHKERRQ(ierr);
@@ -574,6 +575,8 @@ static PetscErrorCode AugmentedTSPreStep(TS ats)
       ierr = VecCopy(mU,actx->U[0]);CHKERRQ(ierr);
       ierr = DMCompositeRestoreAccessArray(dm,U,1,&z,actx->U);CHKERRQ(ierr);
     }
+    ierr = TSGetConvergedReason(actx->model,&reason);CHKERRQ(ierr);
+    ierr = TSSetConvergedReason(ats,reason);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
 }
@@ -587,8 +590,9 @@ static PetscErrorCode AugmentedTSPostEvaluate(TS ats)
   PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   if (actx->model->postevaluate) {
-    Vec              mU;
-    PetscObjectState sprev,spost;
+    Vec               mU;
+    PetscObjectState  sprev,spost;
+    TSConvergedReason reason;
 
     ierr = AugmentedTSUpdateModelSolution(ats);CHKERRQ(ierr);
     ierr = TSGetSolution(actx->model,&mU);CHKERRQ(ierr);
@@ -598,6 +602,8 @@ static PetscErrorCode AugmentedTSPostEvaluate(TS ats)
     if (sprev != spost) {
       ierr = TSRestartStep(ats);CHKERRQ(ierr);
     }
+    ierr = TSGetConvergedReason(actx->model,&reason);CHKERRQ(ierr);
+    ierr = TSSetConvergedReason(ats,reason);CHKERRQ(ierr);
   }
   ierr = AugmentedTSUpdateModelTS(ats);CHKERRQ(ierr);
   PetscFunctionReturn(0);

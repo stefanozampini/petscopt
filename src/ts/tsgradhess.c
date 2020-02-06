@@ -57,7 +57,7 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
   TSTrajectory   otrj;
   TSAdapt        adapt;
   PetscReal      dt;
-  PetscBool      istr,soadisc,tlmdisc;
+  PetscBool      istr,soadisc,tlmdisc,done;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -113,10 +113,13 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
 
   /* XXX should we add the AdjointTS to the TS private data? */
   ierr = PetscObjectCompose((PetscObject)tshess->model,"_ts_hessian_foats",tshess->GN ? NULL : (PetscObject)tshess->foats);CHKERRQ(ierr);
-  ierr = TSSolveWithQuadrature_Private(tshess->tlmts,NULL,tshess->design,x,y,NULL);CHKERRQ(ierr);
+  ierr = TSSolveWithQuadrature_Private(tshess->tlmts,NULL,tshess->design,x,y,NULL,&done);CHKERRQ(ierr);
   ierr = PetscObjectCompose((PetscObject)tshess->model,"_ts_hessian_foats",NULL);CHKERRQ(ierr);
   ierr = TLMTSSetPerturbationVec(tshess->tlmts,NULL);CHKERRQ(ierr);
   ierr = PetscLogEventEnd(TSOPT_API_HMultTLM,0,0,0,0);CHKERRQ(ierr);
+
+  /* something went wrong */
+  if (!done) goto cleanup;
 
   /* second-order adjoint solve */
   ierr = PetscLogEventBegin(TSOPT_API_HMultSOA,0,0,0,0);CHKERRQ(ierr);
@@ -151,17 +154,41 @@ static PetscErrorCode MatMult_TSHessian(Mat H, Vec x, Vec y)
     ierr = TSSetMaxSteps(tshess->soats,nsteps-1);CHKERRQ(ierr);
     ierr = TSSetExactFinalTime(tshess->soats,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
   }
-  ierr = AdjointTSSolveWithQuadrature_Private(tshess->soats);CHKERRQ(ierr);
-  ierr = AdjointTSFinalizeQuadrature(tshess->soats);CHKERRQ(ierr);
+  ierr = AdjointTSSolveWithQuadrature_Private(tshess->soats,&done);CHKERRQ(ierr);
+  if (done) {
+    ierr = AdjointTSFinalizeQuadrature(tshess->soats);CHKERRQ(ierr);
+  }
   ierr = AdjointTSSetQuadratureVec(tshess->soats,NULL);CHKERRQ(ierr);
   ierr = AdjointTSSetDirectionVec(tshess->soats,NULL);CHKERRQ(ierr);
   ierr = PetscLogEventEnd(TSOPT_API_HMultSOA,0,0,0,0);CHKERRQ(ierr);
 
+cleanup:
   ierr = TSTrajectoryDestroy(&tshess->tlmts->trajectory);CHKERRQ(ierr); /* XXX add Reset method to TSTrajectory */
   tshess->model->trajectory = otrj;
   ierr = PetscLogEventEnd(TSOPT_API_HMult,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
+
+#if 0
+static PetscErrorCode VecIsValid(Vec vec,PetscBool *valid)
+{
+  PetscErrorCode    ierr;
+  PetscInt          n,i;
+  const PetscScalar *x;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(vec,VEC_CLASSID,1);
+  PetscValidPointer(valid,2);
+  *valid = PETSC_TRUE;
+  ierr = VecGetLocalSize(vec,&n);CHKERRQ(ierr);
+  ierr = VecGetArrayRead(vec,&x);CHKERRQ(ierr);
+  for (i=0; i<n; i++)
+    if (PetscUnlikely(PetscIsInfOrNanScalar(x[i]))) { *valid = PETSC_FALSE; break; }
+  ierr = VecRestoreArrayRead(vec,&x);CHKERRQ(ierr);
+  ierr = MPI_Allreduce(MPI_IN_PLACE,valid,1,MPIU_BOOL,MPI_LAND,PetscObjectComm((PetscObject)vec));CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+#endif
 
 /* private functions for objective, gradient and Hessian evaluation */
 static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec design, Vec gradient, PetscReal *val)
@@ -170,6 +197,7 @@ static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec de
   TSTrajectory   otrj = NULL;
   PetscReal      t0,tf,dt;
   PetscContainer c;
+  PetscBool      done;
   PetscErrorCode ierr;
   PetscLogEvent  loge;
 
@@ -214,7 +242,10 @@ static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec de
 
   /* forward solve */
   ierr = TSGetTime(ts,&t0);CHKERRQ(ierr);
-  ierr = TSSolveWithQuadrature_Private(ts,X,design,NULL,gradient,val);CHKERRQ(ierr);
+  ierr = TSSolveWithQuadrature_Private(ts,X,design,NULL,gradient,val,&done);CHKERRQ(ierr);
+
+  /* something went wrong */
+  if (!done) goto cleanup;
 
   /* adjoint */
   if (gradient) {
@@ -243,9 +274,12 @@ static PetscErrorCode TSComputeObjectiveAndGradient_Private(TS ts, Vec X, Vec de
         ierr = TSSetExactFinalTime(adjts,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
       }
     }
-    ierr = AdjointTSSolveWithQuadrature_Private(adjts);CHKERRQ(ierr);
-    ierr = AdjointTSFinalizeQuadrature(adjts);CHKERRQ(ierr);
+    ierr = AdjointTSSolveWithQuadrature_Private(adjts,&done);CHKERRQ(ierr);
+    if (done) {
+      ierr = AdjointTSFinalizeQuadrature(adjts);CHKERRQ(ierr);
+    }
   }
+cleanup:
   ierr = PetscLogEventEnd(loge,0,0,0,0);CHKERRQ(ierr);
   ierr = TSDestroy(&adjts);CHKERRQ(ierr);
   /* restore TS to its original state */
@@ -326,14 +360,15 @@ static PetscErrorCode TSComputeHessian_MFFD(TS ts, PetscReal t0, PetscReal dt, P
 
 static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec X, Vec design, Mat H)
 {
-  PetscContainer c;
-  TSHessian      *tshess;
-  Vec            U;
-  TSTrajectory   otrj;
-  TSAdapt        adapt;
-  PetscBool      has,istr;
-  PetscBool      tlmdisc,foadisc,soadisc;
-  PetscErrorCode ierr;
+  PetscContainer    c;
+  TSHessian         *tshess;
+  Vec               U;
+  TSTrajectory      otrj;
+  TSAdapt           adapt;
+  PetscBool         has,istr;
+  PetscBool         tlmdisc,foadisc,soadisc;
+  TSConvergedReason reason;
+  PetscErrorCode    ierr;
 
   PetscFunctionBegin;
   ierr = PetscObjectQuery((PetscObject)ts,"_ts_obj_ctx",(PetscObject*)&c);CHKERRQ(ierr);
@@ -474,6 +509,9 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
   }
   ierr = VecCopy(tshess->x0,U);CHKERRQ(ierr);
   ierr = TSSolve(ts,U);CHKERRQ(ierr);
+  ierr = TSGetConvergedReason(ts,&reason);CHKERRQ(ierr);
+  /* This error is unrecoverable */
+  if (reason <= TS_CONVERGED_ITERATING) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_NOT_CONVERGED,"Model TS did not converge");
   ierr = TSTrajectoryDestroy(&tshess->modeltj);CHKERRQ(ierr);
   tshess->modeltj = ts->trajectory;
 
@@ -505,6 +543,9 @@ static PetscErrorCode TSComputeHessian_Private(TS ts, PetscReal t0, PetscReal dt
       ierr = TSSetExactFinalTime(tshess->foats,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
     }
     ierr = TSSolve(tshess->foats,NULL);CHKERRQ(ierr);
+    ierr = TSGetConvergedReason(tshess->foats,&reason);CHKERRQ(ierr);
+    /* This error is unrecoverable */
+    if (reason <= TS_CONVERGED_ITERATING) SETERRQ(PetscObjectComm((PetscObject)ts),PETSC_ERR_NOT_CONVERGED,"First-order adjoint TS did not converge");
   }
   /* restore old TSTrajectory (if any) */
   ts->trajectory = otrj;

@@ -59,7 +59,7 @@ static PetscErrorCode MatMultTranspose_Propagator(Mat A, Vec x, Vec y)
 {
   MatPropagator_Ctx *prop;
   PetscErrorCode    ierr;
-  PetscBool         istr,dadj,dtlm;
+  PetscBool         istr,dadj,dtlm,done;
   PetscReal         dt;
   Vec               tlmdesign,tlmworkrhs;
   TSTrajectory      otrj;
@@ -127,8 +127,11 @@ static PetscErrorCode MatMultTranspose_Propagator(Mat A, Vec x, Vec y)
   ierr = TLMTSIsDiscrete(prop->lts,&dtlm);CHKERRQ(ierr);
   ierr = AdjointTSIsDiscrete(prop->adjlts,&dadj);CHKERRQ(ierr);
   if (dtlm != dadj) SETERRQ2(PetscObjectComm((PetscObject)A),PETSC_ERR_SUP,"Cannot mix %s TLM and %s adjoint",dtlm ? "discrete" : "continuous",dadj ? "discrete" : "continuous");
-  ierr = AdjointTSSolveWithQuadrature_Private(prop->adjlts);CHKERRQ(ierr);
-  ierr = AdjointTSFinalizeQuadrature(prop->adjlts);CHKERRQ(ierr);
+  ierr = AdjointTSSolveWithQuadrature_Private(prop->adjlts,&done);CHKERRQ(ierr);
+  /* An error here, if any, is unrecoverable */
+  if (done) {
+    ierr = AdjointTSFinalizeQuadrature(prop->adjlts);CHKERRQ(ierr);
+  } else SETERRQ(PetscObjectComm((PetscObject)A),PETSC_ERR_NOT_CONVERGED,"Adjoint of tangent linear model TS did not converge");
   prop->lts->trajectory = NULL;
   prop->tj = prop->model->trajectory;
   prop->model->trajectory = otrj;
@@ -142,6 +145,7 @@ static PetscErrorCode MatMult_Propagator(Mat A, Vec x, Vec y)
   PetscReal         dt;
   PetscBool         istr;
   Vec               sol,tlmdesign;
+  TSConvergedReason reason;
   TSTrajectory      otrj;
 
   PetscFunctionBegin;
@@ -181,13 +185,16 @@ static PetscErrorCode MatMult_Propagator(Mat A, Vec x, Vec y)
     ierr = TSSetExactFinalTime(prop->lts,TS_EXACTFINALTIME_MATCHSTEP);CHKERRQ(ierr);
   }
   ierr = TSSolve(prop->lts,NULL);CHKERRQ(ierr);
+  ierr = TSGetConvergedReason(prop->lts,&reason);CHKERRQ(ierr);
+  ierr = TLMTSSetPerturbationVec(prop->lts,NULL);CHKERRQ(ierr);
+  /* This error is unrecoverable */
+  if (reason <= TS_CONVERGED_ITERATING) SETERRQ(PetscObjectComm((PetscObject)A),PETSC_ERR_NOT_CONVERGED,"Tangent linear model TS did not converge");
   ierr = TSGetSolution(prop->lts,&sol);CHKERRQ(ierr);
   if (prop->P) {
     ierr = MatMult(prop->P,sol,y);CHKERRQ(ierr);
   } else {
     ierr = VecCopy(sol,y);CHKERRQ(ierr);
   }
-  ierr = TLMTSSetPerturbationVec(prop->lts,NULL);CHKERRQ(ierr);
   prop->tj = prop->model->trajectory;
   prop->model->trajectory = otrj;
   PetscFunctionReturn(0);
@@ -199,6 +206,7 @@ static PetscErrorCode MatPropagatorUpdate_Propagator(Mat A, PetscReal t0, PetscR
   Vec               osol;
   TSTrajectory      otrj;
   MatPropagator_Ctx *prop;
+  TSConvergedReason reason;
   PetscBool         flg;
   PetscErrorCode    ierr;
 
@@ -243,6 +251,9 @@ static PetscErrorCode MatPropagatorUpdate_Propagator(Mat A, PetscReal t0, PetscR
   }
   ierr = VecCopy(prop->x0,osol);CHKERRQ(ierr);
   ierr = TSSolve(prop->model,NULL);CHKERRQ(ierr);
+  ierr = TSGetConvergedReason(prop->model,&reason);CHKERRQ(ierr);
+  /* This error is unrecoverable */
+  if (reason <= TS_CONVERGED_ITERATING) SETERRQ(PetscObjectComm((PetscObject)A),PETSC_ERR_NOT_CONVERGED,"Model TS did not converge");
   prop->tj = prop->model->trajectory;
   prop->model->trajectory = otrj;
   PetscFunctionReturn(0);
