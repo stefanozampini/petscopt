@@ -896,6 +896,15 @@ static PetscErrorCode TestTSPostEvent(TS adjts, PetscInt nevents, PetscInt event
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode RaiseErrorPostEvaluate(TS ts)
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TSSetConvergedReason(ts,TS_DIVERGED_NONLINEAR_SOLVE);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
 static PetscErrorCode DummyPostStep(TS ts)
 {
   PetscFunctionBegin;
@@ -934,7 +943,7 @@ int main(int argc, char* argv[])
   PetscBool      testps = PETSC_TRUE;
   PetscBool      userobjective = PETSC_TRUE;
   PetscBool      usefd = PETSC_FALSE, usetaylor = PETSC_FALSE;
-  PetscBool      testm = PETSC_TRUE;
+  PetscBool      testm = PETSC_TRUE,testrecovery = PETSC_FALSE;
   PetscBool      testremove_multadd = PETSC_FALSE;
   PetscBool      flg;
   PetscReal      dx = PETSC_SMALL;
@@ -985,6 +994,7 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsBool("-use_fd","Use finite differencing to test gradient evaluation","",usefd,&usefd,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-use_taylor","Use Taylor remainders to check gradient evaluation","",usetaylor,&usetaylor,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_remove_multadd","Test with removal of MultAdd operations","",testremove_multadd,&testremove_multadd,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-test_recovery","Test recovery from an error in TS","",testrecovery,&testrecovery,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-dx","dx for FD","",dx,&dx,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsEnd();CHKERRQ(ierr);
 
@@ -1270,6 +1280,9 @@ int main(int argc, char* argv[])
   ierr = TSSetHessianIC(ts,NULL,NULL,NULL,EvalHessianIC_MM,&userdae);CHKERRQ(ierr);
 
   /* Test objective function evaluation */
+  if (testrecovery) {
+    ierr = TSSetPostEvaluate(ts,RaiseErrorPostEvaluate);CHKERRQ(ierr);
+  }
   ierr = TSComputeObjectiveAndGradient(ts,t0,dt,tf,U,M,NULL,&obj);CHKERRQ(ierr);
 
   /* due to termination events, we take the real final time rtf here
@@ -1305,6 +1318,7 @@ int main(int argc, char* argv[])
   /* Test gradient evaluation */
   ierr = TSComputeObjectiveAndGradient(ts,t0,dt,tf,U,M,Mgrad,NULL);CHKERRQ(ierr);
   ierr = VecView(Mgrad,NULL);CHKERRQ(ierr);
+  ierr = TSSetPostEvaluate(ts,NULL);CHKERRQ(ierr);
 
   /* Test the gradient code by finite differencing the objective evaluation */
   if (usefd) {
@@ -1587,5 +1601,10 @@ int main(int argc, char* argv[])
     requires: !complex !single
     suffix: 15_discrete_theta_full_mass
     args: -t0 -1.9 -tf -1.1 -dt 0.01 -ts_type theta -ts_theta_theta {{0.23 0.5 0.71 1.0}separate output} -ts_theta_endpoint 0 -test_general -test_objfixed_final -p 1.3 -ts_trajectory_type memory -test_objective_norm -test_ifunc -test_mass -m 1.1 -use_taylor -tsgradient_adjoint_discrete -tlm_discrete -adjoint_tlm_discrete -phi_view -phiT_view -err_view -taylor_ts_steps 6 -use_taylor -tsgradient_adjoint_discrete -tshessian_foadjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_view
+
+  test:
+    requires: !complex
+    suffix: recovery
+    args: -t0 0 -dt 0.1 -tf 0.2 -test_recovery -ts_type {{rk cn bdf theta}} -malloc -malloc_dump -malloc_debug
 
 TEST*/
