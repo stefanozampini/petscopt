@@ -502,9 +502,10 @@ void PDCoefficient::SetUpOperators()
             pinitv[i+st0] = v0[piniti[i]];
          }
          const int ste = g*esslist.Size();
+         const int stp = g*pactii.Size();
          for (int i = 0; i < esslist.Size(); i++)
          {
-            ess_tdof_list[i+ste] = esslist[i]+ste;
+            ess_tdof_list[i+ste] = esslist[i] + stp;
             ess_tdof_vals[i+ste] = v0[pactii[esslist[i]]];
          }
       }
@@ -518,7 +519,6 @@ void PDCoefficient::SetUpOperators()
 
    /* Update BCHandler */
    bchandler.Update(ess_tdof_list,ess_tdof_vals);
-
 }
 
 void PDCoefficient::SaveExcl(const char* filename)
