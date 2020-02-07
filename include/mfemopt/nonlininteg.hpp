@@ -33,12 +33,13 @@ protected:
    bool symmetrize;
    bool project;
    friend class TVRegularizer;
+   void SetDualCoefficients(const mfem::Array<mfem::VectorGridFunctionCoefficient*>&);
+   void SetDualCoefficients();
 
 public:
    VTVIntegrator(double,bool=true);
-   void SetDualCoefficients(const mfem::Array<mfem::VectorGridFunctionCoefficient*>&);
-   void SetDualCoefficients();
    void SetBeta(double _beta) { beta = _beta; }
+   double GetBeta() { return beta; }
    void Symmetrize(bool _sym = true) { symmetrize = _sym; }
    void Project(bool _prj = true) { project = _prj; }
    virtual double GetElementEnergy(const mfem::Array<const mfem::FiniteElement*>&,

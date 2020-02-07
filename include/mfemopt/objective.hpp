@@ -165,6 +165,8 @@ private:
 public:
    TVRegularizer(PDCoefficient*,double,bool=false,bool=true);
 
+   double GetBeta() { return vtvInteg.GetBeta(); }
+   void SetBeta(double _beta) { vtvInteg.SetBeta(_beta); }
    void Symmetrize(bool _sym = true) { vtvInteg.Symmetrize(_sym); }
    void Project(bool _prj = true) { vtvInteg.Project(_prj); }
    void UpdateDual(const mfem::Vector&);
