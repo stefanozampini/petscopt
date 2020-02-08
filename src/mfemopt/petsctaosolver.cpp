@@ -4,6 +4,7 @@
 #include <mfemopt/private/mfemoptpetscmacros.h>
 #include <petsctao.h>
 #include <petsc/private/petscimpl.h>
+#include <petsc/private/matimpl.h>
 
 static PetscErrorCode ierr;
 
@@ -187,10 +188,30 @@ static PetscErrorCode __mfem_tao_hessian(Tao tao, Vec x, Mat H, Mat Hpre, void* 
       delete_mat = true;
    }
 
+   // Get nonzerostate
+   PetscObjectState nonzerostate;
+   ierr = MatGetNonzeroState(H,&nonzerostate); CHKERRQ(ierr);
+
    // Avoid unneeded copy of the matrix by hacking
    Mat B = pHH->ReleaseMat(false);
    ierr = MatHeaderReplace(H,&B);CHKERRQ(ierr);
    if (delete_mat) delete pHH;
+
+   // When using MATNEST and PCFIELDSPLIT, the second setup of the
+   // preconditioner fails because MatCreateSubMatrix_Nest does not
+   // actually return a matrix. Instead, for efficiency reasons,
+   // it returns a reference to the submatrix. The second time it
+   // is called, MAT_REUSE_MATRIX is used and MatCreateSubMatrix_Nest
+   // aborts since the two submatrices are actually different.
+   // We circumvent this issue by incrementing the nonzero state
+   // (i.e. PETSc thinks the operator sparsity pattern has changed)
+   // This does not impact performances in the case of MATNEST
+   PetscBool isnest;
+   ierr = PetscObjectTypeCompare((PetscObject)H,MATNEST,&isnest);
+   CHKERRQ(ierr);
+   if (isnest) { H->nonzerostate = nonzerostate + 1; }
+
+
    PetscFunctionReturn(0);
 }
 
