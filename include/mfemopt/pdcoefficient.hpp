@@ -127,6 +127,7 @@ public:
    void Save(const char*);
    void SaveExcl(const char*);
    void SaveVisIt(const char*);
+   void SaveParaView(const char*);
    void Visualize(const char* = NULL);
 
    mfem::PetscBCHandler* GetBCHandler() { return &bchandler; }

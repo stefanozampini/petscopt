@@ -582,6 +582,27 @@ void PDCoefficient::SaveVisIt(const char* filename)
    delete dc;
 }
 
+void PDCoefficient::SaveParaView(const char* filename)
+{
+   if (!pcoeffgf.Size()) return;
+
+   ParMesh *pmesh = pcoeffgf[0]->ParFESpace()->GetParMesh();
+   DataCollection *dc = NULL;
+   dc = new ParaViewDataCollection(filename, pmesh);
+   dc->SetPrecision(8);
+   dc->SetFormat(DataCollection::SERIAL_FORMAT);
+   for (int i=0; i<pcoeffgf.Size(); i++)
+   {
+      std::ostringstream fname;
+      fname << "coeff" << "-" << i;
+      dc->RegisterField(fname.str(), pcoeffgf[i]);
+   }
+   dc->SetCycle(0);
+   dc->SetTime(0.0);
+   dc->Save();
+   delete dc;
+}
+
 void PDCoefficient::Visualize(const char* keys)
 {
    std::string fkeys = keys ? keys : "c";
