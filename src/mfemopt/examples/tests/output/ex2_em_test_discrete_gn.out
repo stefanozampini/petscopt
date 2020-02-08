@@ -17,13 +17,13 @@ Receivers matrix
 0.000168919	1.99329 	2	7.83855e-07	2.99969 	3
 =======================================
 NC 0 -> Number of dofs 20
-Initial objective 2.7e-08 (LS 0., TV 2.7e-08)
-it=0	lit=0	obj=2.700000e-08	(g,du)=-0.000000e+00	||g||=2.306558e-13	step=1.000000e+00
+Initial objective 2.7e-08 (LS 1.09678e-23, TV 2.7e-08)
+it=0	lit=0	obj=2.700000e-08	(g,du)=-0.000000e+00	||g||=2.301343e-13	step=1.000000e+00
   ---------- Testing Jacobian -------------
   Run with -snes_test_jacobian_view and optionally -snes_test_jacobian <threshold> to show difference
     of hand-coded and finite difference Jacobian entries greater than <threshold>.
   Testing hand-coded Jacobian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Jacobian is probably correct.
-  ||J - Jfd||_F/||J||_F = 5.54987e-08, ||J - Jfd||_F = 6.02741e-08
-it=1	lit=14	obj=2.700000e-08	(g,du)=-1.130945e-23	||g||=9.614204e-17	step=1.000000e+00
-Final objective (SNES) 2.7e-08 (LS 0., TV 2.7e-08)
+  ||J - Jfd||_F/||J||_F = 7.87103e-08, ||J - Jfd||_F = 8.5483e-08
+it=1	lit=14	obj=2.700000e-08	(g,du)=-1.131053e-23	||g||=1.154736e-16	step=1.000000e+00
+Final objective (SNES) 2.7e-08 (LS 5.29807e-24, TV 2.7e-08)

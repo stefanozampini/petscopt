@@ -846,7 +846,6 @@ static PetscErrorCode MyTSSetUpFromDesign(TS ts, Vec x0, Vec M, void *ctx)
   PetscInt          ls;
   Mat               J,pJ;
   TSRHSJacobian     rhsjac;
-  TSProblemType     ptype;
 
   PetscFunctionBeginUser;
   ierr = VecScatterBegin(userdae->Msct,M,userdae->M,INSERT_VALUES,SCATTER_FORWARD);CHKERRQ(ierr);
@@ -867,10 +866,6 @@ static PetscErrorCode MyTSSetUpFromDesign(TS ts, Vec x0, Vec M, void *ctx)
       ierr = FormRHSJacobian(ts,0.0,x0,J,pJ,userdae);CHKERRQ(ierr);
       ierr = TSSetRHSJacobian(ts,J,pJ,TSComputeRHSJacobianConstant,NULL);CHKERRQ(ierr);
     }
-  }
-  ierr = TSGetProblemType(ts,&ptype);CHKERRQ(ierr);
-  if (ptype == TS_LINEAR && userdae->p != 1.0) {
-    ierr = TSSetProblemType(ts,TS_NONLINEAR);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
 }
@@ -920,7 +915,6 @@ int main(int argc, char* argv[])
   Vec            U,M,Mgrad,sol;
   UserObjective  userobj;
   UserDAE        userdae;
-  TSProblemType  problemtype;
   PetscScalar    a, b, one = 1.0, mm;
   PetscReal      p, t0 = 0.0, tf = 2.0, dt = 0.1, rtf;
   PetscReal      obj,objtest,err,normPhi;
@@ -998,8 +992,6 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsReal("-dx","dx for FD","",dx,&dx,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsEnd();CHKERRQ(ierr);
 
-  problemtype = TS_LINEAR;
-
   userdae.a  = a;
   userdae.b  = b;
   userdae.p  = p;
@@ -1010,10 +1002,6 @@ int main(int argc, char* argv[])
   dsize = 3;
   if (testm && (testifunc || testmix)) {
     dsize++;
-  }
-  if (p != 1.0) {
-    problemtype = TS_NONLINEAR;
-    testrhsjacconst = PETSC_FALSE;
   }
   if (testmix) testifunc = PETSC_TRUE;
 
@@ -1039,7 +1027,6 @@ int main(int argc, char* argv[])
   /* ---------- Create TS solver  ---------- */
 
   ierr = TSCreate(PETSC_COMM_WORLD,&ts);CHKERRQ(ierr);
-  ierr = TSSetProblemType(ts,problemtype);CHKERRQ(ierr);
   ierr = VecDuplicate(U,&sol);CHKERRQ(ierr);
   ierr = TSSetSolution(ts,sol);CHKERRQ(ierr);
   ierr = VecDestroy(&sol);CHKERRQ(ierr);
@@ -1050,8 +1037,10 @@ int main(int argc, char* argv[])
   ierr = MatSetUp(J);CHKERRQ(ierr);
   ierr = MatAssemblyBegin(J,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
   ierr = MatAssemblyEnd(J,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatShift(J,1.0);CHKERRQ(ierr);
+  ierr = MatShift(J,-1.0);CHKERRQ(ierr);
   if (testpjac) {
-    ierr = MatDuplicate(J,MAT_DO_NOT_COPY_VALUES,&pJ);CHKERRQ(ierr);
+    ierr = MatDuplicate(J,MAT_COPY_VALUES,&pJ);CHKERRQ(ierr);
   } else {
     ierr = PetscObjectReference((PetscObject)J);CHKERRQ(ierr);
     pJ   = J;
@@ -1283,6 +1272,15 @@ int main(int argc, char* argv[])
   if (testrecovery) {
     ierr = TSSetPostEvaluate(ts,RaiseErrorPostEvaluate);CHKERRQ(ierr);
   }
+
+  ierr = TSSetTime(ts,t0);CHKERRQ(ierr);
+  ierr = TSSetTimeStep(ts,dt);CHKERRQ(ierr);
+  ierr = TSSetMaxTime(ts,tf);CHKERRQ(ierr);
+  ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_STEPOVER);CHKERRQ(ierr);
+  ierr = TSGetSolution(ts,&sol);CHKERRQ(ierr);
+  ierr = TSSetUpFromDesign(ts,sol,M);CHKERRQ(ierr);
+  ierr = TSSolve(ts,NULL);CHKERRQ(ierr);
+
   ierr = TSComputeObjectiveAndGradient(ts,t0,dt,tf,U,M,NULL,&obj);CHKERRQ(ierr);
 
   /* due to termination events, we take the real final time rtf here
@@ -1406,6 +1404,7 @@ int main(int argc, char* argv[])
     ierr = MatDestroy(&He);CHKERRQ(ierr);
     ierr = MatDestroy(&HeT);CHKERRQ(ierr);
   }
+  ierr = MatDestroy(&H);CHKERRQ(ierr);
 
   /* Test gradient and Hessian using Taylor series */
   if (usetaylor) {
@@ -1429,7 +1428,6 @@ int main(int argc, char* argv[])
   /* XXX coverage */
   ierr = TSSetGradientIC(ts,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
   ierr = TSDestroy(&ts);CHKERRQ(ierr);
-  ierr = MatDestroy(&H);CHKERRQ(ierr);
   ierr = VecDestroy(&U);CHKERRQ(ierr);
   ierr = VecDestroy(&M);CHKERRQ(ierr);
   ierr = VecDestroy(&Mgrad);CHKERRQ(ierr);
@@ -1509,7 +1507,7 @@ int main(int argc, char* argv[])
   test:
     requires: !complex !single
     suffix: 7
-    args: -t0 0 -tf 0.02 -dt 0.001 -b 0.3 -a 1.7 -p 1 -ts_type rosw -test_ifunc -test_objfixed_func -ts_adapt_type none -tshessian_mffd -use_taylor -ts_trajectory_type memory
+    args: -t0 0 -tf 0.02 -dt 0.001 -b 0.3 -a 1.7 -p 1 -ts_type rosw -test_ifunc -test_objfixed_final -ts_adapt_type none -tshessian_mffd -use_taylor -ts_trajectory_type memory
 
   test:
     requires: !complex !single

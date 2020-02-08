@@ -496,7 +496,7 @@ int main(int argc, char* argv[])
    /* process options */
    PetscErrorCode ierr;
    char imgfile[PETSC_MAX_PATH_LEN] = "../../../../share/petscopt/data/logo_noise.txt";
-   PetscBool save = PETSC_FALSE, viz = PETSC_TRUE, mon = PETSC_TRUE, visit = PETSC_FALSE;
+   PetscBool save = PETSC_FALSE, viz = PETSC_TRUE, mon = PETSC_TRUE, visit = PETSC_FALSE, paraview = PETSC_FALSE;
    PetscBool primal_dual = PETSC_FALSE, symmetrize = PETSC_FALSE, project = PETSC_FALSE, vector = PETSC_FALSE, coupled = PETSC_TRUE;
    PetscBool quad = PETSC_FALSE, normalize = PETSC_TRUE, mataij = PETSC_FALSE;
    PetscReal noise = 0.0, tv_alpha = 0.0007, tv_beta = 0.1, tk_alpha = 1.0;
@@ -505,6 +505,7 @@ int main(int argc, char* argv[])
 
    ierr = PetscOptionsGetBool(NULL,NULL,"-normalize",&normalize,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetBool(NULL,NULL,"-visit",&visit,NULL);CHKERRQ(ierr);
+   ierr = PetscOptionsGetBool(NULL,NULL,"-paraview",&paraview,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetBool(NULL,NULL,"-save",&save,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetBool(NULL,NULL,"-glvis",&viz,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetBool(NULL,NULL,"-monitor",&mon,NULL);CHKERRQ(ierr);
@@ -609,12 +610,13 @@ int main(int argc, char* argv[])
       u = 0.;
       newton.Mult(dummy,u);
 
-      if (viz || save || visit)
+      if (viz || save || visit || paraview)
       {
          imgpd->Distribute(u);
          if (save) imgpd->Save("reconstructed_image");
          if (viz) imgpd->Visualize("RJlc");
          if (visit) imgpd->SaveVisIt("reconstructed_image_visit");
+         if (paraview) imgpd->SaveParaView("reconstructed_image_paraview");
       }
 
       /* Test optimization solver */
@@ -631,12 +633,13 @@ int main(int argc, char* argv[])
       u = 0.;
       opt.Solve(u);
 
-      if (viz || save || visit)
+      if (viz || save || visit || paraview)
       {
          imgpd->Distribute(u);
          if (save) imgpd->Save("reconstructed_image_opt");
          if (viz) imgpd->Visualize("RJlc");
          if (visit) imgpd->SaveVisIt("reconstructed_image_opt_visit");
+         if (paraview) imgpd->SaveParaView("reconstructed_image_opt_paraview");
       }
 
       delete imgpd;
@@ -694,15 +697,18 @@ int main(int argc, char* argv[])
 
   testset:
     nsize: 1
-    args: -glvis 0 -image ${petscopt_dir}/share/petscopt/data/hearts.txt -monitor 0 -noise 0.2 -quad -order 1 -vector 1 -opt_tao_type nls -snes_type newtonls -mataij -snes_converged_reason -opt_tao_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -opt_tao_gatol 1.e-10 -ksp_type preonly -opt_tao_nls_ksp_type preonly -tv_beta 1.e-4 -snes_max_it 30 -opt_tao_max_it 30
+    args: -glvis 0 -image ${petscopt_dir}/share/petscopt/data/hearts.txt -monitor 0 -noise 0.2 -quad -order 1 -vector 1 -opt_tao_type nls -snes_type newtonls -snes_converged_reason -opt_tao_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -opt_tao_gatol 1.e-10 -tv_beta 1.e-4 -snes_max_it 30 -opt_tao_max_it 30
     test:
       suffix: vtv
-      args: -pc_type lu -pc_factor_mat_ordering_type nd -opt_tao_nls_pc_type lu -opt_tao_nls_pc_factor_mat_ordering_type nd -coupled {{0 1}separate output}
+      args: -mataij -ksp_type preonly -opt_tao_nls_ksp_type preonly -pc_type lu -pc_factor_mat_ordering_type nd -opt_tao_nls_pc_type lu -opt_tao_nls_pc_factor_mat_ordering_type nd -coupled {{0 1}separate output}
     test:
       suffix: vtv_pd
-      args: -primaldual -pc_type lu -pc_factor_mat_ordering_type nd -opt_tao_nls_pc_type lu -opt_tao_nls_pc_factor_mat_ordering_type nd -coupled {{0 1}separate output}
+      args: -mataij -ksp_type preonly -opt_tao_nls_ksp_type preonly -primaldual -pc_type lu -pc_factor_mat_ordering_type nd -opt_tao_nls_pc_type lu -opt_tao_nls_pc_factor_mat_ordering_type nd -coupled {{0 1}separate output}
     test:
       suffix: vtv_pd_spd
-      args: -primaldual -pc_type cholesky -pc_factor_mat_ordering_type nd -opt_tao_nls_pc_type cholesky -opt_tao_nls_pc_factor_mat_ordering_type nd -coupled {{0 1}separate output} -symmetrize -project {{0 1}separate output}
+      args: -mataij -ksp_type preonly -opt_tao_nls_ksp_type preonly -primaldual -pc_type cholesky -pc_factor_mat_ordering_type nd -opt_tao_nls_pc_type cholesky -opt_tao_nls_pc_factor_mat_ordering_type nd -coupled {{0 1}separate output} -symmetrize -project {{0 1}separate output}
+    test:
+      suffix: vtv_fieldsplit
+      args: -pc_type fieldsplit -opt_tao_nls_pc_type fieldsplit -coupled {{0 1}separate output} -ksp_type fgmres -opt_tao_nls_ksp_type fgmres -primaldual
 
 TEST*/

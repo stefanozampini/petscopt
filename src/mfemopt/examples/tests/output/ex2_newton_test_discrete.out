@@ -13,7 +13,7 @@ it=0	lit=0	obj=7.671890e-03	(g,du)=-0.000000e+00	||g||=1.492785e-02	step=1.00000
     of hand-coded and finite difference Jacobian entries greater than <threshold>.
   Testing hand-coded Jacobian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Jacobian is probably correct.
-  ||J - Jfd||_F/||J||_F = 1.64371e-08, ||J - Jfd||_F = 1.32817e-07
+  ||J - Jfd||_F/||J||_F = 7.21866e-08, ||J - Jfd||_F = 5.83289e-07
 it=1	lit=3	obj=7.622800e-03	(g,du)=-9.556576e-05	||g||=2.308750e-04	step=1.000000e+00
 Nonlinear newton_ solve did not converge due to DIVERGED_MAX_IT iterations 1
 Final objective (SNES) 0.0076228 (LS 0.00127076, TV 0.00635204)
