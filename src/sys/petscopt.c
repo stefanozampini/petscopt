@@ -47,6 +47,7 @@ PetscErrorCode PetscOptInitializePackage(void)
   PetscOptPackageInitialized = PETSC_TRUE;
   /* Register classes */
   ierr = KSPRegister(KSPAUGTRIANGULAR,KSPCreate_AugTriangular);CHKERRQ(ierr);
+  ierr = SNESRegister(SNESAUGMENTED,SNESCreate_Augmented);CHKERRQ(ierr);
   /* Register Events */
   ierr = PetscLogEventRegister("TSOptEvalGrad",     0,&TSOPT_Opt_Eval_Grad_DAE);CHKERRQ(ierr);
   ierr = PetscLogEventRegister("TSOptEvalGradIC",   0,&TSOPT_Opt_Eval_Grad_IC);CHKERRQ(ierr);

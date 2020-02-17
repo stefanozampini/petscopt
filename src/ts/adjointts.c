@@ -1888,7 +1888,7 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts,PetscBool *done)
     qctx.Udot           = NULL;
     qctx.design         = NULL;
 
-    ierr = TSCreateQuadTS(PetscObjectComm((PetscObject)adjts),adj_ctx->quadvec,diffrhs,&qctx,&qts);CHKERRQ(ierr);
+    ierr = TSCreateQuadTS(adjts,adj_ctx->quadvec,diffrhs,&qctx,&qts);CHKERRQ(ierr);
     ierr = TSSetProblemType(qts,TS_LINEAR);CHKERRQ(ierr);
 
     if (!adj_ctx->discrete) {
@@ -1905,9 +1905,6 @@ PetscErrorCode AdjointTSSolveWithQuadrature_Private(TS adjts,PetscBool *done)
     ierr = MatDestroy(&Ac);CHKERRQ(ierr);
     ierr = MatDestroy(&Bc);CHKERRQ(ierr);
     ierr = TSDestroy(&qts);CHKERRQ(ierr);
-    if (ats->snes) {
-      ierr = SNESSetType(ats->snes,SNESKSPTRANSPOSEONLY);CHKERRQ(ierr);
-    }
     ierr = TSSetFromOptions(ats);CHKERRQ(ierr);
     ierr = AugmentedTSInitialize(ats);CHKERRQ(ierr);
     ierr = TSSolve(ats,NULL);CHKERRQ(ierr);

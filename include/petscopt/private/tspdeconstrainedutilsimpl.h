@@ -16,7 +16,7 @@ typedef struct {
   void        *evalquadctx;
 } TSQuadCtx;
 
-PETSC_INTERN PetscErrorCode TSCreateQuadTS(MPI_Comm,Vec,PetscBool,TSQuadCtx*,TS*);
+PETSC_INTERN PetscErrorCode TSCreateQuadTS(TS,Vec,PetscBool,TSQuadCtx*,TS*);
 PETSC_INTERN PetscErrorCode QuadTSUpdateStates(TS,Vec,Vec);
 PETSC_INTERN PetscErrorCode TSQuadraturePostStep_Private(TS);
 PETSC_INTERN PetscErrorCode TSQuadratureCtxDestroy_Private(void*);

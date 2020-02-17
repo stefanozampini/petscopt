@@ -4,6 +4,7 @@
 #include <petscsys.h>
 
 #define KSPAUGTRIANGULAR "augtriangular"
+#define SNESAUGMENTED    "augmented"
 
 PETSC_EXTERN PetscErrorCode PetscOptInitialize(int*,char***,const char[],const char[]);
 PETSC_EXTERN PetscErrorCode PetscOptFinalize();

@@ -4,6 +4,7 @@
 #include <petscts.h>
 
 PETSC_INTERN PetscErrorCode KSPCreate_AugTriangular(KSP);
+PETSC_INTERN PetscErrorCode SNESCreate_Augmented(SNES);
 
 typedef struct {
   TS             model;
@@ -16,13 +17,14 @@ typedef struct {
   Vec            *Udot;
   Vec            *F;
   PetscErrorCode (*setup)(TS);
+  PetscInt       activets;
 } TSAugCtx;
 
 /* Check sanity of the AugmentedTS */
 #if !defined(PETSC_USE_DEBUG)
 #define PetscCheckAugmentedTS(a) do {} while (0)
 #else
-#define PetscCheckAugmentedTS(a)                                                                                                                \
+#define PetscCheckAugmentedTS(a)                                                                                                                 \
   do {                                                                                                                                           \
     PetscErrorCode __ierr;                                                                                                                       \
     PetscContainer __c;                                                                                                                          \

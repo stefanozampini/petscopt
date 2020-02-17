@@ -5,6 +5,7 @@
 #include <petsc/private/kspimpl.h>
 #include <petsc/private/petscimpl.h>
 #include <petsc/private/dmimpl.h>
+#include <petscopt/tsutils.h>
 #include <petscopt/tlmts.h>
 #include <petscopt/augmentedts.h>
 #include <petscdm.h>
@@ -202,16 +203,21 @@ static PetscErrorCode QuadTSJacCoupling(TS ts, PetscReal time, Vec Q, Vec Qdot, 
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode TSCreateQuadTS(MPI_Comm comm, Vec v, PetscBool diffrhs, TSQuadCtx *ctx, TS *qts)
+PetscErrorCode TSCreateQuadTS(TS ts, Vec v, PetscBool diffrhs, TSQuadCtx *ctx, TS *qts)
 {
+  MPI_Comm       comm;
+  SNES           snes;
   Mat            A,B;
+  const char     *prefix;
   PetscInt       n;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  ierr = TSCreate(comm,qts);CHKERRQ(ierr);
+  ierr = PetscObjectGetComm((PetscObject)ts,&comm);CHKERRQ(ierr);
+  ierr = TSCreateWithTS(ts,qts);CHKERRQ(ierr);
   ierr = TSSetApplicationContext(*qts,ctx);CHKERRQ(ierr);
-  if (!v) {
+  ierr = TSGetOptionsPrefix(ts,&prefix);CHKERRQ(ierr);
+  if (!v) { /* no vector provided, assumes scalar quadrature */
     PetscMPIInt rank;
 
     ierr = MPI_Comm_rank(comm,&rank);CHKERRQ(ierr);
@@ -219,14 +225,21 @@ PetscErrorCode TSCreateQuadTS(MPI_Comm comm, Vec v, PetscBool diffrhs, TSQuadCtx
     ierr = VecCreateMPI(comm,n,PETSC_DECIDE,&v);CHKERRQ(ierr);
     ierr = TSSetSolution(*qts,v);CHKERRQ(ierr);
     ierr = VecDestroy(&v);CHKERRQ(ierr);
+    ierr = TSSetOptionsPrefix(*qts,"qscal_");CHKERRQ(ierr);
   } else {
     ierr = TSSetSolution(*qts,v);CHKERRQ(ierr);
     ierr = VecGetLocalSize(v,&n);CHKERRQ(ierr);
+    ierr = TSSetOptionsPrefix(*qts,"qvec_");CHKERRQ(ierr);
   }
+  ierr = TSAppendOptionsPrefix(*qts,prefix);CHKERRQ(ierr);
   ierr = MatCreateConstantDiagonal(comm,n,n,PETSC_DECIDE,PETSC_DECIDE,0.0,&A);CHKERRQ(ierr);
   ierr = MatCreateConstantDiagonal(comm,n,n,PETSC_DECIDE,PETSC_DECIDE,0.0,&B);CHKERRQ(ierr);
   ierr = TSSetRHSFunction(*qts,NULL,QuadTSRHSFunction,NULL);CHKERRQ(ierr);
   ierr = TSSetRHSJacobian(*qts,A,diffrhs ? B : A,QuadTSRHSJacobian,NULL);CHKERRQ(ierr);
+
+  /* linear in q (nonlinear in state) */
+  ierr = TSGetSNES(*qts,&snes);CHKERRQ(ierr);
+  ierr = SNESSetType(snes,SNESKSPONLY);CHKERRQ(ierr);
 
 #if PETSC_VERSION_LT(3,13,0)
   /* Missing ops for MATCONSTANTDIAGONAL */
@@ -799,7 +812,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     DM  dm;
     Vec v;
 
-    ierr = TSCreateQuadTS(PetscObjectComm((PetscObject)ts),NULL,diffrhs,&qctxs[nq],&qts[nq]);CHKERRQ(ierr);
+    ierr = TSCreateQuadTS(ts,NULL,diffrhs,&qctxs[nq],&qts[nq]);CHKERRQ(ierr);
     ierr = TSSetProblemType(qts[nq],TS_NONLINEAR);CHKERRQ(ierr);
 
     qctxs[nq].evalquad       = squad;
@@ -851,16 +864,16 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     qctxs[nq].evalquad_fixed = vquad_fixed;
     qctxs[nq].evalquadctx    = vquad_ctx;
 
-    ierr = TSCreateQuadTS(PetscObjectComm((PetscObject)ts),quadvec,diffrhs,&qctxs[nq],&qts[nq]);CHKERRQ(ierr);
+    ierr = TSCreateQuadTS(ts,quadvec,diffrhs,&qctxs[nq],&qts[nq]);CHKERRQ(ierr);
     ierr = TSSetProblemType(qts[nq],direction ? TS_LINEAR : TS_NONLINEAR);CHKERRQ(ierr);
 
     /* Coupling Jacobian */
     if (direction && vquad && qtlm.adjts) {
-      TSOpt     tsopt;
+      TSOpt       tsopt;
       TSIFunction ifunc;
-      PetscBool Hhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
-                              {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
-                              {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
+      PetscBool   Hhas[3][3] = {{PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                                {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
+                                {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
 
       ierr = TSGetTSOpt(model,&tsopt);CHKERRQ(ierr);
       ierr = TSOptHasHessianDAE(tsopt,Hhas);CHKERRQ(ierr);
@@ -943,7 +956,7 @@ PetscErrorCode TSSolveWithQuadrature_Private(TS ts, Vec X, Vec design, Vec direc
     if (direction) { /* we always stop at the selected times */
       PetscBool has1,has2;
 
-      ierr  = TSObjHasObjectiveFixed(funchead,t0,tf,NULL,NULL,NULL,NULL,&has1,&has2,&tfup);CHKERRQ(ierr);
+      ierr = TSObjHasObjectiveFixed(funchead,t0,tf,NULL,NULL,NULL,NULL,&has1,&has2,&tfup);CHKERRQ(ierr);
     } else {
       PetscBool has1,has2;
 
