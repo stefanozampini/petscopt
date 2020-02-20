@@ -338,13 +338,14 @@ PetscErrorCode AdjointTSSetUpStep(TS adjts)
     SNES      snes;
     KSP       ksp;
     PetscInt  lag;
-    PetscBool rk,theta,cn;
+    PetscBool rk,theta,cn,be;
 
     ierr = PetscObjectTypeCompare((PetscObject)adjts,TSRK,&rk);CHKERRQ(ierr);
     ierr = PetscObjectTypeCompare((PetscObject)adjts,TSTHETA,&theta);CHKERRQ(ierr);
     ierr = PetscObjectTypeCompare((PetscObject)adjts,TSCN,&cn);CHKERRQ(ierr);
-    if (rk)               adjts->ops->step = TSStep_Adjoint_RK;
-    else if (theta || cn) adjts->ops->step = TSStep_Adjoint_Theta;
+    ierr = PetscObjectTypeCompare((PetscObject)adjts,TSBEULER,&be);CHKERRQ(ierr);
+    if (rk)                     adjts->ops->step = TSStep_Adjoint_RK;
+    else if (theta || cn || be) adjts->ops->step = TSStep_Adjoint_Theta;
     else {
       TSType tstype;
 

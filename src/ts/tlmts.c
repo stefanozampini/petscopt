@@ -543,13 +543,14 @@ PetscErrorCode TLMTSSetUpStep(TS lts)
     SNES      snes;
     KSP       ksp;
     PetscInt  lag;
-    PetscBool rk,theta,cn;
+    PetscBool rk,theta,cn,be;
 
     ierr = PetscObjectTypeCompare((PetscObject)lts,TSRK,&rk);CHKERRQ(ierr);
     ierr = PetscObjectTypeCompare((PetscObject)lts,TSTHETA,&theta);CHKERRQ(ierr);
     ierr = PetscObjectTypeCompare((PetscObject)lts,TSCN,&cn);CHKERRQ(ierr);
-    if (rk)               lts->ops->step = TSStep_TLM_RK;
-    else if (theta || cn) lts->ops->step = TSStep_TLM_Theta;
+    ierr = PetscObjectTypeCompare((PetscObject)lts,TSBEULER,&be);CHKERRQ(ierr);
+    if (rk)                     lts->ops->step = TSStep_TLM_RK;
+    else if (theta || cn || be) lts->ops->step = TSStep_TLM_Theta;
     else {
       TSType tstype;
 
