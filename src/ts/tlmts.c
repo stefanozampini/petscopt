@@ -67,6 +67,7 @@ PetscErrorCode TLMTSComputeForcing(TS lts, PetscReal time, Vec U, Vec Udot, Pets
   ierr = TSGetTSOpt(tlm_ctx->model,&tsopt);CHKERRQ(ierr);
   ierr = TSOptHasGradientDAE(tsopt,&has,&hasnc);CHKERRQ(ierr);
   if (has) {
+    ierr = PetscLogEventBegin(TSOPT_TLM_Forcing,lts,0,0,0);CHKERRQ(ierr);
     if (hasnc) { /* non constant dependence */
       Mat F_m;
 
@@ -75,6 +76,7 @@ PetscErrorCode TLMTSComputeForcing(TS lts, PetscReal time, Vec U, Vec Udot, Pets
     } else {
       ierr = VecCopy(tlm_ctx->workrhs,F);CHKERRQ(ierr);
     }
+    ierr = PetscLogEventEnd(TSOPT_TLM_Forcing,lts,0,0,0);CHKERRQ(ierr);
   }
   *hasf = has;
   PetscFunctionReturn(0);

@@ -727,6 +727,7 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, Vec Udot
                                   {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE},
                                   {PETSC_FALSE,PETSC_FALSE,PETSC_FALSE}};
 
+    ierr = PetscLogEventBegin(TSOPT_SOA_Forcing,adjts,0,0,0);CHKERRQ(ierr);
     ierr = VecSet(F,0.0);CHKERRQ(ierr);
     ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
     ierr = DMGetGlobalVector(dm,&soawork0);CHKERRQ(ierr);
@@ -819,11 +820,13 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, Vec Udot
     if (!lU) { ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tlmts->trajectory,&TLMH,NULL);CHKERRQ(ierr); }
     ierr = DMRestoreGlobalVector(dm,&soawork0);CHKERRQ(ierr);
     ierr = DMRestoreGlobalVector(dm,&soawork1);CHKERRQ(ierr);
+    ierr = PetscLogEventEnd(TSOPT_SOA_Forcing,adjts,0,0,0);CHKERRQ(ierr);
   } else if (adj_ctx->design) { /* gradient computations */
     TS  fwdts = adj_ctx->fwdts;
     DM  dm;
     Vec FWDH,W;
 
+    ierr = PetscLogEventBegin(TSOPT_FOA_Forcing,adjts,0,0,0);CHKERRQ(ierr);
     ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
     ierr = DMGetGlobalVector(dm,&W);CHKERRQ(ierr);
     if (!U) {
@@ -834,6 +837,7 @@ PetscErrorCode AdjointTSComputeForcing(TS adjts, PetscReal time, Vec U, Vec Udot
       ierr = TSTrajectoryRestoreUpdatedHistoryVecs(fwdts->trajectory,&FWDH,NULL);CHKERRQ(ierr);
     }
     ierr = DMRestoreGlobalVector(dm,&W);CHKERRQ(ierr);
+    ierr = PetscLogEventEnd(TSOPT_FOA_Forcing,adjts,0,0,0);CHKERRQ(ierr);
   }
   *hasf = has;
   PetscFunctionReturn(0);
@@ -1812,6 +1816,8 @@ PetscErrorCode MatCreateShellWithMat(Mat A, PetscBool trans, Mat *B)
 PetscErrorCode AdjointTSComputeQuadrature(TS ts, PetscReal t, Vec U, Vec Udot, Vec L, Vec FOAL, Vec FOALdot, Vec TLMU, Vec TLMUdot, PetscBool* has, Vec F)
 {
   PetscErrorCode ierr;
+  PetscLogEvent  loge = TLMU ? TSOPT_SOA_Quad : TSOPT_FOA_Quad;
+  PetscErrorCode (*f)(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,Vec,Vec,PetscBool*,Vec);
 
   PetscFunctionBegin;
   PetscValidHeaderSpecific(ts,TS_CLASSID,1);
@@ -1825,8 +1831,12 @@ PetscErrorCode AdjointTSComputeQuadrature(TS ts, PetscReal t, Vec U, Vec Udot, V
   PetscValidPointer(has,10);
   PetscValidHeaderSpecific(F,VEC_CLASSID,11);
   *has = PETSC_FALSE;
-  ierr = PetscTryMethod(ts,"AdjointTSComputeQuadrature_C",(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,Vec,Vec,PetscBool*,Vec),
-                                                          (ts,t,U,Udot,L,FOAL,FOALdot,TLMU,TLMUdot,has,F));CHKERRQ(ierr);
+  ierr = PetscObjectQueryFunction((PetscObject)ts,"AdjointTSComputeQuadrature_C",&f);CHKERRQ(ierr);
+  if (f) {
+    ierr = PetscLogEventBegin(loge,ts,0,0,0);CHKERRQ(ierr);
+    ierr = (*f)(ts,t,U,Udot,L,FOAL,FOALdot,TLMU,TLMUdot,has,F);CHKERRQ(ierr);
+    ierr = PetscLogEventEnd(loge,ts,0,0,0);CHKERRQ(ierr);
+  }
   PetscFunctionReturn(0);
 }
 

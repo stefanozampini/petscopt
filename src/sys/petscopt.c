@@ -15,6 +15,11 @@ PetscLogEvent TSOPT_Opt_Eval_Grad_IC        = 0;
 PetscLogEvent TSOPT_Opt_Eval_Hess_DAE[3][3] = {{0,0,0},{0,0,0},{0,0,0}};
 PetscLogEvent TSOPT_Opt_Eval_Hess_IC[2][2]  = {{0,0},{0,0}};
 PetscLogEvent TSOPT_Opt_SetUp               = 0;
+PetscLogEvent TSOPT_FOA_Forcing             = 0;
+PetscLogEvent TSOPT_FOA_Quad                = 0;
+PetscLogEvent TSOPT_SOA_Forcing             = 0;
+PetscLogEvent TSOPT_SOA_Quad                = 0;
+PetscLogEvent TSOPT_TLM_Forcing             = 0;
 PetscLogEvent TSOPT_API_Obj                 = 0;
 PetscLogEvent TSOPT_API_ObjGrad             = 0;
 PetscLogEvent TSOPT_API_Grad                = 0;
@@ -65,6 +70,11 @@ PetscErrorCode PetscOptInitializePackage(void)
   ierr = PetscLogEventRegister("TSOptEvalHICMX",    0,&TSOPT_Opt_Eval_Hess_IC[1][0]);CHKERRQ(ierr);
   ierr = PetscLogEventRegister("TSOptEvalHICMM",    0,&TSOPT_Opt_Eval_Hess_IC[1][1]);CHKERRQ(ierr);
   ierr = PetscLogEventRegister("TSOptSetUp",        0,&TSOPT_Opt_SetUp);CHKERRQ(ierr);
+  ierr = PetscLogEventRegister("TSOptFOAForcing",   0,&TSOPT_FOA_Forcing);CHKERRQ(ierr);
+  ierr = PetscLogEventRegister("TSOptFOAQuad",      0,&TSOPT_FOA_Quad);CHKERRQ(ierr);
+  ierr = PetscLogEventRegister("TSOptSOAForcing",   0,&TSOPT_SOA_Forcing);CHKERRQ(ierr);
+  ierr = PetscLogEventRegister("TSOptSOAQuad",      0,&TSOPT_SOA_Quad);CHKERRQ(ierr);
+  ierr = PetscLogEventRegister("TSOptTLMForcing",   0,&TSOPT_TLM_Forcing);CHKERRQ(ierr);
   ierr = PetscLogEventRegister("TSObjective",       0,&TSOPT_API_Obj);CHKERRQ(ierr);
   ierr = PetscLogEventRegister("TSObjGrad",         0,&TSOPT_API_ObjGrad);CHKERRQ(ierr);
   ierr = PetscLogEventRegister("TSGradient",        0,&TSOPT_API_Grad);CHKERRQ(ierr);
@@ -93,6 +103,11 @@ PetscErrorCode PetscOptInitializePackage(void)
         }
       }
       ierr = PetscLogEventDeactivate(TSOPT_Opt_SetUp);CHKERRQ(ierr);
+      ierr = PetscLogEventDeactivate(TSOPT_FOA_Forcing);CHKERRQ(ierr);
+      ierr = PetscLogEventDeactivate(TSOPT_FOA_Quad);CHKERRQ(ierr);
+      ierr = PetscLogEventDeactivate(TSOPT_SOA_Forcing);CHKERRQ(ierr);
+      ierr = PetscLogEventDeactivate(TSOPT_SOA_Quad);CHKERRQ(ierr);
+      ierr = PetscLogEventDeactivate(TSOPT_TLM_Forcing);CHKERRQ(ierr);
     }
     ierr = PetscStrInList("tsoptapi",logList,',',&pkg);CHKERRQ(ierr);
     if (pkg) {

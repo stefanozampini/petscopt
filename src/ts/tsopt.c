@@ -76,7 +76,7 @@ PetscErrorCode TSOptEvalGradientDAE(TSOpt tsopt, PetscReal t, Vec U, Vec Udot, V
     TSTrajectory tj;
     Vec          W[2];
 
-    ierr = PetscLogEventBegin(TSOPT_Opt_Eval_Grad_DAE,0,0,0,0);CHKERRQ(ierr);
+    ierr = PetscLogEventBegin(TSOPT_Opt_Eval_Grad_DAE,U,0,0,0);CHKERRQ(ierr);
     W[0] = U;
     W[1] = Udot;
     ierr = TSGetTrajectory(tsopt->ts,&tj);CHKERRQ(ierr);
@@ -87,7 +87,7 @@ PetscErrorCode TSOptEvalGradientDAE(TSOpt tsopt, PetscReal t, Vec U, Vec Udot, V
     if (!U && !Udot) {
       ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,U ? NULL : &W[0],Udot ? NULL : &W[1]);CHKERRQ(ierr);
     }
-    ierr = PetscLogEventEnd(TSOPT_Opt_Eval_Grad_DAE,0,0,0,0);CHKERRQ(ierr);
+    ierr = PetscLogEventEnd(TSOPT_Opt_Eval_Grad_DAE,U,0,0,0);CHKERRQ(ierr);
   }
   /* In the future we can probably support different discretization spaces for
      forward and adjoint states */
@@ -109,9 +109,9 @@ PetscErrorCode TSOptEvalGradientIC(TSOpt tsopt, PetscReal t, Vec x, Vec M, Mat* 
 
   PetscFunctionBegin;
   if (tsopt->Ggrad && M) {
-    ierr = PetscLogEventBegin(TSOPT_Opt_Eval_Grad_IC,0,0,0,0);CHKERRQ(ierr);
+    ierr = PetscLogEventBegin(TSOPT_Opt_Eval_Grad_IC,x,0,0,0);CHKERRQ(ierr);
     ierr = (*tsopt->Ggrad)(tsopt->ts,t,x,M,tsopt->G_x,tsopt->G_m,tsopt->Ggrad_ctx);CHKERRQ(ierr);
-    ierr = PetscLogEventEnd(TSOPT_Opt_Eval_Grad_IC,0,0,0,0);CHKERRQ(ierr);
+    ierr = PetscLogEventEnd(TSOPT_Opt_Eval_Grad_IC,x,0,0,0);CHKERRQ(ierr);
   }
   if (G_x) *G_x = tsopt->G_x;
   if (G_m) *G_m = tsopt->G_m;
@@ -141,7 +141,7 @@ PetscErrorCode TSOptEvalHessianDAE(TSOpt tsopt, PetscInt w0, PetscInt w1, PetscR
 
   PetscFunctionBegin;
   if (tsopt->HF[w0][w1]) {
-    ierr = PetscLogEventBegin(TSOPT_Opt_Eval_Hess_DAE[w0][w1],0,0,0,0);CHKERRQ(ierr);
+    ierr = PetscLogEventBegin(TSOPT_Opt_Eval_Hess_DAE[w0][w1],U,0,0,0);CHKERRQ(ierr);
     W[0] = U;
     W[1] = Udot;
     ierr = TSGetTrajectory(tsopt->ts,&tj);CHKERRQ(ierr);
@@ -152,7 +152,7 @@ PetscErrorCode TSOptEvalHessianDAE(TSOpt tsopt, PetscInt w0, PetscInt w1, PetscR
     if (!U && !Udot) {
       ierr = TSTrajectoryRestoreUpdatedHistoryVecs(tj,U ? NULL : &W[0],Udot ? NULL : &W[1]);CHKERRQ(ierr);
     }
-    ierr = PetscLogEventEnd(TSOPT_Opt_Eval_Hess_DAE[w0][w1],0,0,0,0);CHKERRQ(ierr);
+    ierr = PetscLogEventEnd(TSOPT_Opt_Eval_Hess_DAE[w0][w1],U,0,0,0);CHKERRQ(ierr);
   } else {
     ierr = VecSet(Y,0.0);CHKERRQ(ierr);
   }
@@ -175,9 +175,9 @@ PetscErrorCode TSOptEvalHessianIC(TSOpt tsopt, PetscInt w0, PetscInt w1, PetscRe
 
   PetscFunctionBegin;
   if (tsopt->HG[w0][w1]) {
-    ierr = PetscLogEventBegin(TSOPT_Opt_Eval_Hess_IC[w0][w1],0,0,0,0);CHKERRQ(ierr);
+    ierr = PetscLogEventBegin(TSOPT_Opt_Eval_Hess_IC[w0][w1],U,0,0,0);CHKERRQ(ierr);
     ierr = (*tsopt->HG[w0][w1])(tsopt->ts,t,U,M,L,X,Y,tsopt->HGctx);CHKERRQ(ierr);
-    ierr = PetscLogEventEnd(TSOPT_Opt_Eval_Hess_IC[w0][w1],0,0,0,0);CHKERRQ(ierr);
+    ierr = PetscLogEventEnd(TSOPT_Opt_Eval_Hess_IC[w0][w1],U,0,0,0);CHKERRQ(ierr);
   } else {
     ierr = VecSet(Y,0.0);CHKERRQ(ierr);
   }
@@ -545,14 +545,13 @@ PetscErrorCode TSSetUpFromDesign(TS ts,Vec x0,Vec design)
   TSOpt          tsopt;
 
   PetscFunctionBegin;
-  ierr = PetscLogEventBegin(TSOPT_Opt_SetUp,0,0,0,0);CHKERRQ(ierr);
   ierr = TSGetTSOpt(ts,&tsopt);CHKERRQ(ierr);
   if (tsopt->setupfromdesign) {
-
+    ierr = PetscLogEventBegin(TSOPT_Opt_SetUp,ts,0,0,0);CHKERRQ(ierr);
     ierr = VecLockReadPush(design);CHKERRQ(ierr);
     ierr = (*tsopt->setupfromdesign)(ts,x0,design,tsopt->setupfromdesignctx);CHKERRQ(ierr);
     ierr = VecLockReadPop(design);CHKERRQ(ierr);
+    ierr = PetscLogEventEnd(TSOPT_Opt_SetUp,ts,0,0,0);CHKERRQ(ierr);
   }
-  ierr = PetscLogEventEnd(TSOPT_Opt_SetUp,0,0,0,0);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
