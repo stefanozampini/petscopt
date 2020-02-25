@@ -20,8 +20,8 @@ private:
    int lsize;
    int order;
    int ngf;
+   bool scalar;
    bool usederiv;
-   bool usefuncs;
    /*  false -> dofs at the boundary of active regions are fixed
        true  -> dofs at the boundary of active regions are allowed to vary */
    bool incl_bdr;
@@ -117,10 +117,15 @@ public:
    mfem::Array<bool>& GetActiveElements() { return sforminteg; }
    int GetLocalSize() { return lsize; }
    int GetOrder() { return order; }
+   bool Scalar() { return scalar; }
    int GetComponents() { return ngf; }
    void GetCurrentVector(mfem::Vector&);
    void GetInitialVector(mfem::Vector&);
    void SetUseDerivCoefficients(bool=true);
+   void EvalDerivCoefficient(mfem::ElementTransformation&,const mfem::Vector&,double*);
+   void EvalDerivCoefficient(mfem::ElementTransformation&,const mfem::Vector&,mfem::DenseTensor&);
+   void EvalDerivShape(mfem::ElementTransformation&,mfem::Vector&);
+   void EvalDerivShape(mfem::ElementTransformation&,mfem::DenseTensor&);
    void Distribute(const mfem::Vector&);
    void Distribute(const mfem::Vector&,mfem::Array<mfem::ParGridFunction*>&);
    void Assemble(mfem::Vector&);

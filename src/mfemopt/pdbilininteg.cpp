@@ -6,11 +6,6 @@ namespace mfemopt
 {
 using namespace mfem;
 
-PDBilinearFormIntegrator::~PDBilinearFormIntegrator()
-{
-   delete sworkgf;
-}
-
 void PDBilinearFormIntegrator::UpdateCoefficient(const Vector& m)
 {
    if (!pdcoeff) return;
@@ -25,31 +20,33 @@ void PDBilinearFormIntegrator::GetCurrentVector(Vector& m)
    pdcoeff->GetCurrentVector(m);
 }
 
-void PDBilinearFormIntegrator::ComputeHessian_XM(ParGridFunction *agf, const Vector& m, const Vector& pertIn, Vector& out)
+void PDBilinearFormIntegrator::ComputeHessian_XM(ParGridFunction *agf, const Vector& pertIn, ParGridFunction *ogf)
 {
-   ComputeGradient_Internal(agf,m,pertIn,out,true);
+   ComputeGradient_Internal(agf,pertIn,ogf,true);
 }
 
-void PDBilinearFormIntegrator::ComputeHessian_MX(ParGridFunction *agf, ParGridFunction *sgf, const Vector& m, Vector& out)
+void PDBilinearFormIntegrator::ComputeHessian_MX(ParGridFunction *agf, ParGridFunction *sgf, Vector& out)
 {
-   ComputeGradientAdjoint_Internal(agf,sgf,m,out,true);
+   ComputeGradientAdjoint_Internal(agf,sgf,out,true);
 }
 
-void PDBilinearFormIntegrator::ComputeGradient(ParGridFunction *sgf, const Vector& m, const Vector& pertIn, Vector& out)
+void PDBilinearFormIntegrator::ComputeGradient(ParGridFunction *sgf, const Vector& pertIn, ParGridFunction *ogf)
 {
-   ComputeGradient_Internal(sgf,m,pertIn,out);
+   ComputeGradient_Internal(sgf,pertIn,ogf,false);
 }
 
-void PDBilinearFormIntegrator::ComputeGradientAdjoint(ParGridFunction *agf, ParGridFunction *sgf, const Vector& m, Vector& out)
+void PDBilinearFormIntegrator::ComputeGradientAdjoint(ParGridFunction *agf, ParGridFunction *sgf, Vector& out)
 {
-   ComputeGradientAdjoint_Internal(agf,sgf,m,out);
+   ComputeGradientAdjoint_Internal(agf,sgf,out,false);
 }
 
-void PDBilinearFormIntegrator::ComputeGradient_Internal(ParGridFunction *sgf, const Vector& m, const Vector& pertIn ,Vector& out, bool hessian)
+void PDBilinearFormIntegrator::ComputeGradient_Internal(ParGridFunction *sgf, const Vector& pertIn, ParGridFunction *ogf, bool hessian)
 {
    Vector      ovals,svals,pvals;
    Array<int>  vdofs,pdofs;
    DenseMatrix elmat;
+
+   *ogf = 0.0;
 
    /* get deriv_work_coeff */
    Array<ParGridFunction*>& pgf = pdcoeff->GetDerivCoeffs();
@@ -68,10 +65,6 @@ void PDBilinearFormIntegrator::ComputeGradient_Internal(ParGridFunction *sgf, co
    pdcoeff->Distribute(pertIn);
    pdcoeff->SetUseDerivCoefficients(false);
 
-   /* XXX different adjoint space */
-   if (!sworkgf) sworkgf = new ParGridFunction(sfes);
-   *sworkgf = 0.0;
-
    Array<bool>& elactive = pdcoeff->GetActiveElements();
    for (int e = 0; e < pmesh->GetNE(); e++)
    {
@@ -80,8 +73,6 @@ void PDBilinearFormIntegrator::ComputeGradient_Internal(ParGridFunction *sgf, co
       sfes->GetElementVDofs(e, vdofs);
       sgf->GetSubVector(vdofs, svals);
 
-      /* This could be done more efficiently if we require specialized routines
-         for the element assembly */
       const FiniteElement *sel = sfes->GetFE(e);
       ElementTransformation *eltrans = sfes->GetElementTransformation(e);
       ParFiniteElementSpace *pfes = pdcoeff->pfes;
@@ -97,27 +88,26 @@ void PDBilinearFormIntegrator::ComputeGradient_Internal(ParGridFunction *sgf, co
       }
       if (hessian)
       {
-         ComputeElementHessian(sel,svals,eltrans,pvals,e,ovals);
+         ComputeElementHessian(sel,svals,eltrans,pvals,ovals);
       }
       else
       {
-         ComputeElementGradient(sel,svals,eltrans,pvals,e,ovals);
+         ComputeElementGradient(sel,svals,eltrans,pvals,ovals);
       }
       ptr = ovals.GetData();
       for (int pg = 0; pg < pgf.Size(); pg++)
       {
          Vector vals(ptr,vdofs.Size());
-         sworkgf->AddElementVector(vdofs,vals);
+         ogf->AddElementVector(vdofs,vals);
          ptr += vdofs.Size();
          vals.SetData(NULL); /* XXX clang static analysis */
       }
    }
-   sworkgf->ParallelAssemble(out);
 }
 
-void PDBilinearFormIntegrator::ComputeGradientAdjoint_Internal(ParGridFunction *agf, ParGridFunction *sgf, const Vector& m, Vector& g, bool hessian)
+void PDBilinearFormIntegrator::ComputeGradientAdjoint_Internal(ParGridFunction *agf, ParGridFunction *sgf, Vector& g, bool hessian)
 {
-   Array<int>  vdofs,pdofs;
+   Array<int>  svdofs,avdofs,pdofs;
    Vector      avals,svals,ovals;
 
    Array<ParGridFunction*>& pgf = pdcoeff->GetGradCoeffs();
@@ -126,7 +116,6 @@ void PDBilinearFormIntegrator::ComputeGradientAdjoint_Internal(ParGridFunction *
    ParFiniteElementSpace *sfes = sgf->ParFESpace();
    ParFiniteElementSpace *afes = agf->ParFESpace();
    ParMesh *pmesh = sfes->GetParMesh();
-   MFEM_VERIFY(sfes == afes,"Different adjoint space not supported");
    MFEM_VERIFY(pmesh == afes->GetParMesh(),"Different meshes not supported");
    for (int i = 0; i < pgf.Size(); i++)
    {
@@ -142,14 +131,15 @@ void PDBilinearFormIntegrator::ComputeGradientAdjoint_Internal(ParGridFunction *
    for (int e = 0; e < pmesh->GetNE(); e++)
    {
       if (!elactive[e]) continue;
-      sfes->GetElementVDofs(e, vdofs);
-      sgf->GetSubVector(vdofs, svals);
-      agf->GetSubVector(vdofs, avals);
+      sfes->GetElementVDofs(e, svdofs);
+      sgf->GetSubVector(svdofs, svals);
+      afes->GetElementVDofs(e, avdofs);
+      agf->GetSubVector(avdofs, avals);
 
       const FiniteElement *sel = sfes->GetFE(e);
-      const FiniteElement *ael = sfes->GetFE(e);
+      const FiniteElement *ael = afes->GetFE(e);
       ElementTransformation *eltrans = sfes->GetElementTransformation(e);
-      ComputeElementGradientAdjoint(sel,svals,ael,avals,eltrans,e,ovals);
+      ComputeElementGradientAdjoint(sel,svals,ael,avals,eltrans,ovals);
       ParFiniteElementSpace *pfes = pdcoeff->pfes;
       pfes->GetElementVDofs(e, pdofs);
       double *ptr = ovals.GetData();
@@ -165,46 +155,13 @@ void PDBilinearFormIntegrator::ComputeGradientAdjoint_Internal(ParGridFunction *
    pdcoeff->Assemble(g);
 }
 
-void PDBilinearFormIntegrator::PushPDIntRule(const FiniteElement &el,
-                                             ElementTransformation &Trans,
-                                             int qorder)
-{
-   MFEM_VERIFY(!oIntRule,"You forgot to pop the PDIntRule")
-   if (!IntRule)
-   {
-      IntRule = GetDefaultIntRule(el,Trans,0);
-   }
-   oIntRule = IntRule;
-   IntRule = GetDefaultIntRule(el,Trans,qorder);
-}
-
-void PDBilinearFormIntegrator::PushPDIntRule(const FiniteElement &trial_fe,
-                                             const FiniteElement &test_fe,
-                                             ElementTransformation &Trans,
-                                             int qorder)
-{
-   MFEM_VERIFY(!oIntRule,"You forgot to pop the PDIntRule")
-   if (!IntRule)
-   {
-      IntRule = GetDefaultIntRule(trial_fe,test_fe,Trans,0);
-   }
-   oIntRule = IntRule;
-   IntRule = GetDefaultIntRule(trial_fe,test_fe,Trans,qorder);
-}
-
-void PDBilinearFormIntegrator::PopPDIntRule()
-{
-   MFEM_VERIFY(oIntRule,"You forgot to push the PDIntRule")
-   IntRule = oIntRule;
-   oIntRule = NULL;
-}
-
 const IntegrationRule* PDMassIntegrator::GetDefaultIntRule(const FiniteElement &trial_fe,
                                                            const FiniteElement &test_fe,
                                                            ElementTransformation &Trans,
                                                            int qo)
 {
-   int order = trial_fe.GetOrder() + test_fe.GetOrder() + Trans.OrderW() + qo;
+   //int order = trial_fe.GetOrder() + test_fe.GetOrder() + Trans.OrderW() + qo;
+   int order = trial_fe.GetOrder() + test_fe.GetOrder() + Trans.OrderW();
 
    const IntegrationRule *ir = NULL;
    if (trial_fe.Space() == FunctionSpace::rQk)
@@ -229,10 +186,12 @@ void PDMassIntegrator::AssembleElementMatrix(const FiniteElement &el,
    Coefficient *oQ = MassIntegrator::Q;
    MassIntegrator::Q = pdcoeff->GetActiveCoefficient();
 
-   PushPDIntRule(el,Trans,pdcoeff->GetOrder());
-   MassIntegrator::AssembleElementMatrix(el,Trans,elmat);
-   PopPDIntRule();
+   const IntegrationRule *oir = MassIntegrator::IntRule;
+   MassIntegrator::IntRule = GetDefaultIntRule(el,Trans,pdcoeff->GetOrder());
 
+   MassIntegrator::AssembleElementMatrix(el,Trans,elmat);
+
+   MassIntegrator::IntRule = oir;
    MassIntegrator::Q = oQ;
 }
 
@@ -244,21 +203,22 @@ void PDMassIntegrator::AssembleElementMatrix2(const FiniteElement &trial_fe,
    Coefficient *oQ = MassIntegrator::Q;
    MassIntegrator::Q = pdcoeff->GetActiveCoefficient();
 
-   PushPDIntRule(trial_fe,test_fe,Trans,pdcoeff->GetOrder());
-   MassIntegrator::AssembleElementMatrix2(trial_fe,test_fe,Trans,elmat);
-   PopPDIntRule();
+   const IntegrationRule *oir = MassIntegrator::IntRule;
+   MassIntegrator::IntRule = GetDefaultIntRule(trial_fe,test_fe,Trans,pdcoeff->GetOrder());
 
+   MassIntegrator::AssembleElementMatrix2(trial_fe,test_fe,Trans,elmat);
+
+   MassIntegrator::IntRule = oir;
    MassIntegrator::Q = oQ;
 }
 
 void PDMassIntegrator::ComputeElementGradientAdjoint(const FiniteElement *sel, const Vector& svals,
                                                      const FiniteElement *ael, const Vector& avals,
-                                                     ElementTransformation *eltrans, int e,
+                                                     ElementTransformation *eltrans,
                                                      Vector& ovals)
 {
    MFEM_VERIFY(pdcoeff,"Missing PDCoefficient");
-   const int ngf = pdcoeff->GetComponents();
-   MFEM_VERIFY(ngf == 1,"Invalid PDCoefficient components " << ngf);
+   MFEM_VERIFY(pdcoeff->Scalar(),"Need a scalar coefficient");
 
    const int nsd = sel->GetDof();
    const int nad = ael->GetDof();
@@ -268,16 +228,9 @@ void PDMassIntegrator::ComputeElementGradientAdjoint(const FiniteElement *sel, c
    shape.SetSize(nsd);
    te_shape.SetSize(nad);
 
-   ParFiniteElementSpace *pfes = pdcoeff->GetPFES();
 #ifdef MFEM_THREAD_SAFE
    Vector pshape;
 #endif
-   const FiniteElement *pel = pfes->GetFE(e);
-   const int npd = pel->GetDof();
-   pshape.SetSize(npd);
-
-   ovals.SetSize(npd);
-   ovals = 0.0;
 
    const IntegrationRule *ir = GetDefaultIntRule(*sel,*ael,*eltrans,pdcoeff->GetOrder());
 
@@ -287,39 +240,43 @@ void PDMassIntegrator::ComputeElementGradientAdjoint(const FiniteElement *sel, c
       eltrans->SetIntPoint(&ip);
       sel->CalcShape(ip, shape);
       if (ael != sel) ael->CalcShape(ip, te_shape);
-      pel->CalcShape(ip, pshape);
 
       const double w = eltrans->Weight() * ip.weight;
       const double L = (ael != sel) ? avals*te_shape : avals*shape;
       const double R = shape*svals;
-      for (int k = 0; k < npd; k++)
+      const double f = w*L*R;
+      if (!i)
       {
-         ovals(k) += L*w*pshape(k)*R;
+         pdcoeff->EvalDerivShape(*eltrans,ovals);
+         ovals *= f;
+      }
+      else
+      {
+         pdcoeff->EvalDerivShape(*eltrans,pshape);
+         ovals.Add(f,pshape);
       }
    }
 }
 
-void PDMassIntegrator::ComputeElementGradient_Internal(const FiniteElement *sel, const Vector& svals,
-                                                       ElementTransformation *eltrans, const Vector& pvals, int e,
-                                                       Vector& ovals, bool hessian)
+void PDMassIntegrator::ComputeElementHessian(const FiniteElement *sel, const Vector& svals,
+                                             ElementTransformation *eltrans, const Vector& pvals,
+                                             Vector& ovals)
+{
+   ComputeElementGradient(sel,svals,eltrans,pvals,ovals);
+}
+
+void PDMassIntegrator::ComputeElementGradient(const FiniteElement *sel, const Vector& svals,
+                                              ElementTransformation *eltrans, const Vector& pvals,
+                                              Vector& ovals)
 {
    MFEM_VERIFY(pdcoeff,"Missing PDCoefficient");
-   const int ngf = pdcoeff->GetComponents();
-   MFEM_VERIFY(ngf == 1,"Invalid PDCoefficient components " << ngf);
+   MFEM_VERIFY(pdcoeff->Scalar(),"Need a scalar coefficient");
 
    const int nsd = sel->GetDof();
 #ifdef MFEM_THREAD_SAFE
    Vector shape;
 #endif
    shape.SetSize(nsd);
-
-#ifdef MFEM_THREAD_SAFE
-   Vector pshape;
-#endif
-   ParFiniteElementSpace *pfes = pdcoeff->GetPFES();
-   const FiniteElement *pel = pfes->GetFE(e);
-   const int npd = pel->GetDof();
-   pshape.SetSize(npd);
 
    ovals.SetSize(nsd);
    ovals = 0.0;
@@ -331,15 +288,11 @@ void PDMassIntegrator::ComputeElementGradient_Internal(const FiniteElement *sel,
       const IntegrationPoint &ip = ir->IntPoint(i);
       eltrans->SetIntPoint(&ip);
       sel->CalcShape(ip, shape);
-      pel->CalcShape(ip, pshape);
-
+      double Q;
+      pdcoeff->EvalDerivCoefficient(*eltrans,pvals,&Q);
       const double w = eltrans->Weight() * ip.weight;
       const double R = shape*svals;
-      for (int k = 0; k < npd; k++)
-      {
-         const double ww = w*pshape(k)*pvals(k)*R;
-         ovals.Add(ww,shape);
-      }
+      ovals.Add(Q*w*R,shape);
    }
 }
 
@@ -348,7 +301,8 @@ const IntegrationRule* PDVectorFEMassIntegrator::GetDefaultIntRule(const FiniteE
                                                                    ElementTransformation &Trans,
                                                                    int qo)
 {
-   int order = Trans.OrderW() + trial_fe.GetOrder() + test_fe.GetOrder() + qo;
+   //int order = Trans.OrderW() + trial_fe.GetOrder() + test_fe.GetOrder() + qo;
+   int order = Trans.OrderW() + trial_fe.GetOrder() + test_fe.GetOrder();
    return &IntRules.Get(trial_fe.GetGeomType(), order);
 }
 
@@ -363,9 +317,12 @@ void PDVectorFEMassIntegrator::AssembleElementMatrix(const FiniteElement &el,
    VectorFEMassIntegrator::VQ = NULL;
    VectorFEMassIntegrator::MQ = pdcoeff->GetActiveMatrixCoefficient();
 
-   PushPDIntRule(el,Trans,pdcoeff->GetOrder());
+   const IntegrationRule *oir = VectorFEMassIntegrator::IntRule;
+   VectorFEMassIntegrator::IntRule = GetDefaultIntRule(el,Trans,pdcoeff->GetOrder());
+
    VectorFEMassIntegrator::AssembleElementMatrix(el,Trans,elmat);
-   PopPDIntRule();
+
+   VectorFEMassIntegrator::IntRule = oir;
 
    VectorFEMassIntegrator::Q  = oQ;
    VectorFEMassIntegrator::VQ = VQ;
@@ -384,9 +341,12 @@ void PDVectorFEMassIntegrator::AssembleElementMatrix2(const FiniteElement &trial
    VectorFEMassIntegrator::VQ = NULL;
    VectorFEMassIntegrator::MQ = pdcoeff->GetActiveMatrixCoefficient();
 
-   PushPDIntRule(trial_fe,test_fe,Trans,pdcoeff->GetOrder());
+   const IntegrationRule *oir = VectorFEMassIntegrator::IntRule;
+   VectorFEMassIntegrator::IntRule = GetDefaultIntRule(trial_fe,test_fe,Trans,pdcoeff->GetOrder());
+
    VectorFEMassIntegrator::AssembleElementMatrix2(trial_fe,test_fe,Trans,elmat);
-   PopPDIntRule();
+
+   VectorFEMassIntegrator::IntRule = oir;
 
    VectorFEMassIntegrator::Q  = oQ;
    VectorFEMassIntegrator::VQ = VQ;
@@ -395,21 +355,15 @@ void PDVectorFEMassIntegrator::AssembleElementMatrix2(const FiniteElement &trial
 
 void PDVectorFEMassIntegrator::ComputeElementGradientAdjoint(const FiniteElement *sel, const Vector& svals,
                                                              const FiniteElement *ael, const Vector& avals,
-                                                             ElementTransformation *eltrans, int e,
+                                                             ElementTransformation *eltrans,
                                                              Vector& ovals)
 {
-   MFEM_VERIFY(pdcoeff,"Missing PDCoefficient");
-   const int ngf = pdcoeff->GetComponents();
-   if (ngf != 1) // XXX not implemented
-   {
-      PDBilinearFormIntegrator::ComputeElementGradientAdjoint(sel,svals,ael,avals,eltrans,e,ovals);
-      return;
-   }
    if (sel->GetRangeType() != FiniteElement::VECTOR || ael->GetRangeType() != FiniteElement::VECTOR)
       mfem_error("PDVectorFEMassIntegrator::ComputeElementGradientAdjoint(...)\n"
                  "   is not implemented for non vector state and adjoint bases.");
+   MFEM_VERIFY(pdcoeff,"Missing PDCoefficient");
 
-   const int dim = sel->GetDim();
+   const int dim = eltrans->GetSpaceDim();
    const int nsd = sel->GetDof();
    const int nad = ael->GetDof();
 #ifdef MFEM_THREAD_SAFE
@@ -419,18 +373,9 @@ void PDVectorFEMassIntegrator::ComputeElementGradientAdjoint(const FiniteElement
    svshape.SetSize(nsd,dim);
    avshape.SetSize(nad,dim);
 #endif
-   Vector R(dim),L(dim);
+   Vector R(dim),L(dim),Rt(dim);
 
-   ParFiniteElementSpace *pfes = pdcoeff->GetPFES();
-#ifdef MFEM_THREAD_SAFE
-   Vector pshape;
-#endif
-   const FiniteElement *pel = pfes->GetFE(e);
-   const int npd = pel->GetDof();
-   pshape.SetSize(npd);
-
-   ovals.SetSize(npd);
-   ovals = 0.0;
+   DenseTensor K;
 
    const IntegrationRule *ir = GetDefaultIntRule(*sel,*ael,*eltrans,pdcoeff->GetOrder());
 
@@ -453,49 +398,61 @@ void PDVectorFEMassIntegrator::ComputeElementGradientAdjoint(const FiniteElement
       }
       const double w = eltrans->Weight() * ip.weight;
 
-      // assuming scalar coefficients
-      const double w2 = L*R;
-      pel->CalcShape(ip, pshape);
-      for (int k = 0; k < npd; k++)
+      if (pdcoeff->Scalar())
       {
-         ovals(k) += w*pshape(k)*w2;
+         const double w2 = w*(L*R);
+         if (!i)
+         {
+            pdcoeff->EvalDerivShape(*eltrans,ovals);
+            ovals *= w2;
+         }
+         else
+         {
+            pdcoeff->EvalDerivShape(*eltrans,pshape);
+            ovals.Add(w2,pshape);
+         }
+      }
+      else
+      {
+         pdcoeff->EvalDerivShape(*eltrans,K);
+         const int npd = K.SizeK();
+         if (!i)
+         {
+            ovals.SetSize(npd);
+            ovals = 0.0;
+         }
+         for (int k = 0; k < npd; k++)
+         {
+            K(k).Mult(R,Rt);
+            const double w2 = w*(L*Rt);
+
+            ovals(k) += w2;
+         }
       }
    }
 }
 
-void PDVectorFEMassIntegrator::ComputeElementGradient_Internal(const FiniteElement *sel, const Vector& svals,
-                                                               ElementTransformation *eltrans, const Vector& pvals, int e,
-                                                               Vector& ovals, bool hessian)
+void PDVectorFEMassIntegrator::ComputeElementGradient(const FiniteElement *sel, const Vector& svals,
+                                                      ElementTransformation *eltrans, const Vector& pvals,
+                                                      Vector& ovals)
 {
-   MFEM_VERIFY(pdcoeff,"Missing PDCoefficient");
-   const int ngf = pdcoeff->GetComponents();
-   if (ngf != 1) // XXX not implemented
-   {
-      PDBilinearFormIntegrator::ComputeElementGradient_Internal(sel,svals,eltrans,pvals,e,ovals,hessian);
-      return;
-   }
    if (sel->GetRangeType() != FiniteElement::VECTOR)
-      mfem_error("PDVectorFEMassIntegrator::ComputeElementGradient_Internal(...)\n"
+      mfem_error("PDVectorFEMassIntegrator::ComputeElementGradient(...)\n"
                  "   is not implemented for non vector bases.");
 
-   const int dim = sel->GetDim();
+   MFEM_VERIFY(pdcoeff,"Missing PDCoefficient");
+   const int ngf = pdcoeff->GetComponents();
+   const int dim = eltrans->GetSpaceDim();
    const int nsd = sel->GetDof();
 #ifdef MFEM_THREAD_SAFE
    DenseMatrix svshape(nsd,dim);
 #else
    svshape.SetSize(nsd,dim);
 #endif
-   Vector R(dim),L(nsd);
+   Vector R(dim),L(nsd),Rt(dim);
+   DenseTensor K(dim,dim,ngf);
 
-   ParFiniteElementSpace *pfes = pdcoeff->GetPFES();
-#ifdef MFEM_THREAD_SAFE
-   Vector pshape;
-#endif
-   const FiniteElement *pel = pfes->GetFE(e);
-   const int npd = pel->GetDof();
-   pshape.SetSize(npd);
-
-   ovals.SetSize(nsd);
+   ovals.SetSize(nsd*ngf);
    ovals = 0.0;
 
    const IntegrationRule *ir = GetDefaultIntRule(*sel,*sel,*eltrans,pdcoeff->GetOrder());
@@ -510,27 +467,71 @@ void PDVectorFEMassIntegrator::ComputeElementGradient_Internal(const FiniteEleme
       svshape.MultTranspose(svals,R);
       const double w = eltrans->Weight() * ip.weight;
 
-      // assuming scalar coefficients
-      pel->CalcShape(ip, pshape);
-      svshape.Mult(R,L);
-      for (int k = 0; k < npd; k++)
+      if (pdcoeff->Scalar())
       {
-         const double ww = w*pshape(k)*pvals(k);
-         ovals.Add(ww,L);
+         double Q;
+         pdcoeff->EvalDerivCoefficient(*eltrans,pvals,&Q);
+         svshape.Mult(R,L);
+         ovals.Add(Q*w,L);
+      }
+      else
+      {
+         double *ptr = ovals.GetData();
+         pdcoeff->EvalDerivCoefficient(*eltrans,pvals,K);
+         for (int k = 0; k < ngf; k++)
+         {
+            K(k).Mult(R,Rt);
+
+            Vector oovals(ptr,nsd);
+            svshape.Mult(Rt,L);
+            oovals.Add(w,L);
+            ptr += nsd;
+            oovals.SetData(NULL);
+         }
       }
    }
 }
 
+void PDVectorFEMassIntegrator::ComputeElementHessian(const FiniteElement *sel, const Vector& svals,
+                                                     ElementTransformation *eltrans, const Vector& pvals,
+                                                     Vector& ovals)
+{
+   ComputeElementGradient(sel,svals,eltrans,pvals,ovals);
+}
 
+/* default implementations */
+void PDBilinearFormIntegrator::ComputeElementGradient(const FiniteElement *sel, const Vector& svals,
+                                                      ElementTransformation *eltrans, const Vector& pvals,
+                                                      Vector& ovals)
+{
+   ComputeElementGradient_Internal(sel,svals,eltrans,pvals,ovals,false);
+}
+
+void PDBilinearFormIntegrator::ComputeElementHessian(const FiniteElement *sel, const Vector& svals,
+                                                     ElementTransformation *eltrans, const Vector& pvals,
+                                                     Vector& ovals)
+{
+   ComputeElementGradient_Internal(sel,svals,eltrans,pvals,ovals,true);
+}
 
 void PDBilinearFormIntegrator::ComputeElementGradientAdjoint(const FiniteElement *sel, const Vector& svals,
                                                              const FiniteElement *ael, const Vector& avals,
-                                                             ElementTransformation *eltrans, int e,
+                                                             ElementTransformation *eltrans,
                                                              Vector& ovals)
+{
+   ComputeElementGradientAdjoint_Internal(sel,svals,ael,avals,eltrans,ovals);
+}
+
+/* reference implementations (should work with all bilinear integrators) */
+void PDBilinearFormIntegrator::ComputeElementGradientAdjoint_Internal(const FiniteElement *sel, const Vector& svals,
+                                                                      const FiniteElement *ael, const Vector& avals,
+                                                                      ElementTransformation *eltrans,
+                                                                      Vector& ovals)
 {
    pdcoeff->SetUseDerivCoefficients();
    ParFiniteElementSpace *pfes = pdcoeff->pfes;
 
+   int e = eltrans->ElementNo;
    Array<int> pdofs;
    pfes->GetElementVDofs(e, pdofs);
 
@@ -558,26 +559,14 @@ void PDBilinearFormIntegrator::ComputeElementGradientAdjoint(const FiniteElement
    pdcoeff->SetUseDerivCoefficients(false);
 }
 
-void PDBilinearFormIntegrator::ComputeElementGradient(const FiniteElement *sel, const Vector& svals,
-                                                      ElementTransformation *eltrans, const Vector& pvals, int e,
-                                                      Vector& ovals)
-{
-   ComputeElementGradient_Internal(sel,svals,eltrans,pvals,e,ovals,false);
-}
-
-void PDBilinearFormIntegrator::ComputeElementHessian(const FiniteElement *sel, const Vector& svals,
-                                                     ElementTransformation *eltrans, const Vector& pvals, int e,
-                                                     Vector& ovals)
-{
-   ComputeElementGradient_Internal(sel,svals,eltrans,pvals,e,ovals,true);
-}
 
 void PDBilinearFormIntegrator::ComputeElementGradient_Internal(const FiniteElement *sel, const Vector& svals,
-                                                               ElementTransformation *eltrans, const Vector& pvals, int e,
+                                                               ElementTransformation *eltrans, const Vector& pvals,
                                                                Vector& ovals, bool hessian)
 {
    ParFiniteElementSpace *pfes = pdcoeff->pfes;
 
+   int e = eltrans->ElementNo;
    Array<int> pdofs;
    pfes->GetElementVDofs(e, pdofs);
 

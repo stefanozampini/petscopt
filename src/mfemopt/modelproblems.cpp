@@ -1,3 +1,4 @@
+#include <mfemopt/pdbilininteg.hpp>
 #include <mfemopt/modelproblems.hpp>
 #include <mfemopt/mfemextra.hpp>
 #include <petscopt/tsopt.h>
@@ -74,9 +75,6 @@ void ModelHeat::Init(ParFiniteElementSpace *_fe, Operator::Type _oid)
    rhs = NULL;
    vrhs = NULL;
 
-   mu_pd_bilin = NULL;
-   sigma_pd_bilin = NULL;
-
    fes = _fe;
    ParFiniteElementSpaceGetRangeAndDeriv(*fes,&fe_range,&fe_deriv);
 
@@ -84,8 +82,8 @@ void ModelHeat::Init(ParFiniteElementSpace *_fe, Operator::Type _oid)
 
    adjgf = new ParGridFunction(fes);
    stgf = new ParGridFunction(fes);
-   k = new ParBilinearForm(fes);
-   m = new ParBilinearForm(fes);
+   kpd = new PDBilinearForm(fes);
+   mpd = new PDBilinearForm(fes);
    rhsvec = new PetscParVector(fes);
 
    pfactory = NULL;
@@ -123,8 +121,8 @@ void ModelHeat::InitForms(Coefficient* mu, MatrixCoefficient* sigma)
       tm = new VectorFEMassIntegrator(*mu);
       ts = new CurlCurlIntegrator(*sigma);
    }
-   m->AddDomainIntegrator(tm);
-   k->AddDomainIntegrator(ts);
+   mpd->AddDomainIntegrator(tm);
+   kpd->AddDomainIntegrator(ts);
 }
 
 void ModelHeat::InitForms(PDCoefficient* mu, MatrixCoefficient* sigma)
@@ -144,11 +142,8 @@ void ModelHeat::InitForms(PDCoefficient* mu, MatrixCoefficient* sigma)
       tm = new PDVectorFEMassIntegrator(*mu);
       ts = new CurlCurlIntegrator(*sigma);
    }
-   m->AddDomainIntegrator(tm);
-   k->AddDomainIntegrator(ts);
-
-   /* just flag we have a parameter dependent bilinear form */
-   mu_pd_bilin = tm;
+   mpd->AddDomainIntegrator(tm);
+   kpd->AddDomainIntegrator(ts);
 }
 
 void ModelHeat::InitForms(Coefficient* mu, Coefficient* sigma)
@@ -174,8 +169,8 @@ void ModelHeat::InitForms(Coefficient* mu, Coefficient* sigma)
          ts = new CurlCurlIntegrator(*sigma);
       }
    }
-   m->AddDomainIntegrator(tm);
-   k->AddDomainIntegrator(ts);
+   mpd->AddDomainIntegrator(tm);
+   kpd->AddDomainIntegrator(ts);
 }
 
 void ModelHeat::InitForms(PDCoefficient* mu, Coefficient* sigma)
@@ -201,11 +196,8 @@ void ModelHeat::InitForms(PDCoefficient* mu, Coefficient* sigma)
          ts = new CurlCurlIntegrator(*sigma);
       }
    }
-   m->AddDomainIntegrator(tm);
-   k->AddDomainIntegrator(ts);
-
-   /* just flag we have a parameter dependent bilinear form */
-   mu_pd_bilin = tm;
+   mpd->AddDomainIntegrator(tm);
+   kpd->AddDomainIntegrator(ts);
 }
 
 ModelHeat::ModelHeat(Coefficient* mu, MatrixCoefficient* sigma, ParFiniteElementSpace *_fe, Operator::Type _oid)
@@ -250,41 +242,20 @@ ModelHeat::ModelHeat(PDCoefficient* mu, Coefficient* sigma, ParFiniteElementSpac
 
 void ModelHeat::UpdateStiffness()
 {
-   k->Update();
-   k->Assemble(0);
-   k->Finalize(0);
+   kpd->Update();
+   kpd->Assemble(0);
+   kpd->Finalize(0);
    if (!Kh) Kh = new OperatorHandle(oid);
-   k->ParallelAssemble(*Kh);
+   kpd->ParallelAssemble(*Kh);
 }
 
 void ModelHeat::UpdateMass()
 {
-   m->Update();
-   m->Assemble(0);
-   m->Finalize(0);
+   mpd->Update();
+   mpd->Assemble(0);
+   mpd->Finalize(0);
    if (!Mh) Mh = new OperatorHandle(oid);
-   m->ParallelAssemble(*Mh);
-}
-
-void ModelHeat::GetCurrentVector(Vector &m)
-{
-   MFEM_VERIFY(m.Size() >= GetParameterSize(),"Invalid Vector size " << m.Size() << ", should be (at least) " << GetParameterSize());
-   double *data = m.GetData();
-   if (mu_pd_bilin)
-   {
-      int ls = mu_pd_bilin->GetLocalSize();
-      Vector pm(data,ls);
-      mu_pd_bilin->GetCurrentVector(pm);
-      data += ls;
-      pm.SetData(NULL); /* XXX clang static analysis */
-   }
-   if (sigma_pd_bilin)
-   {
-      int ls = sigma_pd_bilin->GetLocalSize();
-      Vector pm(data,ls);
-      sigma_pd_bilin->GetCurrentVector(pm);
-      pm.SetData(NULL); /* XXX clang static analysis */
-   }
+   mpd->ParallelAssemble(*Mh);
 }
 
 int ModelHeat::GetStateSize()
@@ -294,31 +265,14 @@ int ModelHeat::GetStateSize()
 
 int ModelHeat::GetParameterSize()
 {
-   int ls = 0;
-   if (mu_pd_bilin) ls += mu_pd_bilin->GetLocalSize();
-   if (sigma_pd_bilin) ls += sigma_pd_bilin->GetLocalSize();
-   return ls;
+   return mpd->GetParameterSize() + kpd->GetParameterSize();
 }
 
 void ModelHeat::SetUpFromParameters(const Vector& p)
 {
    MFEM_VERIFY(p.Size() >= GetParameterSize(),"Invalid Vector size " << p.Size() << ", should be (at least) " << GetParameterSize());
-   double *data = p.GetData();
-   if (mu_pd_bilin)
-   {
-      int ls = mu_pd_bilin->GetLocalSize();
-      Vector pp(data,ls);
-      mu_pd_bilin->UpdateCoefficient(pp);
-      data += ls;
-      pp.SetData(NULL); /* XXX clang static analysis */
-   }
-   if (sigma_pd_bilin)
-   {
-      int ls = sigma_pd_bilin->GetLocalSize();
-      Vector pp(data,ls);
-      sigma_pd_bilin->UpdateCoefficient(pp);
-      pp.SetData(NULL); /* XXX clang static analysis */
-   }
+   /* XXX multiple coeffs */
+   mpd->UpdateParameter(p);
    UpdateMass();
    UpdateStiffness();
 }
@@ -336,19 +290,8 @@ void ModelHeat::ComputeGradientAdjoint(const Vector& adj, const Vector& tdstate,
    MFEM_VERIFY(m.Size() >= GetParameterSize(),"Invalid Vector size " << m.Size() << ", should be (at least) " << GetParameterSize());
    MFEM_VERIFY(g.Size() >= GetParameterSize(),"Invalid Vector size " << g.Size() << ", should be (at least) " << GetParameterSize());
 
-   double *mdata = m.GetData();
-   double *gdata = g.GetData();
-
-   adjgf->Distribute(adj);
-   stgf->Distribute(tdstate);
-   if (mu_pd_bilin)
-   {
-      int ls = mu_pd_bilin->GetLocalSize();
-      Vector pm(mdata,ls);
-      Vector pg(gdata,ls);
-      mu_pd_bilin->ComputeGradientAdjoint(adjgf,stgf,pm,pg);
-   }
    /* XXX multiple coeffs */
+   mpd->ComputeGradientAdjoint(adj,tdstate,m,g);
 }
 
 /* Callback used by the tangent linear model solver */
@@ -358,20 +301,8 @@ void ModelHeat::ComputeGradient(const Vector& tdstate, const Vector& state, cons
    MFEM_VERIFY(pert.Size() >= GetParameterSize(),"Invalid Vector size " << pert.Size() << ", should be (at least) " << GetParameterSize());
    MFEM_VERIFY(o.Size() == tdstate.Size(),"Invalid Vector size " << o.Size() << ", should be " << tdstate.Size());
 
-   double *mdata = m.GetData();
-   double *pdata = pert.GetData();
-   double *odata = o.GetData();
-
-   stgf->Distribute(tdstate);
-   if (mu_pd_bilin)
-   {
-      int ls = mu_pd_bilin->GetLocalSize();
-      Vector pm(mdata,ls);
-      Vector ppert(pdata,ls);
-      Vector po(odata,tdstate.Size());
-      mu_pd_bilin->ComputeGradient(stgf,pm,ppert,po);
-   }
    /* XXX multiple coeffs */
+   mpd->ComputeGradient(tdstate,m,pert,o);
 }
 
 /* Callback used within the Hessian matrix-vector routines of the TS object */
@@ -380,38 +311,18 @@ void ModelHeat::ComputeHessian(int A,int B,const Vector& tdstate,const Vector& s
 {
    MFEM_VERIFY(m.Size() >= GetParameterSize(),"Invalid Vector size " << m.Size() << ", should be (at least) " << GetParameterSize());
 
-   double *mdata = m.GetData();
-   double *ydata = y.GetData();
-   double *xdata = x.GetData();
-
    /* XXX multiple coeffs */
    if (A == 1 && B == 2) /* L^T \otimes I_N F_XtM x */
    {
       MFEM_VERIFY(y.Size() == tdstate.Size(),"Invalid Vector size " << y.Size() << ", should be " << tdstate.Size());
       MFEM_VERIFY(x.Size() >= GetParameterSize(),"Invalid Vector size " << x.Size() << ", should be (at least) " << GetParameterSize());
-      adjgf->Distribute(l);
-      if (mu_pd_bilin)
-      {
-         int ls = mu_pd_bilin->GetLocalSize();
-         Vector pm(mdata,ls);
-         Vector ppert(xdata,ls);
-         Vector py(ydata,tdstate.Size());
-         mu_pd_bilin->ComputeHessian_XM(adjgf,pm,ppert,py);
-      }
+      mpd->ComputeHessian_XM(l,m,x,y);
    }
    else if (A == 2 && B == 1) /* L^T \otimes I_P F_MXt x */
    {
       MFEM_VERIFY(x.Size() == tdstate.Size(),"Invalid Vector size " << x.Size() << ", should be " << tdstate.Size());
       MFEM_VERIFY(y.Size() >= GetParameterSize(),"Invalid Vector size " << y.Size() << ", should be (at least) " << GetParameterSize());
-      adjgf->Distribute(l);
-      stgf->Distribute(x);
-      if (mu_pd_bilin)
-      {
-         int ls = mu_pd_bilin->GetLocalSize();
-         Vector py(ydata,ls);
-         Vector pm(mdata,ls);
-         mu_pd_bilin->ComputeHessian_MX(adjgf,stgf,pm,py);
-      }
+      mpd->ComputeHessian_MX(l,x,m,y);
    }
    else
    {
@@ -514,8 +425,8 @@ ModelHeat::~ModelHeat()
    DeleteJacobians();
    delete rhsform;
    delete rhsvec;
-   delete m;
-   delete k;
+   delete mpd;
+   delete kpd;
    delete adjgf;
    delete stgf;
    delete pfactory;

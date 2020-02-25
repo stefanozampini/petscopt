@@ -13,7 +13,7 @@ ObjectiveFunction::TestFDHessian state x state
 ||H||_F = 1., ||H_fd||_F = 1., ||H - H_fd||_F = 6.57681e-09, ||H-H_fd||_F/||H_fd||_F = 6.57681e-09
 ---------------------------------------
 PDOperator::TestFDGradient wrt design
-||G|| = 0.922188, ||G^T|| = 0.922188, ||G - (G^T)^T||/||G|| = 1.36103e-16, ||G_fd|| = 0.922188, ||G_fd - G|| = 6.15746e-09
+||G|| = 0.922188, ||G^T|| = 0.922188, ||G - (G^T)^T||/||G|| = 4.64596e-17, ||G_fd|| = 0.922188, ||G_fd - G|| = 1.03305e-08
 ---------------------------------------
 Misfit objective 1.4883e-23
 ReducedFunctional::TestFDGradient, delta: 1e-08

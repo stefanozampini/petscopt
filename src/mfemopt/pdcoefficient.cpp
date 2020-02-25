@@ -10,6 +10,7 @@ using namespace mfem;
 
 void PDCoefficient::Reset()
 {
+   scalar = false;
    usederiv = false;
    delete l2gf;
    pcoeffiniti.SetSize(0);
@@ -69,6 +70,8 @@ void PDCoefficient::Init()
 {
    lsize = 0;
    order = -1;
+   ngf = -1;
+   scalar = false;
    usederiv = false;
    incl_bdr = true;
    deriv_s_coeff = NULL;
@@ -141,7 +144,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
       fe = fec->FiniteElementForGeometry(mesh->GetElementBaseGeometry(0));
    }
    /* Reduce on the comm */
-   bool scalar;
+   bool fescalar;
    {
       int loc[2] = {-1,-1};
       int glob[2];
@@ -158,7 +161,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
          MFEM_VERIFY(loc[1] == glob[1],"Different range not supported " << loc[1] << " != " << glob[1]); /* XXX Not exhaustive check */
       }
       order = glob[0];
-      scalar = (glob[1] == FiniteElement::SCALAR);
+      fescalar = (glob[1] == FiniteElement::SCALAR);
    }
 
    /* store values of projected initial coefficients
@@ -168,7 +171,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
    else if (VQ)
    {
       /* XXX MASK */
-      if (scalar)
+      if (fescalar)
       {
          ngf = VQ->GetVDim();
       }
@@ -180,7 +183,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
    }
    else if (Q)
    {
-      MFEM_VERIFY(scalar,"Cannot represent a scalar coefficient with a vector finite element space");
+      MFEM_VERIFY(fescalar,"Cannot represent a scalar coefficient with a vector finite element space");
       ngf = 1;
    }
    else mfem_error("Unhandled case");
@@ -192,10 +195,11 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
 
    /* store values of projected initial coefficients
       and create actual coefficients to be used */
+   scalar = false;
    if (MQ) { mfem_error("Not yet implemented"); }
    else if (VQ)
    {
-      if (scalar)
+      if (fescalar)
       {
          for (int i = 0; i < ngf; i++)
          {
@@ -245,6 +249,7 @@ void PDCoefficient::Init(Coefficient *Q, VectorCoefficient *VQ, MatrixCoefficien
       pcoeffgf[0]->ProjectDiscCoefficient(*Q,GridFunction::ARITHMETIC);
       s_coeff = new GridFunctionCoefficient(pcoeffgf[0]);
       deriv_s_coeff = new GridFunctionCoefficient(deriv_coeffgf[0]);
+      scalar = true;
    }
 
    /* Store conforming initial values and distribute, because
@@ -698,6 +703,121 @@ void PDCoefficient::ElemDeriv(int pg, int el, int d, double val)
          (*deriv_coeffgf[k])[dd] = vv;
       }
    }
+}
+
+void PDCoefficient::EvalDerivCoefficient(ElementTransformation& T, const Vector& vals, double *f)
+{
+   MFEM_VERIFY(ngf == 1,"Invalid ngf " << ngf << " (expected 1)");
+   ParFiniteElementSpace *pfes = deriv_coeffgf[0]->ParFESpace();
+   Array<int> dofs;
+   pfes->GetElementVDofs(T.ElementNo, dofs);
+   deriv_coeffgf[0]->SetSubVector(dofs, vals);
+   *f = deriv_s_coeff->Eval(T,T.GetIntPoint());
+}
+
+void PDCoefficient::EvalDerivCoefficient(ElementTransformation& T, const Vector& vals, DenseTensor& K)
+{
+   MFEM_VERIFY(!scalar,"Only for non-scalar coefficients");
+   /* TODO CHECK K */
+   Vector zeros;
+   if (deriv_m_coeff)
+   {
+      K = 0.0;
+      double *ptr = vals.GetData();
+      for (int i = 0; i < ngf; i++)
+      {
+         ParFiniteElementSpace *pfes = deriv_coeffgf[i]->ParFESpace();
+         Array<int> dofs;
+         pfes->GetElementVDofs(T.ElementNo,dofs);
+         Vector pvals(ptr,dofs.Size());
+         if (!i)
+         {
+            zeros.SetSize(dofs.Size());
+            zeros = 0.0;
+         }
+         for (int k = 0; k < ngf; k++)
+         {
+            if (k == i) continue;
+            deriv_coeffgf[k]->SetSubVector(dofs,zeros);
+         }
+         deriv_coeffgf[i]->SetSubVector(dofs,pvals);
+         deriv_m_coeff->Eval(K(i),T,T.GetIntPoint());
+         ptr += dofs.Size();
+         pvals.SetData(NULL);
+      }
+   }
+   else
+   {
+      double f;
+      EvalDerivCoefficient(T,vals,&f);
+      K = 0.0;
+      for (int d = 0; d < K.SizeI(); d++) K(0)(d,d) = f;
+   }
+}
+
+void PDCoefficient::EvalDerivShape(ElementTransformation& T, Vector& pshape)
+{
+   MFEM_VERIFY(scalar,"Only for scalar coefficients");
+   ParFiniteElementSpace *pfes = deriv_coeffgf[0]->ParFESpace();
+
+   const IntegrationPoint &ip = T.GetIntPoint();
+   const int e = T.ElementNo;
+   const FiniteElement *pel = pfes->GetFE(e);
+   const int npd = pel->GetDof();
+   pshape.SetSize(npd);
+   pel->CalcShape(ip, pshape);
+}
+
+void PDCoefficient::EvalDerivShape(ElementTransformation& T, DenseTensor& K)
+{
+   /* TODO full matrix case */
+   MFEM_VERIFY(!scalar,"Only for non-scalar coefficients");
+   MFEM_VERIFY(deriv_m_coeff,"Missing deriv_m_coeff");
+   const int vdim = deriv_m_coeff->GetWidth();
+   MFEM_VERIFY(ngf == 1 || ngf == vdim,"Invalid ngf " << ngf << " != 1 and != " << vdim);
+   const int e = T.ElementNo;
+   if (ngf == 1) // vector space
+   {
+      ParFiniteElementSpace *pfes = deriv_coeffgf[0]->ParFESpace();
+      const FiniteElement *pel = pfes->GetFE(e);
+      const int npd = pel->GetDof();
+      K.SetSize(vdim,vdim,npd);
+      K = 0.0;
+      DenseMatrix pshape(npd,vdim);
+      pel->CalcVShape(T, pshape);
+      for (int k = 0; k < npd; k++)
+      {
+         DenseMatrix& Kk = K(k);
+         for (int d = 0; d < vdim; d++)
+         {
+            Kk(d,d) = pshape(k,d);
+         }
+      }
+   }
+   else if (ngf == vdim) // multi-scalar
+   {
+      ParFiniteElementSpace *pfes = deriv_coeffgf[0]->ParFESpace();
+      const IntegrationPoint &ip = T.GetIntPoint();
+      const FiniteElement *pel = pfes->GetFE(e);
+      const int npd = pel->GetDof();
+      K.SetSize(vdim,vdim,npd*ngf);
+      K = 0.0;
+      Vector pshape(npd);
+      pel->CalcShape(ip, pshape);
+      for (int d = 0; d < npd; d++)
+      {
+         const double v = pshape(d);
+         for (int k = 0; k < ngf; k++)
+         {
+            K(k,k,k*npd+d) = v;
+         }
+      }
+   }
+   else
+   {
+      mfem_error("Not implemented");
+   }
+
 }
 
 Coefficient* PDCoefficient::GetActiveCoefficient()

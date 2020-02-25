@@ -411,7 +411,7 @@ void MultiSourceMisfit::RunTests(bool progress)
    Xdot.Randomize();
    /* X.Randomize(); */
    X = 0.0; /* The operator only depends on Xdot, and stiffness parameter may be huge, avoid cancellation errors */
-   heat->GetCurrentVector(*M);
+   M->Randomize();
    heat->TestFDGradient(comm,Xdot,X,*M,t);
    ierr = PetscPrintf(comm,"---------------------------------------\n");CCHKERRQ(comm,ierr);
 }

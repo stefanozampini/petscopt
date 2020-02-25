@@ -6,7 +6,8 @@
 #if defined(PETSCOPT_HAVE_MFEMOPT)
 #include <mfemoptconf.h>
 #include <mfemopt/pdoperator.hpp>
-#include <mfemopt/pdbilininteg.hpp>
+#include <mfemopt/pdcoefficient.hpp>
+#include <mfemopt/pdbilinearform.hpp>
 #include <mfem/fem/pfespace.hpp>
 #include <mfem/fem/pgridfunc.hpp>
 #include <mfem/fem/plinearform.hpp>
@@ -56,11 +57,8 @@ public:
 
    mfem::ParGridFunction *adjgf,*stgf;
 
-   mfem::ParBilinearForm *k;
-   mfem::ParBilinearForm *m;
-
-   PDBilinearFormIntegrator *mu_pd_bilin;
-   PDBilinearFormIntegrator *sigma_pd_bilin;
+   PDBilinearForm *kpd;
+   PDBilinearForm *mpd;
 
    mfem::PetscPreconditionerFactory *pfactory;
 
@@ -112,8 +110,6 @@ public:
    virtual void ComputeHessian(int,int,const mfem::Vector&,const mfem::Vector&,const mfem::Vector&,
                                const mfem::Vector&,const mfem::Vector&,mfem::Vector&);
 
-   /* XXX */
-   void GetCurrentVector(mfem::Vector&);
 };
 
 }

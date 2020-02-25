@@ -1,20 +1,20 @@
 Using param fec type H1, order 2
 Using state fec type HCURL, order 2
-[SP_VS] ||   op_M_pd - op_M||: 2.93168e-16
-[SP_VS] ||    op_M_m - op_M||: 1.59161e-16
-[SP_VS] || op_M_pd_m - op_M||: 2.85579e-16
+[SP_VS] ||   op_M_pd - op_M||: 0.00233234
+[SP_VS] ||    op_M_m - op_M||: 8.52671e-16
+[SP_VS] || op_M_pd_m - op_M||: 0.00233234
 [SP_VS] Test null parameter
 PDOperator::TestFDGradient wrt design
 ||G|| = 0., ||G^T|| = 0., ||G - (G^T)^T||/||G|| = 0., ||G_fd|| = 0., ||G_fd - G|| = 0.
 [SP_VS] Test non-null parameter
 PDOperator::TestFDGradient wrt design
-||G|| = 3.21097, ||G^T|| = 3.21097, ||G - (G^T)^T||/||G|| = 9.11121e-17, ||G_fd|| = 3.21097, ||G_fd - G|| = 2.34775e-08
-[SP_VS_VI] ||   op_M_pd - op_M||: 1.11022e-16
-[SP_VS_VI] ||    op_M_m - op_M||: 1.95698e-17
-[SP_VS_VI] || op_M_pd_m - op_M||: 1.11022e-16
+||G|| = 1.10442, ||G^T|| = 1.10442, ||G - (G^T)^T||/||G|| = 9.3208e-17, ||G_fd|| = 1.10442, ||G_fd - G|| = 1.94546e-08
+[SP_VS_VI] ||   op_M_pd - op_M||: 0.000279179
+[SP_VS_VI] ||    op_M_m - op_M||: 1.49972e-16
+[SP_VS_VI] || op_M_pd_m - op_M||: 0.000279179
 [SP_VS_VI] Test null parameter
 PDOperator::TestFDGradient wrt design
 ||G|| = 0., ||G^T|| = 0., ||G - (G^T)^T||/||G|| = 0., ||G_fd|| = 0., ||G_fd - G|| = 0.
 [SP_VS_VI] Test non-null parameter
 PDOperator::TestFDGradient wrt design
-||G|| = 3.21097, ||G^T|| = 3.21097, ||G - (G^T)^T||/||G|| = 1.9636e-17, ||G_fd|| = 3.21097, ||G_fd - G|| = 1.95871e-08
+||G|| = 1.05782, ||G^T|| = 1.05782, ||G - (G^T)^T||/||G|| = 3.19556e-17, ||G_fd|| = 1.05782, ||G_fd - G|| = 2.79008e-08

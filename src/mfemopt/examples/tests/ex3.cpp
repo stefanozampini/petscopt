@@ -20,7 +20,7 @@ static const char *FECTypes[] = {"L2","H1","HCURL","HDIV","FecType","FEC_",0};
 
 static int refine_fn(const Vector &x)
 {
-   for (int d = 0; d < x.Size(); d++) if (x(d) < 0.25 || x(d) > 0.75) return 0;
+   for (int d = 0; d < x.Size()-1; d++) if (x(d) < 0.25 || x(d) > 0.75) return 0;
    return 1;
 }
 
@@ -47,7 +47,7 @@ static bool excl_fn(const Vector &x)
 static double mu_fn(const Vector &x)
 {
    double v = 1.0;
-   for (int i = 0; i < x.Size(); i++) v += x(i)*x(i);
+   for (int i = 0; i < x.Size(); i++) v += x(i)*x(x.Size()-i-1);
    return v;
 }
 
@@ -72,15 +72,23 @@ static void mu_mat_fn(const Vector& x,DenseMatrix& K)
    }
 }
 
-class TestOperator
+class TestOperator : public PDOperator
 {
 private:
-   ParBilinearForm pbform;
+   PDBilinearForm       pbform;
    ParMixedBilinearForm pbformmix;
-   OperatorHandle  Mh;
-   OperatorHandle  Mhmix;
+   OperatorHandle       Mh;
+   OperatorHandle       Mhmix;
 public:
    TestOperator(ParFiniteElementSpace*,BilinearFormIntegrator*,Operator::Type = Operator::PETSC_MATAIJ);
+
+   virtual void SetUpFromParameters(const mfem::Vector&);
+   virtual int GetStateSize();
+   virtual int GetParameterSize();
+   virtual void Mult(const mfem::Vector&,const mfem::Vector&,const mfem::Vector&,double,mfem::Vector&);
+   virtual void ComputeGradient(const mfem::Vector&,const mfem::Vector&,const mfem::Vector&,const mfem::Vector&,mfem::Vector&);
+   virtual void ComputeGradientAdjoint(const mfem::Vector&,const mfem::Vector&,const mfem::Vector&,const mfem::Vector&,mfem::Vector&);
+
    Operator* GetOperator();
    Operator* GetOperatorMixed();
    ~TestOperator();
@@ -90,6 +98,37 @@ TestOperator::TestOperator(ParFiniteElementSpace *s_fes, BilinearFormIntegrator 
 {
    pbform.AddDomainIntegrator(pd_bilin);
    pbformmix.AddDomainIntegrator(pd_bilin);
+}
+
+int TestOperator::GetStateSize()
+{
+   return pbform.ParFESpace()->GetTrueVSize();
+}
+
+int TestOperator::GetParameterSize()
+{
+   return pbform.GetParameterSize();
+}
+
+void TestOperator::SetUpFromParameters(const Vector& p)
+{
+   pbform.UpdateParameter(p);
+}
+
+void TestOperator::Mult(const Vector& tdstate, const Vector& state, const Vector& m, double t, Vector& f)
+{
+   SetUpFromParameters(m);
+   GetOperator()->Mult(state,f);
+}
+
+void TestOperator::ComputeGradientAdjoint(const Vector& adj, const Vector& tdstate, const Vector& state, const Vector& m, Vector& g)
+{
+   pbform.ComputeGradientAdjoint(adj,state,m,g);
+}
+
+void TestOperator::ComputeGradient(const Vector& tdstate, const Vector& state, const Vector& m, const Vector &pert, Vector& o)
+{
+   pbform.ComputeGradient(state,m,pert,o);
 }
 
 Operator* TestOperator::GetOperator()
@@ -137,10 +176,8 @@ static void PetscParMatrixInftyNorm(PetscParMatrix& op_M,PetscReal *norm)
 
 static void RunTest(ParFiniteElementSpace *fes, BilinearFormIntegrator *bilin, PDBilinearFormIntegrator *bilin_pd, const std::string& name)
 {
-
    TestOperator    op(fes,bilin);
    TestOperator op_pd(fes,bilin_pd);
-
    PetscParMatrix      op_M(PETSC_COMM_WORLD,   op.GetOperator(),Operator::PETSC_MATAIJ);
    PetscParMatrix   op_M_pd(PETSC_COMM_WORLD,op_pd.GetOperator(),Operator::PETSC_MATAIJ);
    PetscParMatrix    op_M_m(PETSC_COMM_WORLD,   op.GetOperatorMixed(),Operator::PETSC_MATAIJ);
@@ -196,6 +233,24 @@ static void RunTest(ParFiniteElementSpace *fes, BilinearFormIntegrator *bilin, P
    oname = name + "-diff-op_M_pd_m";
    PetscObjectSetName((PetscObject)T,oname.c_str());
    MatViewFromOptions(T,NULL,"-test_diff_view");
+
+   // Tests PDOperator
+   Vector X,Xdot,M;
+
+   X.SetSize(fes->GetTrueVSize());
+   Xdot.SetSize(fes->GetTrueVSize());
+   Xdot.Randomize(1);
+   X.Randomize(1);
+
+   PetscPrintf(PETSC_COMM_WORLD,"[%s] Test null parameter\n",name.c_str());
+   M.SetSize(op.GetParameterSize());
+   M.Randomize(1);
+   op.TestFDGradient(PETSC_COMM_WORLD,Xdot,X,M,0.0);
+
+   PetscPrintf(PETSC_COMM_WORLD,"[%s] Test non-null parameter\n",name.c_str());
+   M.SetSize(op_pd.GetParameterSize());
+   M.Randomize(1);
+   op_pd.TestFDGradient(PETSC_COMM_WORLD,Xdot,X,M,0.0);
 }
 
 int main(int argc, char *argv[])
@@ -452,5 +507,10 @@ int main(int argc, char *argv[])
      suffix: nonconforming
      nsize: 1
      args: -glvis 0 -meshfile ${petscopt_dir}/share/petscopt/meshes/inline_quad.mesh -state_fec_type {{H1 HCURL HDIV L2}separate output} -state_ord 2 -mu_fec_type {{H1 HCURL HDIV L2}separate output} -mu_ord 2 -ncrl 1
+
+   test:
+     suffix: nonconforming_ho
+     nsize: 1
+     args: -glvis 0 -meshfile ${petscopt_dir}/share/petscopt/meshes/star-surf.mesh -state_fec_type {{H1 HCURL HDIV L2}separate output} -state_ord 2 -mu_fec_type {{H1 HCURL HDIV L2}separate output} -mu_ord 2 -ncrl 1
 
 TEST*/

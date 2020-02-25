@@ -3,3 +3,9 @@ Using state fec type L2, order 2
 [SP_SS] ||   op_M_pd - op_M||: 0.
 [SP_SS] ||    op_M_m - op_M||: 0.
 [SP_SS] || op_M_pd_m - op_M||: 0.
+[SP_SS] Test null parameter
+PDOperator::TestFDGradient wrt design
+||G|| = 0., ||G^T|| = 0., ||G - (G^T)^T||/||G|| = 0., ||G_fd|| = 0., ||G_fd - G|| = 0.
+[SP_SS] Test non-null parameter
+PDOperator::TestFDGradient wrt design
+||G|| = 0.0200533, ||G^T|| = 0.0200533, ||G - (G^T)^T||/||G|| = 0., ||G_fd|| = 0.0200533, ||G_fd - G|| = 1.85241e-11
