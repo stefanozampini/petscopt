@@ -4,6 +4,7 @@ CPPFLAGS        =
 FPPFLAGS        =
 LOCDIR          = src/ts/examples/tests
 EXAMPLESC       = ex1.c ex2.c ex3.c ex4.c ex5.c
+EXAMPLESCPP     = ex5_adolc.cpp
 EXAMPLESF       =
 MANSEC          = TS
 DIRS            = petsc 
