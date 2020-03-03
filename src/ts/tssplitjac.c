@@ -128,14 +128,14 @@ PetscErrorCode TSGetSplitJacobians(TS ts, Mat* JU, Mat* pJU, Mat *JUdot, Mat* pJ
   ierr = TSGetIJacobian(ts,&A,&B,NULL,NULL);CHKERRQ(ierr);
   if (JU) {
     if (!splitJ->J_U) {
-      ierr = MatDuplicate(A,MAT_DO_NOT_COPY_VALUES,&splitJ->J_U);CHKERRQ(ierr);
+      ierr = MatDuplicate(A,MAT_SHARE_NONZERO_PATTERN,&splitJ->J_U);CHKERRQ(ierr);
     }
     *JU = splitJ->J_U;
   }
   if (pJU) {
     if (!splitJ->pJ_U) {
       if (B && B != A) {
-        ierr = MatDuplicate(B,MAT_DO_NOT_COPY_VALUES,&splitJ->pJ_U);CHKERRQ(ierr);
+        ierr = MatDuplicate(B,MAT_SHARE_NONZERO_PATTERN,&splitJ->pJ_U);CHKERRQ(ierr);
       } else {
         ierr = PetscObjectReference((PetscObject)splitJ->J_U);CHKERRQ(ierr);
         splitJ->pJ_U = splitJ->J_U;
@@ -145,14 +145,14 @@ PetscErrorCode TSGetSplitJacobians(TS ts, Mat* JU, Mat* pJU, Mat *JUdot, Mat* pJ
   }
   if (JUdot) {
     if (!splitJ->J_Udot) {
-      ierr = MatDuplicate(A,MAT_DO_NOT_COPY_VALUES,&splitJ->J_Udot);CHKERRQ(ierr);
+      ierr = MatDuplicate(A,MAT_SHARE_NONZERO_PATTERN,&splitJ->J_Udot);CHKERRQ(ierr);
     }
     *JUdot = splitJ->J_Udot;
   }
   if (pJUdot) {
     if (!splitJ->pJ_Udot) {
       if (B && B != A) {
-        ierr = MatDuplicate(B,MAT_DO_NOT_COPY_VALUES,&splitJ->pJ_Udot);CHKERRQ(ierr);
+        ierr = MatDuplicate(B,MAT_SHARE_NONZERO_PATTERN,&splitJ->pJ_Udot);CHKERRQ(ierr);
       } else {
         ierr = PetscObjectReference((PetscObject)splitJ->J_Udot);CHKERRQ(ierr);
         splitJ->pJ_Udot = splitJ->J_Udot;
