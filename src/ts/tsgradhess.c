@@ -838,13 +838,15 @@ PetscErrorCode TSTaylorTest(TS ts, PetscReal t0, PetscReal dt, PetscReal tf, Vec
 
 #include <petscopt/private/tssplitjacimpl.h>
 #include <petscdm.h>
-/* MFFD data struct to check Hessian terms */
+
+/* MFFD data struct to check Gradient/Hessian terms */
 typedef struct {
   Vec L;
   Vec U;
   Vec Udot;
   Vec M;
 
+  PetscBool hessian;
   PetscBool ic;
   PetscInt  deriv;
   PetscInt  sample;
@@ -854,48 +856,60 @@ typedef struct {
 
 } MFFDCtx;
 
-static PetscErrorCode ResidualHessian_Private(void *ctx, Vec X, Vec Y)
+static PetscErrorCode Residual_Private(void *ctx, Vec X, Vec Y)
 {
   MFFDCtx*       mffd = (MFFDCtx*)(ctx);
   TSOpt          tsopt;
-  Mat            G;
+  Mat            G = NULL;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
   ierr = TSGetTSOpt(mffd->ts,&tsopt);CHKERRQ(ierr);
-  if (mffd->ic) {
-    ierr = TSOptEvalGradientIC(tsopt,mffd->t,(mffd->deriv == 0) ? X : mffd->U,
-                                             (mffd->deriv == 1) ? X : mffd->M,
-                                              mffd->sample ? NULL : &G,
-                                              mffd->sample ? &G : NULL);CHKERRQ(ierr);
-  } else {
-    if (mffd->sample < 2) {
-      Mat J_U,pJ_U,J_Udot,pJ_Udot;
+  if (mffd->deriv == 2) {
+    DM  dm;
+    Vec U0;
 
-      if (mffd->deriv == 2) {
-        DM  dm;
-        Vec U0;
-
-        ierr = TSGetDM(mffd->ts,&dm);CHKERRQ(ierr);
-        ierr = DMGetGlobalVector(dm,&U0);CHKERRQ(ierr);
-        ierr = TSSetUpFromDesign(mffd->ts,U0,X);CHKERRQ(ierr);
-        ierr = DMRestoreGlobalVector(dm,&U0);CHKERRQ(ierr);
-      }
-      ierr = TSGetSplitJacobians(mffd->ts,&J_U,&pJ_U,&J_Udot,&pJ_Udot);CHKERRQ(ierr);
-      ierr = TSComputeSplitJacobians(mffd->ts,mffd->t,(mffd->deriv == 0) ? X : mffd->U,
-                                                      (mffd->deriv == 1) ? X : mffd->Udot,
-                                                      J_U,pJ_U,J_Udot,pJ_Udot);CHKERRQ(ierr);
-      G = mffd->sample ? J_Udot : J_U;
-    } else {
-      ierr = TSOptEvalGradientDAE(tsopt,mffd->t,(mffd->deriv == 0) ? X : mffd->U,
-                                                (mffd->deriv == 1) ? X : mffd->Udot,
-                                                (mffd->deriv == 2) ? X : mffd->M,&G,NULL);CHKERRQ(ierr);
-    }
+    ierr = TSGetDM(mffd->ts,&dm);CHKERRQ(ierr);
+    ierr = DMGetGlobalVector(dm,&U0);CHKERRQ(ierr);
+    ierr = VecCopy(mffd->U,U0);CHKERRQ(ierr);
+    ierr = TSSetUpFromDesign(mffd->ts,U0,X);CHKERRQ(ierr);
+    ierr = DMRestoreGlobalVector(dm,&U0);CHKERRQ(ierr);
   }
-  if (G) {
-    ierr = MatMultTranspose(G,mffd->L,Y);CHKERRQ(ierr);
+  if (!mffd->hessian) {
+    ierr = VecSet(Y,0);CHKERRQ(ierr);
+    if (mffd->ic) { /* TODO */
+      PetscFunctionReturn(0);
+    } else {
+      ierr = TSComputeIFunction(mffd->ts,mffd->t,(mffd->deriv == 0) ? X : mffd->U,
+                                                 (mffd->deriv == 1) ? X : mffd->Udot,
+                                                 Y,PETSC_FALSE);CHKERRQ(ierr);
+    }
   } else {
-    ierr = VecSet(Y,0.0);CHKERRQ(ierr);
+    if (mffd->ic) {
+      ierr = TSOptEvalGradientIC(tsopt,mffd->t,(mffd->deriv == 0) ? X : mffd->U,
+                                               (mffd->deriv == 1) ? X : mffd->M,
+                                                mffd->sample ? NULL : &G,
+                                                mffd->sample ? &G : NULL);CHKERRQ(ierr);
+    } else {
+      if (mffd->sample < 2) {
+        Mat J_U,pJ_U,J_Udot,pJ_Udot;
+
+        ierr = TSGetSplitJacobians(mffd->ts,&J_U,&pJ_U,&J_Udot,&pJ_Udot);CHKERRQ(ierr);
+        ierr = TSComputeSplitJacobians(mffd->ts,mffd->t,(mffd->deriv == 0) ? X : mffd->U,
+                                                        (mffd->deriv == 1) ? X : mffd->Udot,
+                                                        J_U,pJ_U,J_Udot,pJ_Udot);CHKERRQ(ierr);
+        G = mffd->sample ? J_Udot : J_U;
+      } else {
+        ierr = TSOptEvalGradientDAE(tsopt,mffd->t,(mffd->deriv == 0) ? X : mffd->U,
+                                                  (mffd->deriv == 1) ? X : mffd->Udot,
+                                                  (mffd->deriv == 2) ? X : mffd->M,&G,NULL);CHKERRQ(ierr);
+      }
+    }
+    if (G) {
+      ierr = MatMultTranspose(G,mffd->L,Y);CHKERRQ(ierr);
+    } else {
+      ierr = VecSet(Y,0.0);CHKERRQ(ierr);
+    }
   }
   PetscFunctionReturn(0);
 }
@@ -920,10 +934,65 @@ static PetscErrorCode HessianMult_Private(Mat H, Vec X, Vec Y)
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode TSCheckHessian_Private(TS ts, PetscReal t, Vec U, Vec Udot, Vec design, Vec L, PetscBool ic)
+static PetscErrorCode GradientMultTranspose_Private(Mat H, Vec X, Vec Y)
+{
+  MFFDCtx*       mffd;
+  TSOpt          tsopt;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = MatShellGetContext(H,(void**)&mffd);CHKERRQ(ierr);
+  ierr = TSGetTSOpt(mffd->ts,&tsopt);CHKERRQ(ierr);
+  ierr = VecSet(Y,0);CHKERRQ(ierr);
+  if (mffd->ic) {
+  } else {
+    Mat J_U,pJ_U,J_Udot,pJ_Udot,M = NULL;
+
+    ierr = TSGetSplitJacobians(mffd->ts,&J_U,&pJ_U,&J_Udot,&pJ_Udot);CHKERRQ(ierr);
+    if (mffd->deriv == 2) {
+      ierr = TSOptEvalGradientDAE(tsopt,mffd->t,mffd->U,mffd->Udot,mffd->M,NULL,&M);CHKERRQ(ierr);
+      if (M) { ierr = MatMult(M,X,Y);CHKERRQ(ierr); }
+    } else {
+      ierr = TSComputeSplitJacobians(mffd->ts,mffd->t,mffd->U,mffd->Udot,J_U,pJ_U,J_Udot,pJ_Udot);CHKERRQ(ierr);
+      M    = !mffd->deriv ? J_U : J_Udot;
+      ierr = MatMultTranspose(M,X,Y);CHKERRQ(ierr);
+    }
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode GradientMult_Private(Mat H, Vec X, Vec Y)
+{
+  MFFDCtx*       mffd;
+  TSOpt          tsopt;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = MatShellGetContext(H,(void**)&mffd);CHKERRQ(ierr);
+  ierr = TSGetTSOpt(mffd->ts,&tsopt);CHKERRQ(ierr);
+  ierr = VecSet(Y,0);CHKERRQ(ierr);
+  if (mffd->ic) {
+  } else {
+    Mat J_U,pJ_U,J_Udot,pJ_Udot,M = NULL;
+
+    ierr = TSGetSplitJacobians(mffd->ts,&J_U,&pJ_U,&J_Udot,&pJ_Udot);CHKERRQ(ierr);
+    if (mffd->deriv == 2) {
+      ierr = TSOptEvalGradientDAE(tsopt,mffd->t,mffd->U,mffd->Udot,mffd->M,&M,NULL);CHKERRQ(ierr);
+    } else {
+      ierr = TSComputeSplitJacobians(mffd->ts,mffd->t,mffd->U,mffd->Udot,J_U,pJ_U,J_Udot,pJ_Udot);CHKERRQ(ierr);
+      M    = !mffd->deriv ? J_U : J_Udot;
+    }
+    if (M) {
+      ierr = MatMult(M,X,Y);CHKERRQ(ierr);
+    }
+  }
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode TSOptCheckTS_Private(TS ts, PetscReal t, Vec U, Vec Udot, Vec design, Vec L, PetscBool hessian, PetscBool ic)
 {
   MFFDCtx           mffd;
-  Mat               H,He,HeMFFD;
+  Mat               H,He,HeT = NULL,HeMFFD;
   Vec               base;
   PetscInt          samples,i,j,m,n,M,N;
   MPI_Comm          comm;
@@ -936,23 +1005,29 @@ static PetscErrorCode TSCheckHessian_Private(TS ts, PetscReal t, Vec U, Vec Udot
 
   PetscFunctionBegin;
   ierr = PetscObjectOptionsBegin((PetscObject)ts);CHKERRQ(ierr);
-  ierr = PetscOptionsViewer("-ts_test_hessian_view","View difference between hand-coded and finite difference Hessian terms","None",&mviewer,&format,&mview);CHKERRQ(ierr);
+  if (hessian) {
+    ierr = PetscOptionsViewer("-ts_test_hessian_view","View difference between hand-coded and finite difference Hessian terms","None",&mviewer,&format,&mview);CHKERRQ(ierr);
+  } else {
+    ierr = PetscOptionsViewer("-ts_test_gradient_view","View difference between hand-coded and finite difference Gradient terms","None",&mviewer,&format,&mview);CHKERRQ(ierr);
+  }
   ierr = PetscOptionsEnd();CHKERRQ(ierr);
   if (mview) {
     ierr = PetscViewerPushFormat(mviewer,format);CHKERRQ(ierr);
   }
   ierr = PetscObjectGetComm((PetscObject)ts,&comm);CHKERRQ(ierr);
   ierr = PetscViewerASCIIGetStdout(comm,&viewer);CHKERRQ(ierr);
-  ierr = PetscViewerASCIIPrintf(viewer,"  ---------- Testing Hessian %s terms -------------\n",ic ? "IC" : "DAE");CHKERRQ(ierr);
+  ierr = PetscViewerASCIIPrintf(viewer,"  ---------- Testing %s %s terms -------------\n",hessian ? "Hessian" : "Gradient",ic ? "IC" : "DAE");CHKERRQ(ierr);
 
-  mffd.ts   = ts;
-  mffd.ic   = ic;
-  mffd.t    = t;
-  mffd.U    = U;
-  mffd.Udot = Udot;
-  mffd.M    = design;
-  mffd.L    = L;
-  samples   = ic ? 2 : 3;
+  mffd.ts      = ts;
+  mffd.ic      = ic;
+  mffd.t       = t;
+  mffd.U       = U;
+  mffd.Udot    = Udot;
+  mffd.M       = design;
+  mffd.L       = L;
+  mffd.hessian = hessian;
+
+  samples = ic ? 2 : 3;
   for (i=0;i<samples;i++) {
     mffd.sample = i;
     for (j=0;j<samples;j++) {
@@ -987,21 +1062,30 @@ static PetscErrorCode TSCheckHessian_Private(TS ts, PetscReal t, Vec U, Vec Udot
         ierr = VecGetSize(U,&M);CHKERRQ(ierr);
         ierr = VecGetLocalSize(U,&m);CHKERRQ(ierr);
       }
+      if (!hessian) { ierr = PetscStrcpy(sstr,"");CHKERRQ(ierr); }
       ierr = MatCreate(comm,&H);CHKERRQ(ierr);
       ierr = MatSetSizes(H,m,n,M,N);CHKERRQ(ierr);
       ierr = MatSetType(H,MATMFFD);CHKERRQ(ierr);
       ierr = MatSetUp(H);CHKERRQ(ierr);
 
       ierr = MatMFFDSetBase(H,base,NULL);CHKERRQ(ierr);
-      ierr = MatMFFDSetFunction(H,(PetscErrorCode (*)(void*,Vec,Vec))ResidualHessian_Private,&mffd);CHKERRQ(ierr);
+      ierr = MatMFFDSetFunction(H,(PetscErrorCode (*)(void*,Vec,Vec))Residual_Private,&mffd);CHKERRQ(ierr);
       ierr = MatAssemblyBegin(H,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
       ierr = MatAssemblyEnd(H,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
       ierr = MatComputeOperator(H,NULL,&HeMFFD);CHKERRQ(ierr);
       ierr = MatDestroy(&H);CHKERRQ(ierr);
 
       ierr = MatCreateShell(comm,m,n,M,N,&mffd,&H);CHKERRQ(ierr);
-      ierr = MatShellSetOperation(H,MATOP_MULT,(void(*)(void))HessianMult_Private);CHKERRQ(ierr);
+      if (hessian) {
+        ierr = MatShellSetOperation(H,MATOP_MULT,(void(*)(void))HessianMult_Private);CHKERRQ(ierr);
+      } else {
+        ierr = MatShellSetOperation(H,MATOP_MULT,(void(*)(void))GradientMult_Private);CHKERRQ(ierr);
+        ierr = MatShellSetOperation(H,MATOP_MULT_TRANSPOSE,(void(*)(void))GradientMultTranspose_Private);CHKERRQ(ierr);
+      }
       ierr = MatComputeOperator(H,NULL,&He);CHKERRQ(ierr);
+      if (!hessian) {
+        ierr = MatComputeOperatorTranspose(H,NULL,&HeT);CHKERRQ(ierr);
+      }
       ierr = MatDestroy(&H);CHKERRQ(ierr);
 
       ierr = MatDuplicate(He,MAT_COPY_VALUES,&H);CHKERRQ(ierr);
@@ -1009,21 +1093,45 @@ static PetscErrorCode TSCheckHessian_Private(TS ts, PetscReal t, Vec U, Vec Udot
       ierr = MatNorm(H,NORM_FROBENIUS,&nrm);CHKERRQ(ierr);
       ierr = MatNorm(He,NORM_FROBENIUS,&gnorm);CHKERRQ(ierr);
       if (!gnorm) gnorm = 1; /* just in case */
-      ierr = PetscViewerASCIIPrintf(viewer,"  Hessian%s_%s%s: ||H - Hmffd||_F/||H||_F = %g, ||H - Hmffd||_F = %g\n",ic ? "IC" : "DAE",sstr,dstr,(double)(nrm/gnorm),(double)nrm);CHKERRQ(ierr);
 
+      ierr = PetscViewerASCIIPrintf(viewer,"  %s%s_%s%s: ||H - Hmffd||_F/||H||_F = %g, ||H - Hmffd||_F = %g\n",hessian ? "Hessian" : "Gradient",ic ? "IC" : "DAE",sstr,dstr,(double)(nrm/gnorm),(double)nrm);CHKERRQ(ierr);
       if (mview) {
-        ierr = PetscViewerASCIIPrintf(viewer,"  Hand-coded Hessian%s_%s%s ----------\n",ic ? "IC" : "DAE",sstr,dstr);CHKERRQ(ierr);
+        ierr = PetscViewerASCIIPrintf(viewer,"  Hand-coded %s%s_%s%s ----------\n",hessian ? "Hessian" : "Gradient",ic ? "IC" : "DAE",sstr,dstr);CHKERRQ(ierr);
         ierr = MatView(He,mviewer);CHKERRQ(ierr);
-        ierr = PetscViewerASCIIPrintf(viewer,"  Matrix-free finite difference Hessian%s_%s%s ----------\n",ic ? "IC" : "DAE",sstr,dstr);CHKERRQ(ierr);
+        ierr = PetscViewerASCIIPrintf(viewer,"  Matrix-free finite difference %s%s_%s%s ----------\n",hessian ? "Hessian" : "Gradient",ic ? "IC" : "DAE",sstr,dstr);CHKERRQ(ierr);
         ierr = MatView(HeMFFD,mviewer);CHKERRQ(ierr);
         ierr = PetscViewerASCIIPrintf(viewer,"  Difference\n");CHKERRQ(ierr);
         ierr = MatView(H,mviewer);CHKERRQ(ierr);
       }
-
       ierr = MatDestroy(&H);CHKERRQ(ierr);
       ierr = MatDestroy(&He);CHKERRQ(ierr);
+
+      if (!hessian) {
+        ierr = MatTranspose(HeT,MAT_INITIAL_MATRIX,&He);CHKERRQ(ierr);
+        ierr = MatDestroy(&HeT);CHKERRQ(ierr);
+        ierr = MatDuplicate(He,MAT_COPY_VALUES,&H);CHKERRQ(ierr);
+        ierr = MatAXPY(H,-1.0,HeMFFD,DIFFERENT_NONZERO_PATTERN);CHKERRQ(ierr);
+        ierr = MatNorm(H,NORM_FROBENIUS,&nrm);CHKERRQ(ierr);
+        ierr = MatNorm(He,NORM_FROBENIUS,&gnorm);CHKERRQ(ierr);
+        if (!gnorm) gnorm = 1; /* just in case */
+        if (HeT) {
+          ierr = PetscViewerASCIIPrintf(viewer,"  %s%s_%s%s: ||(H^T)^T - Hmffd||_F/||(H^T)^T||_F = %g, ||(H^T)^T - Hmffd||_F = %g\n",hessian ? "Hessian" : "Gradient",ic ? "IC" : "DAE",sstr,dstr,(double)(nrm/gnorm),(double)nrm);CHKERRQ(ierr);
+          if (mview) {
+            ierr = PetscViewerASCIIPrintf(viewer,"  Hand-coded %s%s_%s%s ----------\n",hessian ? "Hessian" : "Gradient",ic ? "IC" : "DAE",sstr,dstr);CHKERRQ(ierr);
+            ierr = MatView(He,mviewer);CHKERRQ(ierr);
+            ierr = PetscViewerASCIIPrintf(viewer,"  Matrix-free finite difference %s%s_%s%s ----------\n",hessian ? "Hessian" : "Gradient",ic ? "IC" : "DAE",sstr,dstr);CHKERRQ(ierr);
+            ierr = MatView(HeMFFD,mviewer);CHKERRQ(ierr);
+            ierr = PetscViewerASCIIPrintf(viewer,"  Difference\n");CHKERRQ(ierr);
+            ierr = MatView(H,mviewer);CHKERRQ(ierr);
+          }
+        }
+        ierr = MatDestroy(&H);CHKERRQ(ierr);
+        ierr = MatDestroy(&He);CHKERRQ(ierr);
+      }
+
       ierr = MatDestroy(&HeMFFD);CHKERRQ(ierr);
     }
+    if (!hessian) i = samples;
   }
   if (mview) {
     ierr = PetscViewerPopFormat(mviewer);CHKERRQ(ierr);
@@ -1038,7 +1146,7 @@ PetscErrorCode TSCheckHessianIC(TS ts, PetscReal t0, Vec U0, Vec design, Vec L)
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  ierr = TSCheckHessian_Private(ts,t0,U0,NULL,design,L,PETSC_TRUE);CHKERRQ(ierr);
+  ierr = TSOptCheckTS_Private(ts,t0,U0,NULL,design,L,PETSC_TRUE,PETSC_TRUE);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -1047,6 +1155,15 @@ PetscErrorCode TSCheckHessianDAE(TS ts, PetscReal t, Vec U, Vec Udot, Vec design
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  ierr = TSCheckHessian_Private(ts,t,U,Udot,design,L,PETSC_FALSE);CHKERRQ(ierr);
+  ierr = TSOptCheckTS_Private(ts,t,U,Udot,design,L,PETSC_TRUE,PETSC_FALSE);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode TSCheckGradientDAE(TS ts, PetscReal t, Vec U, Vec Udot, Vec design)
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  ierr = TSOptCheckTS_Private(ts,t,U,Udot,design,NULL,PETSC_FALSE,PETSC_FALSE);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }

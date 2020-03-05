@@ -679,7 +679,7 @@ int main(int argc, char* argv[])
   PetscReal      t0,tf,dt,obj,objnull;
   PetscInt       st;
   PetscBool      paper = PETSC_TRUE, testtao = PETSC_FALSE, testtlm = PETSC_FALSE, testtaylor = PETSC_FALSE;
-  PetscBool      testhistory = PETSC_FALSE, flg, check_hessian_dae = PETSC_FALSE;
+  PetscBool      testhistory = PETSC_FALSE, flg, check_dae = PETSC_FALSE;
   PetscErrorCode ierr;
 
   ierr = PetscOptInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
@@ -692,7 +692,7 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsReal("-t0","Initial time","",t0,&t0,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-tf","Final time","",tf,&tf,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-dt","Initial time step","",dt,&dt,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsBool("-check","Check Hessian DAE terms","",check_hessian_dae,&check_hessian_dae,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-check","Check Hessian DAE terms","",check_dae,&check_dae,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_tao","Solve the optimization problem","",testtao,&testtao,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_tlm","Test Tangent Linear Model to compute the gradient","",testtlm,&testtlm,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_taylor","Run Taylor test","",testtaylor,&testtaylor,NULL);CHKERRQ(ierr);
@@ -794,17 +794,19 @@ int main(int argc, char* argv[])
                             NULL);CHKERRQ(ierr);
 
   /* check Hessian terms */
-  if (check_hessian_dae) {
+  if (check_dae) {
     PetscRandom r;
     Vec         L,Udot;
 
     ierr = PetscRandomCreate(PETSC_COMM_WORLD,&r);CHKERRQ(ierr);
+    ierr = PetscRandomSetFromOptions(r);CHKERRQ(ierr);
     ierr = TSGetSolution(ts,&U);CHKERRQ(ierr);
     ierr = VecDuplicate(U,&L);CHKERRQ(ierr);
     ierr = VecDuplicate(U,&Udot);CHKERRQ(ierr);
     ierr = VecSetRandom(U,r);CHKERRQ(ierr);
     ierr = VecSetRandom(Udot,r);CHKERRQ(ierr);
     ierr = VecSetRandom(L,r);CHKERRQ(ierr);
+    ierr = TSCheckGradientDAE(ts,0.0,U,Udot,M);CHKERRQ(ierr);
     ierr = TSCheckHessianDAE(ts,0.0,U,Udot,M,L);CHKERRQ(ierr);
     ierr = VecDestroy(&Udot);CHKERRQ(ierr);
     ierr = VecDestroy(&L);CHKERRQ(ierr);

@@ -12,30 +12,34 @@ Vec Object: 1 MPI processes
 0.36043
 Mat Object: 1 MPI processes
   type: seqdense
-2.0544988949272036e+00 -1.3146583769014389e-01 
-0.0000000000000000e+00 9.9999999946054430e-01 
+1.0100727270356125e+00 -1.4282104449639643e-01 
+0.0000000000000000e+00 1.0000000051371400e+00 
 Mat Object: 1 MPI processes
   type: seqdense
-2.0544989000994898e+00 -1.3146581791681511e-01 
+1.0100727296545742e+00 -1.4282101898620311e-01 
 0.0000000000000000e+00 1.0000000000000000e+00 
 Mat Object: 1 MPI processes
   type: seqdense
-1.4793049036019692e+00 -4.0618970275307417e-03 0.0000000000000000e+00 
-0.0000000000000000e+00 0.0000000000000000e+00 -1.0100727329711090e+00 
+7.2728466242840639e-01 -4.4127434659892084e-03 0.0000000000000000e+00 
+0.0000000000000000e+00 0.0000000000000000e+00 -1.4885132795848548e+00 
 Mat Object: 1 MPI processes
   type: seqdense
-1.4793048985774171e+00 -4.0618971768924574e-03 0.0000000000000000e+00 
-0.0000000000000000e+00 0.0000000000000000e+00 -1.0100727296545742e+00 
+7.2728466139607928e-01 -4.4127386343728956e-03 0.0000000000000000e+00 
+0.0000000000000000e+00 0.0000000000000000e+00 -1.4885132591966901e+00 
+  ---------- Testing Gradient DAE terms -------------
+  GradientDAE_U: ||H - Hmffd||_F/||H||_F = 2.45879e-09, ||H - Hmffd||_F = 3.10318e-09
+  GradientDAE_Udot: ||H - Hmffd||_F/||H||_F = 3.81923e-09, ||H - Hmffd||_F = 5.40121e-09
+  GradientDAE_M: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
   ---------- Testing Hessian IC terms -------------
-  HessianIC_UU: ||H - Hmffd||_F/||H||_F = 6.94536e-11, ||H - Hmffd||_F = 1.06393e-10
-  HessianIC_UM: ||H - Hmffd||_F/||H||_F = 3.54143e-09, ||H - Hmffd||_F = 5.24957e-09
-  HessianIC_MU: ||H - Hmffd||_F/||H||_F = 1.06979e-08, ||H - Hmffd||_F = 1.58578e-08
-  HessianIC_MM: ||H - Hmffd||_F/||H||_F = 2.45182e-09, ||H - Hmffd||_F = 2.61604e-09
+  HessianIC_UU: ||H - Hmffd||_F/||H||_F = 5.46918e-09, ||H - Hmffd||_F = 9.22688e-10
+  HessianIC_UM: ||H - Hmffd||_F/||H||_F = 1.62594e-08, ||H - Hmffd||_F = 3.36715e-09
+  HessianIC_MU: ||H - Hmffd||_F/||H||_F = 1.04767e-08, ||H - Hmffd||_F = 2.16961e-09
+  HessianIC_MM: ||H - Hmffd||_F/||H||_F = 1.8183e-08, ||H - Hmffd||_F = 5.3569e-09
   ---------- Testing Hessian DAE terms -------------
-  HessianDAE_UU: ||H - Hmffd||_F/||H||_F = 4.66035e-09, ||H - Hmffd||_F = 4.33827e-09
+  HessianDAE_UU: ||H - Hmffd||_F/||H||_F = 1.09655e-08, ||H - Hmffd||_F = 4.78095e-10
   HessianDAE_UUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
   HessianDAE_UM: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
-  HessianDAE_UdotU: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_UdotU: ||H - Hmffd||_F/||H||_F = 6.56007e-10, ||H - Hmffd||_F = 6.56007e-10
   HessianDAE_UdotUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
   HessianDAE_UdotM: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
   HessianDAE_MU: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.

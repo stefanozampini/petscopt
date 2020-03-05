@@ -4,11 +4,15 @@ Vec Object: 1 MPI processes
   type: seq
 1.
 0.000796332
+  ---------- Testing Gradient DAE terms -------------
+  GradientDAE_U: ||H - Hmffd||_F/||H||_F = 1.89979e-08, ||H - Hmffd||_F = 3.03086e-08
+  GradientDAE_Udot: ||H - Hmffd||_F/||H||_F = 2.69075e-09, ||H - Hmffd||_F = 2.75e-09
+  GradientDAE_M: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
   ---------- Testing Hessian DAE terms -------------
-  HessianDAE_UU: ||H - Hmffd||_F/||H||_F = 7.29436e-09, ||H - Hmffd||_F = 1.27491e-09
-  HessianDAE_UUdot: ||H - Hmffd||_F/||H||_F = 3.4388e-09, ||H - Hmffd||_F = 3.51453e-09
+  HessianDAE_UU: ||H - Hmffd||_F/||H||_F = 2.2449e-09, ||H - Hmffd||_F = 4.63748e-10
+  HessianDAE_UUdot: ||H - Hmffd||_F/||H||_F = 9.51163e-10, ||H - Hmffd||_F = 5.44014e-10
   HessianDAE_UM: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
-  HessianDAE_UdotU: ||H - Hmffd||_F/||H||_F = 3.47383e-09, ||H - Hmffd||_F = 3.55033e-09
+  HessianDAE_UdotU: ||H - Hmffd||_F/||H||_F = 4.58056e-09, ||H - Hmffd||_F = 2.61983e-09
   HessianDAE_UdotUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
   HessianDAE_UdotM: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
   HessianDAE_MU: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.

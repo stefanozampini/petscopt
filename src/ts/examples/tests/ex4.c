@@ -392,7 +392,7 @@ int main(int argc, char* argv[])
   Vec            U,Uobj,M,Tsol;
   PetscScalar    k[5];
   PetscReal      t0,tf,dt;
-  PetscBool      flg, testmffdic = PETSC_FALSE, testtao = PETSC_FALSE, testtlm = PETSC_FALSE, testtaylor = PETSC_FALSE, testtaylorgn = PETSC_FALSE;
+  PetscBool      flg, testmffd = PETSC_FALSE, testtao = PETSC_FALSE, testtlm = PETSC_FALSE, testtaylor = PETSC_FALSE, testtaylorgn = PETSC_FALSE;
   PetscErrorCode ierr;
 
   ierr = PetscOptInitialize(&argc,&argv,(char*)0,help);if (ierr) return ierr;
@@ -417,7 +417,7 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsReal("-dt","Initial time step","",dt,&dt,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_tao","Solve the optimization problem","",testtao,&testtao,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_tlm","Test Tangent Linear Model to compute the gradient","",testtlm,&testtlm,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsBool("-test_mffd_ic","Run MFFD tests on IC callbacks","",testmffdic,&testmffdic,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-test_mffd","Run MFFD tests on DAE callbacks","",testmffd,&testmffd,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_taylor","Run Taylor test","",testtaylor,&testtaylor,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_taylor_gn","Run Taylor test (use tao solution)","",testtaylorgn,&testtaylorgn,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsEnd();CHKERRQ(ierr);
@@ -511,13 +511,15 @@ int main(int argc, char* argv[])
   ierr = TSSetHessianIC(ts,EvalHessianIC_UU,EvalHessianIC_UM,EvalHessianIC_MU,EvalHessianIC_MM,NULL);CHKERRQ(ierr);
 
   /* test residual for initial condition */
-  if (testmffdic) {
-    Mat H,He;
-    Vec U,L;
+  if (testmffd) {
+    Mat         H,He;
+    Vec         U,Udot,L;
+    PetscRandom r;
 
+    ierr = PetscRandomCreate(PETSC_COMM_WORLD,&r);CHKERRQ(ierr);
     ierr = TSGetSolution(ts,&U);CHKERRQ(ierr);
-    ierr = VecSetRandom(U,NULL);CHKERRQ(ierr);
-    ierr = VecSetRandom(M,NULL);CHKERRQ(ierr);
+    ierr = VecSetRandom(U,r);CHKERRQ(ierr);
+    ierr = VecSetRandom(M,r);CHKERRQ(ierr);
     ierr = EvalGradientIC(ts,0,U,M,G_U0,G_M,NULL);CHKERRQ(ierr);
 
     ierr = MatCreate(PETSC_COMM_SELF,&H);CHKERRQ(ierr);
@@ -553,12 +555,17 @@ int main(int argc, char* argv[])
     ierr = MatDestroy(&He);CHKERRQ(ierr);
 
     ierr = VecDuplicate(U,&L);CHKERRQ(ierr);
-    ierr = VecSetRandom(L,NULL);CHKERRQ(ierr);
-    ierr = VecSetRandom(U,NULL);CHKERRQ(ierr);
-    ierr = VecSetRandom(M,NULL);CHKERRQ(ierr);
+    ierr = VecDuplicate(U,&Udot);CHKERRQ(ierr);
+    ierr = VecSetRandom(L,r);CHKERRQ(ierr);
+    ierr = VecSetRandom(U,r);CHKERRQ(ierr);
+    ierr = VecSetRandom(Udot,r);CHKERRQ(ierr);
+    ierr = VecSetRandom(M,r);CHKERRQ(ierr);
+    ierr = TSCheckGradientDAE(ts,0.0,U,Udot,M);CHKERRQ(ierr);
     ierr = TSCheckHessianIC(ts,0.0,U,M,L);CHKERRQ(ierr);
-    ierr = TSCheckHessianDAE(ts,0.0,U,U,M,L);CHKERRQ(ierr);
+    ierr = TSCheckHessianDAE(ts,0.0,U,Udot,M,L);CHKERRQ(ierr);
     ierr = VecDestroy(&L);CHKERRQ(ierr);
+    ierr = VecDestroy(&Udot);CHKERRQ(ierr);
+    ierr = PetscRandomDestroy(&r);CHKERRQ(ierr);
   }
   ierr = MatDestroy(&G_M);CHKERRQ(ierr);
   ierr = MatDestroy(&G_U0);CHKERRQ(ierr);
@@ -708,7 +715,7 @@ test:
 test:
     requires: !complex !single
     suffix: 2
-    args: -test_mffd_ic -ts_type cn -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tf 1 -tshessian_view -tshessian_mffd {{0 1}separate output} -test_taylor -taylor_ts_hessian
+    args: -test_mffd -ts_type cn -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tf 1 -tshessian_view -tshessian_mffd {{0 1}separate output} -test_taylor -taylor_ts_hessian
 
 test:
     requires: !complex !single
