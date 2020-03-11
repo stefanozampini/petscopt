@@ -1034,6 +1034,7 @@ static PetscErrorCode TSOptCheckTS_Private(TS ts, PetscReal t, Vec U, Vec Udot, 
       mffd.deriv = j;
 
       if (mffd.deriv == samples - 1) {
+        if (!design) continue;
         ierr = PetscStrcpy(dstr,"M");CHKERRQ(ierr);
         ierr = VecGetSize(design,&N);CHKERRQ(ierr);
         ierr = VecGetLocalSize(design,&n);CHKERRQ(ierr);
