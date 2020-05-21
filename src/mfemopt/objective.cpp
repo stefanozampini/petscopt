@@ -732,7 +732,7 @@ void TVRegularizer::UpdateDual(const Vector& m, const Vector& dm, double lambda,
       /* compute rhs for dual update */
       for (int pg = 0; pg < nb; pg++)
       {
-         GridFunction *dgf = WQ[pg]->GetGridFunction();
+         GridFunction *dgf = (GridFunction*)WQ[pg]->GetGridFunction();
          FiniteElementSpace *dfes = dgf->FESpace();
          ParFiniteElementSpace *fes = pgf[pg]->ParFESpace();
          dels[pg] = dfes->GetFE(e);
@@ -753,7 +753,7 @@ void TVRegularizer::UpdateDual(const Vector& m, const Vector& dm, double lambda,
       for (int pg = 0; pg < nb; pg++)
       {
          /* Compute element mass matrix for dual dofs */
-         GridFunction *dgf = WQ[pg]->GetGridFunction();
+         GridFunction *dgf = (GridFunction*)WQ[pg]->GetGridFunction();
          FiniteElementSpace *dfes = dgf->FESpace();
          ElementTransformation *dT = dfes->GetElementTransformation(e);
          dminteg.AssembleElementMatrix(*dels[pg],*dT,dM);
@@ -784,7 +784,7 @@ void TVRegularizer::UpdateDual(const Vector& m, const Vector& dm, double lambda,
    /* update dual dofs */
    for (int pg = 0; pg < nb; pg++)
    {
-      GridFunction *dgf = WQ[pg]->GetGridFunction();
+      GridFunction *dgf = (GridFunction*)WQ[pg]->GetGridFunction();
       GridFunction *dwgf = wkgf2[pg];
       dgf->Add(lopt,*dwgf);
    }
