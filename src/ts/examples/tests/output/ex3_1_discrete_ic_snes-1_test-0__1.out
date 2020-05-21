@@ -4,8 +4,8 @@
   Testing hand-coded Gradient, if (for double precision runs) ||G - Gfd||/||G|| is
     O(1.e-8), the hand-coded Gradient is probably correct.
   ||Gfd|| 1.4637e+14, ||G|| = 1.19667e+13, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 0.918244, ||G - Gfd|| = 1.34403e+14
-  max-norm ||G - Gfd||/||G|| = 0.918244, ||G - Gfd|| = 1.34403e+14
+  2-norm ||G - Gfd||/||G|| = 0.918243, ||G - Gfd|| = 1.34403e+14
+  max-norm ||G - Gfd||/||G|| = 0.918243, ||G - Gfd|| = 1.34403e+14
 -------------------------- Taylor test results ---------------------------
 		Gradient				Hessian
 --------------------------------------------------------------------------

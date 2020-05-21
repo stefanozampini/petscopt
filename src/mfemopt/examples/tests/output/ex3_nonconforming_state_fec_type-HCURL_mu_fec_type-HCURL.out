@@ -1,11 +1,11 @@
 Using param fec type HCURL, order 2
 Using state fec type HCURL, order 2
 [VP_VS] ||   op_M_pd - op_M||: 0.000347222
-[VP_VS] ||    op_M_m - op_M||: 1.95698e-17
+[VP_VS] ||    op_M_m - op_M||: 6.44626e-17
 [VP_VS] || op_M_pd_m - op_M||: 0.000347222
 [VP_VS] Test null parameter
 PDOperator::TestFDGradient wrt design
 ||G|| = 0., ||G^T|| = 0., ||G - (G^T)^T||/||G|| = 0., ||G_fd|| = 0., ||G_fd - G|| = 0.
 [VP_VS] Test non-null parameter
 PDOperator::TestFDGradient wrt design
-||G|| = 58.9714, ||G^T|| = 58.9714, ||G - (G^T)^T||/||G|| = 4.3374e-18, ||G_fd|| = 58.9714, ||G_fd - G|| = 2.88759e-07
+||G|| = 58.9714, ||G^T|| = 58.9714, ||G - (G^T)^T||/||G|| = 4.74108e-18, ||G_fd|| = 58.9714, ||G_fd - G|| = 2.75256e-07

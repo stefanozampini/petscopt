@@ -9,8 +9,8 @@
   0 TAO,  Function value: 0.0335767,  Residual: 0.326615 
   ---------- Testing Gradient -------------
   ||Gfd|| 0.00999484, ||G|| = 0.00999484, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 1.38354e-07, ||G - Gfd|| = 1.38283e-09
-  max-norm ||G - Gfd||/||G|| = 1.38354e-07, ||G - Gfd|| = 1.38283e-09
+  2-norm ||G - Gfd||/||G|| = 4.34449e-08, ||G - Gfd|| = 4.34225e-10
+  max-norm ||G - Gfd||/||G|| = 4.34449e-08, ||G - Gfd|| = 4.34225e-10
   1 TAO,  Function value: 2.79819e-05,  Residual: 0.00999484 
   ---------- Testing Gradient -------------
   ||Gfd|| 0.000890691, ||G|| = 0.000890691, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
@@ -33,7 +33,7 @@ Tao Object: 1 MPI processes
   Mat Object: (tao_blmvm_) 1 MPI processes
     type: lmvmbfgs
     rows=1, cols=1
-      Scale type: diagonal
+      Scale type: DIAGONAL
       Scale history: 1
       Scale params: alpha=1., beta=0.5, rho=1.
       Convex factors: phi=0., theta=0.125
@@ -43,7 +43,7 @@ Tao Object: 1 MPI processes
       Number of rejects: 0
       Number of resets: 1
       Mat Object: (J0_) 1 MPI processes
-        type: lmvmdiagbrdn
+        type: lmvmdiagbroyden
         rows=1, cols=1
           Scale history: 1
           Scale params: alpha=1., beta=0.5, rho=1.

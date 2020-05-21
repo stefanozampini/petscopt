@@ -1,5 +1,5 @@
   0 TAO,  Function value: 0.0708569,  Residual: 0.00973832 
-  1 TAO,  Function value: 5.82208e-16,  Residual: 4.43458e-09 
+  1 TAO,  Function value: 5.82207e-16,  Residual: 4.43458e-09 
 Tao Object: 1 MPI processes
   type: tron
   Total PG its: 3,  PG tolerance: 0.001 
@@ -28,7 +28,7 @@ Tao Object: 1 MPI processes
   Active Set subset type: subvec
   convergence tolerances: gatol=1e-13,   steptol=0.,   gttol=1e-05
   Residual in Function/Gradient:=4.43458e-09
-  Objective value=5.82208e-16
+  Objective value=5.82207e-16
   total number of iterations=1,                          (max: 50)
   total number of gradient evaluations=3,                  max: 4000
   total number of function/gradient evaluations=12,      (max: 4000)

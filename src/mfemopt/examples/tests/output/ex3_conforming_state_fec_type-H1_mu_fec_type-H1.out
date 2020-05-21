@@ -1,11 +1,11 @@
 Using param fec type H1, order 2
 Using state fec type H1, order 2
-[SP_SS] ||   op_M_pd - op_M||: 2.90024e-18
-[SP_SS] ||    op_M_m - op_M||: 4.33681e-19
-[SP_SS] || op_M_pd_m - op_M||: 2.90024e-18
+[SP_SS] ||   op_M_pd - op_M||: 2.27682e-18
+[SP_SS] ||    op_M_m - op_M||: 5.42101e-19
+[SP_SS] || op_M_pd_m - op_M||: 2.27682e-18
 [SP_SS] Test null parameter
 PDOperator::TestFDGradient wrt design
 ||G|| = 0., ||G^T|| = 0., ||G - (G^T)^T||/||G|| = 0., ||G_fd|| = 0., ||G_fd - G|| = 0.
 [SP_SS] Test non-null parameter
 PDOperator::TestFDGradient wrt design
-||G|| = 0.0259385, ||G^T|| = 0.0259385, ||G - (G^T)^T||/||G|| = 4.61851e-17, ||G_fd|| = 0.0259385, ||G_fd - G|| = 2.78683e-10
+||G|| = 0.0259385, ||G^T|| = 0.0259385, ||G - (G^T)^T||/||G|| = 4.7472e-17, ||G_fd|| = 0.0259385, ||G_fd - G|| = 2.52666e-10

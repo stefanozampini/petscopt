@@ -4,14 +4,14 @@
     of hand-coded and finite difference Hessian entries greater than <threshold>.
   Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Hessian is probably correct.
-  ||H - Hfd||_F/||H||_F = 1.56315e-09, ||H - Hfd||_F = 3.00159e-09
+  ||H - Hfd||_F/||H||_F = 1.63447e-10, ||H - Hfd||_F = 3.13854e-10
   1 TAO,  Function value: 7.62967e-06,  Residual: 0.00521813 
   ---------- Testing Hessian -------------
-  ||H - Hfd||_F/||H||_F = 1.81476e-07, ||H - Hfd||_F = 3.22832e-07
+  ||H - Hfd||_F/||H||_F = 1.81418e-07, ||H - Hfd||_F = 3.22729e-07
   2 TAO,  Function value: 7.18094e-13,  Residual: 1.59942e-06 
   ---------- Testing Hessian -------------
-  ||H - Hfd||_F/||H||_F = 6.58024e-08, ||H - Hfd||_F = 1.17208e-07
-  3 TAO,  Function value: 6.46176e-27,  Residual: 1.51721e-13 
+  ||H - Hfd||_F/||H||_F = 3.22067e-08, ||H - Hfd||_F = 5.73669e-08
+  3 TAO,  Function value: 6.35477e-27,  Residual: 1.5046e-13 
 Tao Object: 1 MPI processes
   type: tron
   Total PG its: 9,  PG tolerance: 0.001 
@@ -39,8 +39,8 @@ Tao Object: 1 MPI processes
   total KSP iterations: 3
   Active Set subset type: subvec
   convergence tolerances: gatol=1e-08,   steptol=0.,   gttol=0.
-  Residual in Function/Gradient:=1.51721e-13
-  Objective value=6.46176e-27
+  Residual in Function/Gradient:=1.5046e-13
+  Objective value=6.35477e-27
   total number of iterations=3,                          (max: 50)
   total number of gradient evaluations=6,                  max: 4000
   total number of function/gradient evaluations=13,      (max: 4000)

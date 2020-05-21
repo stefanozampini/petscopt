@@ -5,12 +5,12 @@ Vec Object: 1 MPI processes
 1.
 0.000850079
   ---------- Testing Gradient DAE terms -------------
-  GradientDAE_U: ||H - Hmffd||_F/||H||_F = 1.89979e-08, ||H - Hmffd||_F = 3.03086e-08
-  GradientDAE_Udot: ||H - Hmffd||_F/||H||_F = 2.69075e-09, ||H - Hmffd||_F = 2.75e-09
+  GradientDAE_U: ||H - Hmffd||_F/||H||_F = 1.61904e-08, ||H - Hmffd||_F = 2.58296e-08
+  GradientDAE_Udot: ||H - Hmffd||_F/||H||_F = 4.54994e-09, ||H - Hmffd||_F = 4.65014e-09
   GradientDAE_M: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
   ---------- Testing Hessian DAE terms -------------
   HessianDAE_UU: ||H - Hmffd||_F/||H||_F = 2.2449e-09, ||H - Hmffd||_F = 4.63748e-10
-  HessianDAE_UUdot: ||H - Hmffd||_F/||H||_F = 9.51163e-10, ||H - Hmffd||_F = 5.44014e-10
+  HessianDAE_UUdot: ||H - Hmffd||_F/||H||_F = 1.21304e-09, ||H - Hmffd||_F = 6.93792e-10
   HessianDAE_UM: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
   HessianDAE_UdotU: ||H - Hmffd||_F/||H||_F = 4.58056e-09, ||H - Hmffd||_F = 2.61983e-09
   HessianDAE_UdotUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
@@ -19,52 +19,52 @@ Vec Object: 1 MPI processes
   HessianDAE_MUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
   HessianDAE_MM: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
 Null test: 0. (1.)
-[0] Gradient: -1.60695866335721e-14 1.99999999999800e+00
+[0] Gradient: -2.00341167266756e-14 1.99999999999800e+00
 
 TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
 Mat Object: 1 MPI processes
   type: seqdense
-8.5007932233836098e-04 9.9999963868123609e-01 
--9.9999963868177266e-01 8.5007932233415427e-04 
+8.5007932233632094e-04 9.9999963868123920e-01 
+-9.9999963868176966e-01 8.5007932233595838e-04 
 Mat Object: 1 MPI processes
   type: seqdense
-8.5007932233805306e-04 -9.9999963868177211e-01 
-9.9999963868123665e-01 8.5007932233478246e-04 
+8.5007932233692625e-04 -9.9999963868177033e-01 
+9.9999963868123964e-01 8.5007932233618964e-04 
 Mat Object: 1 MPI processes
   type: seqdense
--3.0791341698588326e-16 5.5511151231257827e-16 
-5.5511151231257827e-16 6.2818673873810127e-16 
+6.0531007289865713e-16 4.4408920985006262e-16 
+-6.6613381477509392e-16 2.3126032339115810e-16 
 
 Gradient via TLM (explicit fwd via multtrans)
 Vec Object: 1 MPI processes
   type: seq
--1.63749e-14
+-2.12467e-14
 2.
 Vec Object: 1 MPI processes
   type: seq
--3.05336e-16
--1.55431e-15
+-1.21256e-15
+0.
 
 Gradient via TLM (explicit adj via mult)
 Vec Object: 1 MPI processes
   type: seq
--1.69899e-14
+-2.00371e-14
 2.
 Vec Object: 1 MPI processes
   type: seq
--9.20276e-16
--4.44089e-16
+-3.01993e-18
+8.88178e-16
   ---------- Testing Hessian -------------
   Run with -tao_test_hessian_view and optionally -tao_test_hessian <threshold> to show difference
     of hand-coded and finite difference Hessian entries greater than <threshold>.
   Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Hessian is probably correct.
-  ||H - Hfd||_F/||H||_F = 6.20899e-08, ||H - Hfd||_F = 1.75617e-07
+  ||H - Hfd||_F/||H||_F = 4.93489e-08, ||H - Hfd||_F = 1.3958e-07
 Mat Object: H 1 MPI processes
   type: seqdense
-1.9999999999999964e+00 7.6856669478273340e-16 
-2.3482186871922283e-16 2.0000000000000013e+00 
+1.9999999999999982e+00 -6.3883759093402697e-16 
+-2.7807045687310237e-15 1.9999999999999951e+00 
 Mat Object: 1 MPI processes
   type: seqdense
-0.0000000000000000e+00 -5.3374482606351051e-16 
-5.3374482606351051e-16 0.0000000000000000e+00 
+0.0000000000000000e+00 -2.1418669777969967e-15 
+2.1418669777969967e-15 0.0000000000000000e+00 

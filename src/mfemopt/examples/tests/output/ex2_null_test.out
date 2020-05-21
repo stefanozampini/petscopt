@@ -13,16 +13,16 @@ ObjectiveFunction::TestFDHessian state x state
 ||H||_F = 1., ||H_fd||_F = 1., ||H - H_fd||_F = 6.57681e-09, ||H-H_fd||_F/||H_fd||_F = 6.57681e-09
 ---------------------------------------
 PDOperator::TestFDGradient wrt design
-||G|| = 0.922188, ||G^T|| = 0.922188, ||G - (G^T)^T||/||G|| = 4.64596e-17, ||G_fd|| = 0.922188, ||G_fd - G|| = 1.03305e-08
+||G|| = 0.922188, ||G^T|| = 0.922188, ||G - (G^T)^T||/||G|| = 2.43818e-17, ||G_fd|| = 0.922188, ||G_fd - G|| = 1.31989e-08
 ---------------------------------------
 Misfit objective 1.4883e-23
 ReducedFunctional::TestFDGradient, delta: 1e-08
 -> hang tight while computing state gradient
-||g|| = 2.17038e-12, ||g_fd|| = 2.18407e-12, ||g - g_fd|| = 1.36926e-14, ||g-g_fd||/||g_fd|| = 0.00626932, cos() = 1.
+||g|| = 2.16972e-12, ||g_fd|| = 2.1828e-12, ||g - g_fd|| = 1.30806e-14, ||g-g_fd||/||g_fd|| = 0.00599257, cos() = 1.
 ReducedFunctional::TestFDHessian
-||H||_F = 5.22615, ||H_fd||_F = 5.23043, ||H - H_fd||_F = 0.00428016, ||H-H_fd||_F/||H_fd||_F = 0.000818319
+||H||_F = 5.22615, ||H_fd||_F = 5.23043, ||H - H_fd||_F = 0.0042801, ||H-H_fd||_F/||H_fd||_F = 0.000818308
 Regularized objective 1.4883e-23 (LS 1.4883e-23, TV 0.)
-Regularized gradient norm 2.17038e-12 (LS 2.17038e-12, TV 0.)
+Regularized gradient norm 2.16972e-12 (LS 2.16972e-12, TV 0.)
 --------------------- ReducedFunctional::TestTaylor ----------------------
 		Gradient				Hessian
 --------------------------------------------------------------------------
@@ -33,5 +33,5 @@ Regularized gradient norm 2.17038e-12 (LS 2.17038e-12, TV 0.)
 =======================================
 NC 0 -> Number of dofs 11
 Initial objective 1.4883e-23 (LS 1.4883e-23, TV 0.)
-it=0	lit=0	obj=1.488299e-23	(g,du)=-0.000000e+00	||g||=2.170382e-12	step=1.000000e+00
+it=0	lit=0	obj=1.488298e-23	(g,du)=-0.000000e+00	||g||=2.169724e-12	step=1.000000e+00
 Final objective (SNES) 1.4883e-23 (LS 1.4883e-23, TV 0.)

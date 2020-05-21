@@ -19,21 +19,21 @@ Vec Object: 1 MPI processes
   HessianDAE_MUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
   HessianDAE_MM: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
 Null test: 0. (1.0008)
-[0] Gradient: -9.99203350664488e-01 1.00079601519029e+00
+[0] Gradient: -9.99203350664500e-01 1.00079601519030e+00
 
 TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
 Mat Object: 1 MPI processes
   type: seqdense
-7.9633226472709579e-04 9.9999968292558783e-01 
--9.9999968292922126e-01 7.9633226471227463e-04 
+7.9633226471741148e-04 9.9999968292558261e-01 
+-9.9999968292922203e-01 7.9633226472152125e-04 
 Mat Object: 1 MPI processes
   type: seqdense
-7.9633226472457675e-04 -9.9999968292921615e-01 
-9.9999968292558250e-01 7.9633226470889485e-04 
+7.9633226471724505e-04 -9.9999968292922170e-01 
+9.9999968292558439e-01 7.9633226472093221e-04 
 Mat Object: 1 MPI processes
   type: seqdense
--2.5190353275528210e-15 -5.3290705182007514e-15 
-5.1070259132757201e-15 -3.3797834322890630e-15 
+-1.6642503347652493e-16 1.7763568394002505e-15 
+3.3306690738754696e-16 -5.8904704031137456e-16 
 
 Gradient via TLM (explicit fwd via multtrans)
 Vec Object: 1 MPI processes
@@ -42,8 +42,8 @@ Vec Object: 1 MPI processes
 1.0008
 Vec Object: 1 MPI processes
   type: seq
--6.21725e-15
-8.88178e-15
+-4.996e-15
+7.10543e-15
 
 Gradient via TLM (explicit adj via mult)
 Vec Object: 1 MPI processes
@@ -52,21 +52,21 @@ Vec Object: 1 MPI processes
 1.0008
 Vec Object: 1 MPI processes
   type: seq
--3.66374e-15
-2.22045e-16
+-4.88498e-15
+8.21565e-15
   ---------- Testing Gradient -------------
   Run with -tao_test_gradient_view and optionally -tao_test_gradient <threshold> to show difference
     of hand-coded and finite difference gradient entries greater than <threshold>.
   Testing hand-coded Gradient, if (for double precision runs) ||G - Gfd||/||G|| is
     O(1.e-8), the hand-coded Gradient is probably correct.
   ||Gfd|| 1.41421, ||G|| = 1.41421, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 7.26224e-07, ||G - Gfd|| = 1.02704e-06
-  max-norm ||G - Gfd||/||G|| = 9.71581e-07, ||G - Gfd|| = 9.72354e-07
+  2-norm ||G - Gfd||/||G|| = 4.24747e-07, ||G - Gfd|| = 6.00683e-07
+  max-norm ||G - Gfd||/||G|| = 6.00194e-07, ||G - Gfd|| = 6.00672e-07
 Mat Object: H 1 MPI processes
   type: seqdense
--4.7213126620352252e-12 -8.0981278004574017e-12 
--8.1056923549924531e-12 4.8043481016132437e-12 
+-4.6846720166563318e-12 -8.0101759237729799e-12 
+-7.9951132552960914e-12 4.7544622006475810e-12 
 Mat Object: 1 MPI processes
   type: seqdense
-0.0000000000000000e+00 -7.5645545350514552e-15 
-7.5645545350514552e-15 0.0000000000000000e+00 
+0.0000000000000000e+00 1.5062668476888493e-14 
+-1.5062668476888493e-14 0.0000000000000000e+00 

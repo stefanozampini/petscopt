@@ -8,4 +8,4 @@ PDOperator::TestFDGradient wrt design
 ||G|| = 0., ||G^T|| = 0., ||G - (G^T)^T||/||G|| = 0., ||G_fd|| = 0., ||G_fd - G|| = 0.
 [SP_SS] Test non-null parameter
 PDOperator::TestFDGradient wrt design
-||G|| = 0.0259675, ||G^T|| = 0.0259675, ||G - (G^T)^T||/||G|| = 0., ||G_fd|| = 0.0259675, ||G_fd - G|| = 3.00539e-11
+||G|| = 0.0259675, ||G^T|| = 0.0259675, ||G - (G^T)^T||/||G|| = 0., ||G_fd|| = 0.0259675, ||G_fd - G|| = 3.06008e-11

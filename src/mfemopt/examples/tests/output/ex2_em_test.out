@@ -12,12 +12,12 @@ Receivers matrix
 TDLeastSquares tests
 ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing state gradient
-||g|| = 786907., ||g_fd|| = 786907., ||g - g_fd|| = 3.77775e-05, ||g-g_fd||/||g_fd|| = 4.80077e-11, cos() = 1.
+||g|| = 786907., ||g_fd|| = 786907., ||g - g_fd|| = 5.65898e-05, ||g-g_fd||/||g_fd|| = 7.19143e-11, cos() = 1.
 ObjectiveFunction::TestFDHessian state x state
-||H||_F = 1.5956e+06, ||H_fd||_F = 1.5956e+06, ||H - H_fd||_F = 0.00343679, ||H-H_fd||_F/||H_fd||_F = 2.15391e-09
+||H||_F = 1.5956e+06, ||H_fd||_F = 1.5956e+06, ||H - H_fd||_F = 0.00342497, ||H-H_fd||_F/||H_fd||_F = 2.14651e-09
 ---------------------------------------
 PDOperator::TestFDGradient wrt design
-||G|| = 1.65739, ||G^T|| = 1.65739, ||G - (G^T)^T||/||G|| = 7.89931e-17, ||G_fd|| = 1.65739, ||G_fd - G|| = 2.4684e-08
+||G|| = 1.65739, ||G^T|| = 1.65739, ||G - (G^T)^T||/||G|| = 9.18835e-17, ||G_fd|| = 1.65739, ||G_fd - G|| = 1.76386e-08
 ---------------------------------------
 Misfit objective 3.42603e-05
 =======================================

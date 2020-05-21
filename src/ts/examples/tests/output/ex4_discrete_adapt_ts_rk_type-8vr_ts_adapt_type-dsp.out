@@ -16,13 +16,13 @@ Vec Object: 1 MPI processes
     of hand-coded and finite difference Hessian entries greater than <threshold>.
   Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Hessian is probably correct.
-  ||H - Hfd||_F/||H||_F = 2.47649e-08, ||H - Hfd||_F = 2.54691e-07
+  ||H - Hfd||_F/||H||_F = 2.67627e-08, ||H - Hfd||_F = 2.75237e-07
   0 TAO,  Function value: 0.0244174,  Residual: 0.0711927 
   ---------- Testing Hessian -------------
-  ||H - Hfd||_F/||H||_F = 4.65967e-08, ||H - Hfd||_F = 5.83355e-08
+  ||H - Hfd||_F/||H||_F = 4.68713e-08, ||H - Hfd||_F = 5.86793e-08
   1 TAO,  Function value: 0.00727804,  Residual: 0.197769 
   ---------- Testing Hessian -------------
-  ||H - Hfd||_F/||H||_F = 4.07672e-08, ||H - Hfd||_F = 1.29115e-07
+  ||H - Hfd||_F/||H||_F = 4.11055e-08, ||H - Hfd||_F = 1.30186e-07
   2 TAO,  Function value: 0.000253352,  Residual: 0.0325201 
   ---------- Testing Hessian -------------
   ||H - Hfd||_F/||H||_F = 4.63044e-08, ||H - Hfd||_F = 1.00081e-07
@@ -70,17 +70,17 @@ Vec Object: 1 MPI processes
 TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
 Mat Object: 1 MPI processes
   type: seqdense
--5.2679980014348027e-01 5.2679980014348027e-01 9.5543123782016992e-01 
--9.3363748994583690e-02 9.3363748994583690e-02 1.1008598385750488e+00 
+-5.2679980014348027e-01 5.2679980014348027e-01 9.5543123782017014e-01 
+-9.3363748994583690e-02 9.3363748994583690e-02 1.1008598385750490e+00 
 Mat Object: 1 MPI processes
   type: seqdense
--5.2679980014347993e-01 -9.3363748994583620e-02 
-5.2679980014347993e-01 9.3363748994583620e-02 
-9.5543123782016848e-01 1.1008598385750490e+00 
+-5.2679980014347993e-01 -9.3363748994583579e-02 
+5.2679980014347993e-01 9.3363748994583579e-02 
+9.5543123782016826e-01 1.1008598385750490e+00 
 Mat Object: 1 MPI processes
   type: seqdense
-3.3306690738754696e-16 -3.3306690738754696e-16 -1.4432899320127035e-15 
-6.9388939039072284e-17 -6.9388939039072284e-17 2.2204460492503131e-16 
+3.3306690738754696e-16 -3.3306690738754696e-16 -1.8873791418627661e-15 
+1.1102230246251565e-16 -1.1102230246251565e-16 0.0000000000000000e+00 
 
 Gradient via TLM (explicit fwd via multtrans)
 Vec Object: 1 MPI processes
@@ -99,7 +99,7 @@ Mat Object: H 1 MPI processes
   type: seqdense
 3.2308256271103125e-01 -3.2308256271103114e-01 -7.2083477372843197e-01 
 -3.2308256271103125e-01 3.2308256271103114e-01 7.2083477372843197e-01 
--7.2083477372762528e-01 7.2083477372762494e-01 2.8565822056225119e+00 
+-7.2083477372762528e-01 7.2083477372762494e-01 2.8565822056225114e+00 
 Mat Object: 1 MPI processes
   type: seqdense
 0.0000000000000000e+00 -1.1102230246251565e-16 8.0668804969263874e-13 

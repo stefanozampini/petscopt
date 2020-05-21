@@ -4,11 +4,11 @@
     of hand-coded and finite difference Hessian entries greater than <threshold>.
   Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Hessian is probably correct.
-  ||H - Hfd||_F/||H||_F = 3.30992e-08, ||H - Hfd||_F = 5.10031e-10
+  ||H - Hfd||_F/||H||_F = 7.45459e-08, ||H - Hfd||_F = 1.14869e-09
   1 TAO,  Function value: 1.00486e-07,  Residual: 5.83318e-05 
   ---------- Testing Hessian -------------
-  ||H - Hfd||_F/||H||_F = 1.27131e-07, ||H - Hfd||_F = 2.14723e-09
-  2 TAO,  Function value: 3.03866e-20,  Residual: 3.20373e-11 
+  ||H - Hfd||_F/||H||_F = 1.00234e-07, ||H - Hfd||_F = 1.69294e-09
+  2 TAO,  Function value: 3.03865e-20,  Residual: 3.20373e-11 
 Tao Object: 1 MPI processes
   type: tron
   Total PG its: 6,  PG tolerance: 0.001 
@@ -37,7 +37,7 @@ Tao Object: 1 MPI processes
   Active Set subset type: subvec
   convergence tolerances: gatol=1e-13,   steptol=0.,   gttol=1e-05
   Residual in Function/Gradient:=3.20373e-11
-  Objective value=3.03866e-20
+  Objective value=3.03865e-20
   total number of iterations=2,                          (max: 50)
   total number of gradient evaluations=4,                  max: 4000
   total number of function/gradient evaluations=17,      (max: 4000)

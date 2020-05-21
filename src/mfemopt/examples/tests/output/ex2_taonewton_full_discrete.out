@@ -13,10 +13,10 @@ it=0	lit=0	obj=7.671890e-03	(g,du)=-0.000000e+00	||g||=1.492785e-02	step=1.00000
     of hand-coded and finite difference Hessian entries greater than <threshold>.
   Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Hessian is probably correct.
-  ||H - Hfd||_F/||H||_F = 7.21956e-08, ||H - Hfd||_F = 5.83361e-07
+  ||H - Hfd||_F/||H||_F = 4.19289e-08, ||H - Hfd||_F = 3.38797e-07
 it=1	lit=3	obj=7.622800e-03	(g,du)=-9.556576e-05	||g||=2.308750e-04	step=1.000000e+00
   ---------- Testing Hessian -------------
-  ||H - Hfd||_F/||H||_F = 5.96997e-08, ||H - Hfd||_F = 4.86729e-07
+  ||H - Hfd||_F/||H||_F = 8.74864e-08, ||H - Hfd||_F = 7.13272e-07
 it=2	lit=3	obj=7.622692e-03	(g,du)=-2.157821e-07	||g||=1.054290e-06	step=1.000000e+00
 TAO solve converged due to CONVERGED_GATOL iterations 2
 Final objective (TAO) 0.00762269 (LS 0.00126724, TV 0.00635545)

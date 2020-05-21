@@ -9,18 +9,18 @@
   0 TAO,  Function value: 0.037294,  Residual: 0.364089 
   ---------- Testing Gradient -------------
   ||Gfd|| 0.00955871, ||G|| = 0.00955871, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 4.88585e-08, ||G - Gfd|| = 4.67025e-10
-  max-norm ||G - Gfd||/||G|| = 4.88585e-08, ||G - Gfd|| = 4.67025e-10
+  2-norm ||G - Gfd||/||G|| = 3.80585e-09, ||G - Gfd|| = 3.6379e-11
+  max-norm ||G - Gfd||/||G|| = 3.80585e-09, ||G - Gfd|| = 3.6379e-11
   1 TAO,  Function value: 2.32199e-05,  Residual: 0.00955871 
   ---------- Testing Gradient -------------
   ||Gfd|| 0.000743941, ||G|| = 0.000743941, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 2.13909e-07, ||G - Gfd|| = 1.59135e-10
-  max-norm ||G - Gfd||/||G|| = 2.13909e-07, ||G - Gfd|| = 1.59135e-10
+  2-norm ||G - Gfd||/||G|| = 3.0413e-07, ||G - Gfd|| = 2.26255e-10
+  max-norm ||G - Gfd||/||G|| = 3.0413e-07, ||G - Gfd|| = 2.26255e-10
   2 TAO,  Function value: 1.41054e-07,  Residual: 0.000743941 
   ---------- Testing Gradient -------------
   ||Gfd|| 1.48575e-06, ||G|| = 1.48575e-06, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 5.4269e-08, ||G - Gfd|| = 8.06301e-14
-  max-norm ||G - Gfd||/||G|| = 5.4269e-08, ||G - Gfd|| = 8.06301e-14
+  2-norm ||G - Gfd||/||G|| = 9.6092e-09, ||G - Gfd|| = 1.42769e-14
+  max-norm ||G - Gfd||/||G|| = 9.6092e-09, ||G - Gfd|| = 1.42769e-14
   3 TAO,  Function value: 5.62483e-13,  Residual: 1.48575e-06 
   ---------- Testing Gradient -------------
   ||Gfd|| 2.3112e-10, ||G|| = 2.31119e-10, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
@@ -33,7 +33,7 @@ Tao Object: 1 MPI processes
   Mat Object: (tao_blmvm_) 1 MPI processes
     type: lmvmbfgs
     rows=1, cols=1
-      Scale type: diagonal
+      Scale type: DIAGONAL
       Scale history: 1
       Scale params: alpha=1., beta=0.5, rho=1.
       Convex factors: phi=0., theta=0.125
@@ -43,7 +43,7 @@ Tao Object: 1 MPI processes
       Number of rejects: 0
       Number of resets: 1
       Mat Object: (J0_) 1 MPI processes
-        type: lmvmdiagbrdn
+        type: lmvmdiagbroyden
         rows=1, cols=1
           Scale history: 1
           Scale params: alpha=1., beta=0.5, rho=1.

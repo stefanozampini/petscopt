@@ -3,8 +3,8 @@ mu 1., steps 100, ftime 0.1
   Testing hand-coded Gradient, if (for double precision runs) ||G - Gfd||/||G|| is
     O(1.e-8), the hand-coded Gradient is probably correct.
   ||Gfd|| 0.201053, ||G|| = 0.201053, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 5.30996e-07, ||G - Gfd|| = 1.06758e-07
-  max-norm ||G - Gfd||/||G|| = 5.07056e-07, ||G - Gfd|| = 1.01671e-07
+  2-norm ||G - Gfd||/||G|| = 5.23013e-07, ||G - Gfd|| = 1.05153e-07
+  max-norm ||G - Gfd||/||G|| = 3.74304e-07, ||G - Gfd|| = 7.50529e-08
   Hand-coded gradient ----------
 Vec Object: 1 MPI processes
   type: seq
@@ -18,13 +18,13 @@ Vec Object: 1 MPI processes
   Hand-coded minus finite-difference gradient ----------
 Vec Object: 1 MPI processes
   type: seq
-1.01671e-07
--3.25613e-08
+-7.365e-08
+-7.50529e-08
   0 TAO,  Function value: 0.0102758,  Residual: 0.201053 
   ---------- Testing Gradient -------------
   ||Gfd|| 0.0291924, ||G|| = 0.0291924, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 8.39015e-08, ||G - Gfd|| = 2.44929e-09
-  max-norm ||G - Gfd||/||G|| = 8.27672e-08, ||G - Gfd|| = 2.29228e-09
+  2-norm ||G - Gfd||/||G|| = 1.67727e-07, ||G - Gfd|| = 4.89637e-09
+  max-norm ||G - Gfd||/||G|| = 1.75505e-07, ||G - Gfd|| = 4.8607e-09
   Hand-coded gradient ----------
 Vec Object: 1 MPI processes
   type: seq
@@ -33,18 +33,18 @@ Vec Object: 1 MPI processes
   Finite difference gradient ----------
 Vec Object: 1 MPI processes
   type: seq
--0.00922787
+-0.00922786
 0.0276956
   Hand-coded minus finite-difference gradient ----------
 Vec Object: 1 MPI processes
   type: seq
--2.29228e-09
-8.62813e-10
+-4.8607e-09
+5.89964e-10
   1 TAO,  Function value: 0.000366799,  Residual: 0.0291924 
   ---------- Testing Gradient -------------
   ||Gfd|| 0.0157492, ||G|| = 0.0157492, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 5.07177e-07, ||G - Gfd|| = 7.98762e-09
-  max-norm ||G - Gfd||/||G|| = 5.18836e-07, ||G - Gfd|| = 7.9876e-09
+  2-norm ||G - Gfd||/||G|| = 2.90222e-07, ||G - Gfd|| = 4.57076e-09
+  max-norm ||G - Gfd||/||G|| = 2.39497e-07, ||G - Gfd|| = 3.68712e-09
   Hand-coded gradient ----------
 Vec Object: 1 MPI processes
   type: seq
@@ -58,13 +58,13 @@ Vec Object: 1 MPI processes
   Hand-coded minus finite-difference gradient ----------
 Vec Object: 1 MPI processes
   type: seq
--7.9876e-09
-1.76394e-11
+3.68712e-09
+-2.70129e-09
   2 TAO,  Function value: 5.91402e-05,  Residual: 0.0157492 
   ---------- Testing Gradient -------------
   ||Gfd|| 0.0173325, ||G|| = 0.0173325, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 2.70535e-07, ||G - Gfd|| = 4.68904e-09
-  max-norm ||G - Gfd||/||G|| = 2.5399e-07, ||G - Gfd|| = 4.33049e-09
+  2-norm ||G - Gfd||/||G|| = 1.53907e-07, ||G - Gfd|| = 2.66759e-09
+  max-norm ||G - Gfd||/||G|| = 1.56441e-07, ||G - Gfd|| = 2.6673e-09
   Hand-coded gradient ----------
 Vec Object: 1 MPI processes
   type: seq
@@ -78,12 +78,12 @@ Vec Object: 1 MPI processes
   Hand-coded minus finite-difference gradient ----------
 Vec Object: 1 MPI processes
   type: seq
-4.33049e-09
--1.79832e-09
+3.95061e-11
+2.6673e-09
   ---------- Testing Gradient -------------
   ||Gfd|| 0.000277204, ||G|| = 0.000277204, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 2.14622e-07, ||G - Gfd|| = 5.9494e-11
-  max-norm ||G - Gfd||/||G|| = 1.7862e-07, ||G - Gfd|| = 4.84649e-11
+  2-norm ||G - Gfd||/||G|| = 1.32752e-07, ||G - Gfd|| = 3.67994e-11
+  max-norm ||G - Gfd||/||G|| = 1.35281e-07, ||G - Gfd|| = 3.67058e-11
   Hand-coded gradient ----------
 Vec Object: 1 MPI processes
   type: seq
@@ -97,13 +97,13 @@ Vec Object: 1 MPI processes
   Hand-coded minus finite-difference gradient ----------
 Vec Object: 1 MPI processes
   type: seq
-4.84649e-11
--3.45064e-11
+2.62318e-12
+3.67058e-11
   3 TAO,  Function value: 3.75621e-08,  Residual: 0.000277204 
   ---------- Testing Gradient -------------
   ||Gfd|| 1.01308e-05, ||G|| = 1.01308e-05, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 2.35173e-07, ||G - Gfd|| = 2.3825e-12
-  max-norm ||G - Gfd||/||G|| = 2.03035e-07, ||G - Gfd|| = 1.82232e-12
+  2-norm ||G - Gfd||/||G|| = 4.72063e-07, ||G - Gfd|| = 4.78238e-12
+  max-norm ||G - Gfd||/||G|| = 4.97243e-07, ||G - Gfd|| = 4.46295e-12
   Hand-coded gradient ----------
 Vec Object: 1 MPI processes
   type: seq
@@ -117,13 +117,13 @@ Vec Object: 1 MPI processes
   Hand-coded minus finite-difference gradient ----------
 Vec Object: 1 MPI processes
   type: seq
--1.53474e-12
-1.82232e-12
+-4.46295e-12
+-1.71848e-12
   4 TAO,  Function value: 3.41701e-11,  Residual: 1.01308e-05 
   ---------- Testing Gradient -------------
   ||Gfd|| 8.79734e-06, ||G|| = 8.79734e-06, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 5.0651e-07, ||G - Gfd|| = 4.45594e-12
-  max-norm ||G - Gfd||/||G|| = 4.6103e-07, ||G - Gfd|| = 4.00123e-12
+  2-norm ||G - Gfd||/||G|| = 3.40411e-07, ||G - Gfd|| = 2.99471e-12
+  max-norm ||G - Gfd||/||G|| = 3.42791e-07, ||G - Gfd|| = 2.97505e-12
   Hand-coded gradient ----------
 Vec Object: 1 MPI processes
   type: seq
@@ -137,13 +137,13 @@ Vec Object: 1 MPI processes
   Hand-coded minus finite-difference gradient ----------
 Vec Object: 1 MPI processes
   type: seq
-1.961e-12
--4.00123e-12
+-3.426e-13
+-2.97505e-12
   5 TAO,  Function value: 1.84218e-11,  Residual: 8.79734e-06 
   ---------- Testing Gradient -------------
   ||Gfd|| 9.6859e-06, ||G|| = 9.6859e-06, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 4.10274e-07, ||G - Gfd|| = 3.97387e-12
-  max-norm ||G - Gfd||/||G|| = 3.98418e-07, ||G - Gfd|| = 3.79681e-12
+  2-norm ||G - Gfd||/||G|| = 2.3393e-07, ||G - Gfd|| = 2.26583e-12
+  max-norm ||G - Gfd||/||G|| = 2.37595e-07, ||G - Gfd|| = 2.26421e-12
   Hand-coded gradient ----------
 Vec Object: 1 MPI processes
   type: seq
@@ -157,12 +157,12 @@ Vec Object: 1 MPI processes
   Hand-coded minus finite-difference gradient ----------
 Vec Object: 1 MPI processes
   type: seq
--1.17298e-12
-3.79681e-12
+-2.26421e-12
+8.54865e-14
   ---------- Testing Gradient -------------
   ||Gfd|| 7.16862e-08, ||G|| = 7.16862e-08, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
-  2-norm ||G - Gfd||/||G|| = 3.70213e-08, ||G - Gfd|| = 2.65391e-15
-  max-norm ||G - Gfd||/||G|| = 3.42528e-08, ||G - Gfd|| = 2.42239e-15
+  2-norm ||G - Gfd||/||G|| = 1.27275e-07, ||G - Gfd|| = 9.12387e-15
+  max-norm ||G - Gfd||/||G|| = 9.76699e-08, ||G - Gfd|| = 6.90731e-15
   Hand-coded gradient ----------
 Vec Object: 1 MPI processes
   type: seq
@@ -176,8 +176,8 @@ Vec Object: 1 MPI processes
   Hand-coded minus finite-difference gradient ----------
 Vec Object: 1 MPI processes
   type: seq
--2.42239e-15
-1.08411e-15
+5.96104e-15
+6.90731e-15
   6 TAO,  Function value: 2.5128e-15,  Residual: 7.16862e-08 
 Tao Object: 1 MPI processes
   type: cg

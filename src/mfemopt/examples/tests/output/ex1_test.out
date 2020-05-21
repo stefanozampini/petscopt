@@ -3,25 +3,25 @@ TV tests
 Obj 0.00423189
 ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing design gradient
-||g|| = 0.00153839, ||g_fd|| = 0.00153839, ||g - g_fd|| = 2.71562e-12, ||g-g_fd||/||g_fd|| = 1.76523e-09, cos() = 1.
+||g|| = 0.00153839, ||g_fd|| = 0.00153839, ||g - g_fd|| = 2.91729e-12, ||g-g_fd||/||g_fd|| = 1.89632e-09, cos() = 1.
 ObjectiveFunction::TestFDHessian design x design
-||H||_F = 0.00806253, ||H_fd||_F = 0.00806253, ||H - H_fd||_F = 4.51723e-09, ||H-H_fd||_F/||H_fd||_F = 5.60274e-07
+||H||_F = 0.00806253, ||H_fd||_F = 0.00806253, ||H - H_fd||_F = 4.51748e-09, ||H-H_fd||_F/||H_fd||_F = 5.60306e-07
 ---------------------------------------
 Tikhonov tests
 Obj 0.0633662
 ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing design gradient
-||g|| = 0.0232572, ||g_fd|| = 0.0232572, ||g - g_fd|| = 5.76207e-11, ||g-g_fd||/||g_fd|| = 2.47755e-09, cos() = 1.
+||g|| = 0.0232572, ||g_fd|| = 0.0232572, ||g - g_fd|| = 5.26961e-11, ||g-g_fd||/||g_fd|| = 2.2658e-09, cos() = 1.
 ObjectiveFunction::TestFDHessian design x design
-||H||_F = 0.0309308, ||H_fd||_F = 0.0309308, ||H - H_fd||_F = 1.13941e-10, ||H-H_fd||_F/||H_fd||_F = 3.68374e-09
+||H||_F = 0.0309308, ||H_fd||_F = 0.0309308, ||H - H_fd||_F = 1.0537e-10, ||H-H_fd||_F/||H_fd||_F = 3.40663e-09
 ---------------------------------------
 Image tests
 Obj 0.0675981
 ReducedFunctional::TestFDGradient, delta: 1e-06
 -> hang tight while computing state gradient
-||g|| = 0.0235012, ||g_fd|| = 0.0235012, ||g - g_fd|| = 7.54753e-11, ||g-g_fd||/||g_fd|| = 3.21155e-09, cos() = 1.
+||g|| = 0.0235012, ||g_fd|| = 0.0235012, ||g - g_fd|| = 6.09584e-11, ||g-g_fd||/||g_fd|| = 2.59384e-09, cos() = 1.
 ReducedFunctional::TestFDHessian
-||H||_F = 0.0347264, ||H_fd||_F = 0.0347264, ||H - H_fd||_F = 4.51738e-09, ||H-H_fd||_F/||H_fd||_F = 1.30085e-07
+||H||_F = 0.0347264, ||H_fd||_F = 0.0347264, ||H - H_fd||_F = 4.52232e-09, ||H-H_fd||_F/||H_fd||_F = 1.30227e-07
 ---------------------------------------
 --------------------- ReducedFunctional::TestTaylor ----------------------
 		Gradient				Hessian
