@@ -91,8 +91,8 @@ endif
 
 generated := $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib/petscopt/conf/files
 
-spkgs := sys,ts,tao,mfemopt
-pkgs := sys ts tao mfemopt
+spkgs := sys,ksp,snes,ts,tao,mfemopt
+pkgs := sys ksp snes ts tao mfemopt
 langs := c cpp
 
 $(generated) : $(config-confheader) $(petscconf) $(petscvariables) $(PETSC_DIR)/config/gmakegen.py | $$(@D)/.DIR
@@ -171,7 +171,7 @@ endif
 	-@echo $(ruler)
 
 clean :
-	$(RM) -r $(OBJDIR) $(LIBDIR)/libpetscopt*.*
+	$(RM) -r $(OBJDIR) $(generated) $(LIBDIR)/libpetscopt*.*
 distclean :
 	@echo "*** Deleting all build files ***"
 	-$(RM) -r $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/

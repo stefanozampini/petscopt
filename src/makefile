@@ -1,5 +1,5 @@
 
-DIRS     = sys ts tao mfemopt
+DIRS     = sys ksp snes ts tao mfemopt
 LOCDIR   = src/
 
 include ${PETSCOPT_DIR}/lib/petsc/conf/variables

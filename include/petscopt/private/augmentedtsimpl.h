@@ -3,9 +3,6 @@
 
 #include <petscts.h>
 
-PETSC_INTERN PetscErrorCode KSPCreate_AugTriangular(KSP);
-PETSC_INTERN PetscErrorCode SNESCreate_Augmented(SNES);
-
 typedef struct {
   TS             model;
   PetscInt       nqts;
@@ -37,8 +34,5 @@ typedef struct {
     if (__cc != __ac) SETERRQ(PetscObjectComm((PetscObject)(a)),PETSC_ERR_USER,"You cannot change the application context for the AugmentedTS"); \
   } while (0)
 #endif
-
-PETSC_INTERN PetscErrorCode AdjointTSGetModelTS_Aug(TS,TS*);
-PETSC_INTERN PetscErrorCode AdjointTSComputeForcing_Aug(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,Vec,PetscBool*,Vec);
 
 #endif

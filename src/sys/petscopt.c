@@ -35,6 +35,9 @@ static PetscErrorCode PetscOptFinalizePackage(void)
   PetscFunctionReturn(0);
 }
 
+PETSC_EXTERN PetscErrorCode KSPCreate_AugTriangular(KSP);
+PETSC_EXTERN PetscErrorCode SNESCreate_Augmented(SNES);
+
 PetscErrorCode PetscOptInitializePackage(void)
 {
   char           logList[256];
