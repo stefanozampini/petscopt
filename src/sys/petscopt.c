@@ -35,6 +35,7 @@ static PetscErrorCode PetscOptFinalizePackage(void)
   PetscFunctionReturn(0);
 }
 
+PETSC_EXTERN PetscErrorCode KSPCreate_HilbertCG(KSP);
 PETSC_EXTERN PetscErrorCode KSPCreate_AugTriangular(KSP);
 PETSC_EXTERN PetscErrorCode SNESCreate_Augmented(SNES);
 
@@ -54,6 +55,7 @@ PetscErrorCode PetscOptInitializePackage(void)
 
   PetscOptPackageInitialized = PETSC_TRUE;
   /* Register classes */
+  ierr = KSPRegister(KSPHILBERTCG,KSPCreate_HilbertCG);CHKERRQ(ierr);
   ierr = KSPRegister(KSPAUGTRIANGULAR,KSPCreate_AugTriangular);CHKERRQ(ierr);
   ierr = SNESRegister(SNESAUGMENTED,SNESCreate_Augmented);CHKERRQ(ierr);
   /* Register Events */

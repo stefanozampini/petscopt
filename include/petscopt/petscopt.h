@@ -3,6 +3,7 @@
 
 #include <petscsys.h>
 
+#define KSPHILBERTCG     "hilbertcg"
 #define KSPAUGTRIANGULAR "augtriangular"
 #define SNESAUGMENTED    "augmented"
 

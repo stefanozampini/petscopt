@@ -3,7 +3,7 @@ ALL: lib
 
 CFLAGS   =
 FFLAGS   =
-SOURCEC  = augtriangular.c
+SOURCEC  = augtriangular.c hilbertcg.c
 SOURCEF  =
 SOURCEH  =
 DIRS     =
