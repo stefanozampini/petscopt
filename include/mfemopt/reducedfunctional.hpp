@@ -53,15 +53,6 @@ public:
    virtual ~ReducedFunctional() {}
 };
 
-class ReducedFunctionalHessianOperatorFD : public mfem::PetscParMatrix
-{
-private:
-   ReducedFunctional* obj;
-
-public:
-   ReducedFunctionalHessianOperatorFD(MPI_Comm,ReducedFunctional*,const mfem::Vector&);
-};
-
 }
 #endif
 

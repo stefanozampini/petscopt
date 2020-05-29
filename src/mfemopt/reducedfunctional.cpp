@@ -16,7 +16,16 @@ namespace mfemopt
 
 using namespace mfem;
 
-void ReducedFunctional::ComputeGradient(const mfem::Vector& m,mfem::Vector& g) const
+class ReducedFunctionalHessianOperatorFD : public PetscParMatrix
+{
+private:
+   ReducedFunctional* obj;
+
+public:
+   ReducedFunctionalHessianOperatorFD(MPI_Comm,ReducedFunctional*,const Vector&);
+};
+
+void ReducedFunctional::ComputeGradient(const Vector& m,Vector& g) const
 {
    if (objgradcalled)
    {
@@ -29,7 +38,7 @@ void ReducedFunctional::ComputeGradient(const mfem::Vector& m,mfem::Vector& g) c
    }
 }
 
-void ReducedFunctional::ComputeObjectiveAndGradient(const mfem::Vector& m,double *f,mfem::Vector& g) const
+void ReducedFunctional::ComputeObjectiveAndGradient(const Vector& m,double *f,Vector& g) const
 {
    ComputeObjective(m,f);
    objgradcalled = true;
@@ -37,7 +46,7 @@ void ReducedFunctional::ComputeObjectiveAndGradient(const mfem::Vector& m,double
    objgradcalled = false;
 }
 
-void ReducedFunctional::ComputeGuess(mfem::Vector& m) const
+void ReducedFunctional::ComputeGuess(Vector& m) const
 {
    Vector l,u;
 
@@ -52,7 +61,7 @@ void ReducedFunctional::ComputeGuess(mfem::Vector& m) const
    }
 }
 
-void ReducedFunctional::GetBounds(mfem::Vector& l, mfem::Vector& u) const
+void ReducedFunctional::GetBounds(Vector& l, Vector& u) const
 {
    l.SetSize(Height());
    u.SetSize(Height());
@@ -60,7 +69,7 @@ void ReducedFunctional::GetBounds(mfem::Vector& l, mfem::Vector& u) const
    u = std::numeric_limits<double>::max();
 }
 
-void ReducedFunctional::TestFDGradient(MPI_Comm comm, const mfem::Vector& mIn, double delta, bool progress)
+void ReducedFunctional::TestFDGradient(MPI_Comm comm, const Vector& mIn, double delta, bool progress)
 {
    PetscErrorCode ierr;
 
