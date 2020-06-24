@@ -6,17 +6,17 @@ Receivers matrix
 +0.000000e+00
 =======================================
 NC 0 -> Number of dofs 5
-Initial objective 0.00767189 (LS 0.00134734, TV 0.00632456)
-it=0	lit=0	obj=7.671890e-03	(g,du)=-0.000000e+00	||g||=1.492785e-02	step=1.000000e+00
+Initial objective 0.0076704 (LS 0.00134584, TV 0.00632456)
+it=0	lit=0	obj=7.670400e-03	(g,du)=-0.000000e+00	||g||=1.499536e-02	step=1.000000e+00
   ---------- Testing Hessian -------------
   Run with -tao_test_hessian_view and optionally -tao_test_hessian <threshold> to show difference
     of hand-coded and finite difference Hessian entries greater than <threshold>.
   Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Hessian is probably correct.
-  ||H - Hfd||_F/||H||_F = 4.19289e-08, ||H - Hfd||_F = 3.38797e-07
-it=1	lit=3	obj=7.622800e-03	(g,du)=-9.556576e-05	||g||=2.308750e-04	step=1.000000e+00
+  ||H - Hfd||_F/||H||_F = 9.89322e-08, ||H - Hfd||_F = 7.99391e-07
+it=1	lit=3	obj=7.621218e-03	(g,du)=-9.574721e-05	||g||=2.300024e-04	step=1.000000e+00
   ---------- Testing Hessian -------------
-  ||H - Hfd||_F/||H||_F = 8.74864e-08, ||H - Hfd||_F = 7.13272e-07
-it=2	lit=3	obj=7.622692e-03	(g,du)=-2.157821e-07	||g||=1.054290e-06	step=1.000000e+00
+  ||H - Hfd||_F/||H||_F = 6.1191e-08, ||H - Hfd||_F = 4.98882e-07
+it=2	lit=5	obj=7.621110e-03	(g,du)=-2.158459e-07	||g||=1.055955e-06	step=1.000000e+00
 TAO solve converged due to CONVERGED_GATOL iterations 2
-Final objective (TAO) 0.00762269 (LS 0.00126724, TV 0.00635545)
+Final objective (TAO) 0.00762111 (LS 0.00126571, TV 0.0063554)

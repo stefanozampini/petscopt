@@ -1,34 +1,34 @@
 ---------------------------------------
 TV tests
-Obj 0.00423189
+Obj 0.0047937
 ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing design gradient
-||g|| = 0.00153839, ||g_fd|| = 0.00153839, ||g - g_fd|| = 2.91729e-12, ||g-g_fd||/||g_fd|| = 1.89632e-09, cos() = 1.
+||g|| = 0.00120201, ||g_fd|| = 0.00120201, ||g - g_fd|| = 4.11623e-12, ||g-g_fd||/||g_fd|| = 3.42445e-09, cos() = 1.
 ObjectiveFunction::TestFDHessian design x design
-||H||_F = 0.00806253, ||H_fd||_F = 0.00806253, ||H - H_fd||_F = 4.51748e-09, ||H-H_fd||_F/||H_fd||_F = 5.60306e-07
+||H||_F = 0.00729093, ||H_fd||_F = 0.00729092, ||H - H_fd||_F = 1.25844e-08, ||H-H_fd||_F/||H_fd||_F = 1.72603e-06
 ---------------------------------------
 Tikhonov tests
-Obj 0.0633662
+Obj 0.0642849
 ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing design gradient
-||g|| = 0.0232572, ||g_fd|| = 0.0232572, ||g - g_fd|| = 5.26961e-11, ||g-g_fd||/||g_fd|| = 2.2658e-09, cos() = 1.
+||g|| = 0.0168863, ||g_fd|| = 0.0168863, ||g - g_fd|| = 5.73936e-11, ||g-g_fd||/||g_fd|| = 3.39883e-09, cos() = 1.
 ObjectiveFunction::TestFDHessian design x design
-||H||_F = 0.0309308, ||H_fd||_F = 0.0309308, ||H - H_fd||_F = 1.0537e-10, ||H-H_fd||_F/||H_fd||_F = 3.40663e-09
+||H||_F = 0.0220989, ||H_fd||_F = 0.0220989, ||H - H_fd||_F = 6.51323e-11, ||H-H_fd||_F/||H_fd||_F = 2.94731e-09
 ---------------------------------------
 Image tests
-Obj 0.0675981
+Obj 0.0690786
 ReducedFunctional::TestFDGradient, delta: 1e-06
 -> hang tight while computing state gradient
-||g|| = 0.0235012, ||g_fd|| = 0.0235012, ||g - g_fd|| = 6.09584e-11, ||g-g_fd||/||g_fd|| = 2.59384e-09, cos() = 1.
+||g|| = 0.0171725, ||g_fd|| = 0.0171725, ||g - g_fd|| = 7.66575e-11, ||g-g_fd||/||g_fd|| = 4.46398e-09, cos() = 1.
 ReducedFunctional::TestFDHessian
-||H||_F = 0.0347264, ||H_fd||_F = 0.0347264, ||H - H_fd||_F = 4.52232e-09, ||H-H_fd||_F/||H_fd||_F = 1.30227e-07
+||H||_F = 0.0255587, ||H_fd||_F = 0.0255587, ||H - H_fd||_F = 1.25879e-08, ||H-H_fd||_F/||H_fd||_F = 4.92508e-07
 ---------------------------------------
 --------------------- ReducedFunctional::TestTaylor ----------------------
 		Gradient				Hessian
 --------------------------------------------------------------------------
-0.00139246	0.00000 	0	5.25871e-09	0.00000 	0
-0.000348115	2.00000 	2	6.95072e-10	2.91947 	3
-8.70289e-05	2.00000 	2	8.94508e-11	2.95800 	3
-2.17572e-05	2.00000 	2	1.13490e-11	2.97853 	3
-Nonlinear  solve converged due to CONVERGED_FNORM_RELATIVE iterations 10
-TAO solve converged due to CONVERGED_GATOL iterations 8
+0.00138224	0.00000 	0	4.22025e-09	0.00000 	0
+0.000345560	2.00000 	2	5.57829e-10	2.91943 	3
+8.63901e-05	2.00000 	2	7.17897e-11	2.95797 	3
+2.15975e-05	2.00000 	2	9.10833e-12	2.97852 	3
+Nonlinear  solve converged due to CONVERGED_FNORM_RELATIVE iterations 9
+TAO solve converged due to CONVERGED_GATOL iterations 9

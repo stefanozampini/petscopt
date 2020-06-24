@@ -6,10 +6,10 @@ Receivers matrix
 +0.000000e+00
 =======================================
 NC 0 -> Number of dofs 5
-Initial objective 0.00767189 (LS 0.00134734, TV 0.00632456)
-it=0	lit=0	obj=7.671890e-03	(g,du)=-0.000000e+00	||g||=1.498014e-02	step=1.000000e+00
-it=1	lit=3	obj=7.622801e-03	(g,du)=-9.572164e-05	||g||=2.159235e-04	step=1.000000e+00
-it=2	lit=3	obj=7.622693e-03	(g,du)=-2.352485e-07	||g||=1.859226e-05	step=1.000000e+00
-it=3	lit=3	obj=7.622692e-03	(g,du)=-1.666664e-09	||g||=2.150927e-06	step=1.000000e+00
+Initial objective 0.0076704 (LS 0.00134584, TV 0.00632456)
+it=0	lit=0	obj=7.670400e-03	(g,du)=-0.000000e+00	||g||=1.504768e-02	step=1.000000e+00
+it=1	lit=3	obj=7.621219e-03	(g,du)=-9.590479e-05	||g||=2.150288e-04	step=1.000000e+00
+it=2	lit=5	obj=7.621111e-03	(g,du)=-2.353096e-07	||g||=1.858527e-05	step=1.000000e+00
+it=3	lit=3	obj=7.621111e-03	(g,du)=-1.665140e-09	||g||=2.147594e-06	step=1.000000e+00
 TAO solve converged due to CONVERGED_GATOL iterations 3
-Final objective (TAO) 0.00762269 (LS 0.00126725, TV 0.00635544)
+Final objective (TAO) 0.00762111 (LS 0.00126572, TV 0.00635539)

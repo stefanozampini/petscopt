@@ -1,2 +1,2 @@
-Nonlinear  solve converged due to CONVERGED_SNORM_RELATIVE iterations 12
+Nonlinear  solve converged due to CONVERGED_FNORM_ABS iterations 12
 TAO solve converged due to CONVERGED_GATOL iterations 12

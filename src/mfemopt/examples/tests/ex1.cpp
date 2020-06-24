@@ -771,9 +771,9 @@ int main(int argc, char* argv[])
     args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor 0 -snes_converged_reason -quad 0 -order 2 -opt_tao_converged_reason -opt_tao_type bnls -test_taylor -taylor_seed 2
 
   test:
-    filter: sed -e "s/-nan/nan/g"
     nsize: 2
     suffix: test_hilbert
+    filter: sed -e "s/-nan/nan/g" | sed -e "s/CONVERGED_FNORM_ABS iterations 21/CONVERGED_FNORM_ABS iterations 20/g"
     args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad {{0 1}separate output} -order 1 -hilbert -mesh_nex 4 -mesh_ney 12 -mesh_rerr 0.4 -mesh_nref 3 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-2 -ksp_atol 1.e-10 -primaldual 0 -symmetrize 0 -monitor 0 -snes_converged_reason -snes_type {{newtonls newtontr}separate output} -opt_tao_converged_reason -opt_tao_converged_reason -opt_tao_gatol 1.e-10
 
   test:
@@ -826,6 +826,7 @@ int main(int argc, char* argv[])
       args: -mataij -ksp_type preonly -opt_tao_nls_ksp_type preonly -primaldual -pc_type cholesky -pc_factor_mat_ordering_type nd -opt_tao_nls_pc_type cholesky -opt_tao_nls_pc_factor_mat_ordering_type nd -coupled {{0 1}separate output} -symmetrize -project {{0 1}separate output}
     test:
       suffix: vtv_fieldsplit
+      filter: sed -e "s/CONVERGED_FNORM_ABS/CONVERGED_SNORM_RELATIVE/g"
       args: -pc_type fieldsplit -opt_tao_nls_pc_type fieldsplit -coupled {{0 1}separate output} -ksp_type fgmres -opt_tao_nls_ksp_type fgmres -primaldual
 
 TEST*/
