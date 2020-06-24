@@ -17,7 +17,7 @@ ModelHeat::MFJac::MFJac(const ModelHeat& h) : heat(h), s(0.0)
 void ModelHeat::MFJac::SetShift(double shift) { s = shift; }
 double ModelHeat::MFJac::GetShift() { return s; }
 
-void ModelHeat::MFJac::Mult_Private(const mfem::Vector& x,mfem::Vector& y,bool trans) const
+void ModelHeat::MFJac::Mult_Private(const Vector& x,Vector& y,bool trans) const
 {
    Operator *M,*K;
    heat.Mh->Get(M);
@@ -54,14 +54,14 @@ void ModelHeat::MFJac::Mult_Private(const mfem::Vector& x,mfem::Vector& y,bool t
       }
       y += *heat.rhsvec;
    }
-};
+}
 
-void ModelHeat::MFJac::Mult(const mfem::Vector& x,mfem::Vector& y) const
+void ModelHeat::MFJac::Mult(const Vector& x,Vector& y) const
 {
    Mult_Private(x,y,false);
 }
 
-void ModelHeat::MFJac::MultTranspose(const mfem::Vector& x,mfem::Vector& y) const
+void ModelHeat::MFJac::MultTranspose(const Vector& x,Vector& y) const
 {
    Mult_Private(x,y,true);
 }
@@ -76,7 +76,7 @@ void ModelHeat::Init(ParFiniteElementSpace *_fe, Operator::Type _oid)
    vrhs = NULL;
 
    fes = _fe;
-   ParFiniteElementSpaceGetRangeAndDeriv(*fes,&fe_range,&fe_deriv);
+   ParFiniteElementSpaceGetRangeAndDerivType(*fes,&fe_range,&fe_deriv);
 
    oid = _oid;
 

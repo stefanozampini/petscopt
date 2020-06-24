@@ -7,10 +7,10 @@
 #include <mfemoptconf.h>
 #include <mfemopt/reducedfunctional.hpp>
 #include <mfemopt/datareplicator.hpp>
+#include <mfem/fem/pgridfunc.hpp>
 #include <mfem/fem/pfespace.hpp>
 #include <mfem/mesh/pmesh.hpp>
 #include <mfem/fem/coefficient.hpp>
-#include <mfem/linalg/petsc.hpp>
 #include <petscsftypes.h>
 
 namespace mfemopt
@@ -63,8 +63,10 @@ public:
 void MeshGetElementsTagged(mfem::Mesh*,const mfem::Array<int>&,mfem::Array<bool>&);
 void MeshGetElementsTagged(mfem::Mesh*,bool(*)(const mfem::Vector&),mfem::Array<bool>&,bool = false);
 
-void FiniteElementSpaceGetRangeAndDeriv(mfem::FiniteElementSpace&,int*,int*);
-void ParFiniteElementSpaceGetRangeAndDeriv(mfem::ParFiniteElementSpace&,int*,int*);
+void FiniteElementSpaceGetRangeAndDerivType(mfem::FiniteElementSpace&,int*,int*);
+void ParFiniteElementSpaceGetRangeAndDerivType(mfem::ParFiniteElementSpace&,int*,int*);
+void FiniteElementSpaceGetRangeAndDerivMapType(mfem::FiniteElementSpace&,int*,int*);
+void ParFiniteElementSpaceGetRangeAndDerivMapType(mfem::ParFiniteElementSpace&,int*,int*);
 
 class FunctionOfCoefficient : public mfem::Coefficient
 {
@@ -106,6 +108,11 @@ public:
                      const mfem::IntegrationPoint&);
    virtual ~DiagonalMatrixCoefficient();
 };
+
+#if 0
+void ProjectCoefficient(mfem::Coefficient&,mfem::ParGridFunction&);
+void ProjectCoefficient(mfem::VectorCoefficient&,mfem::ParGridFunction&);
+#endif
 
 class SymmetricSolver : public mfem::Solver
 {

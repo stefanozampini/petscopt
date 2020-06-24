@@ -32,7 +32,6 @@ std::string type_name()
 /* Safely returns a pointer to class R from a void* pointer */
 template <class R,class A> inline R* mi_void_safe_cast(void *ctx)
 {
-
   R* r = dynamic_cast<R*>(static_cast<A*>(ctx));
   A* a = dynamic_cast<A*>(static_cast<R*>(ctx));
   if (!a && !r) {
@@ -46,6 +45,8 @@ template <class R,class A> inline R* mi_void_safe_cast(void *ctx)
   if (!r) r = static_cast<R*>(ctx);
   return r;
 }
+
+template <class R> inline R* mi_void_safe_cast(void *ctx) { return mi_void_safe_cast<R,R>(ctx); }
 
 }
 #endif

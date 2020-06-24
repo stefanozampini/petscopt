@@ -1,9 +1,12 @@
+#include <petscopt/petscopt_types.h>
+#include <petscopt/ksp.h>
 #include <petsc/private/kspimpl.h>
 #include <petscblaslapack.h>
 
 typedef struct {
-  PetscErrorCode (*inner)(Vec,Vec,PetscScalar*);
-  PetscErrorCode (*riesz)(Vec,Vec);
+  PetscErrorCode (*inner)(Vec,Vec,PetscScalar*,void*);
+  PetscErrorCode (*riesz)(Vec,Vec,void*);
+  void           *rctx;
   /* eigenvalues support */
   PetscInt       emax,ne;
   PetscReal      *ed,*eu,*wed,*weu;
@@ -16,7 +19,7 @@ static PetscErrorCode KSPHilbertCGRiesz(KSP ksp, Vec x, Vec y)
 
   PetscFunctionBegin;
   if (hcg->riesz) {
-    ierr = (*hcg->riesz)(x,y);CHKERRQ(ierr);
+    ierr = (*hcg->riesz)(x,y,hcg->rctx);CHKERRQ(ierr);
   } else {
     ierr = VecCopy(x,y);CHKERRQ(ierr);
   }
@@ -30,7 +33,7 @@ static PetscErrorCode KSPHilbertCGDot(KSP ksp, Vec x, Vec y, PetscScalar *d)
 
   PetscFunctionBegin;
   if (hcg->inner) {
-    ierr = (*hcg->inner)(x,y,d);CHKERRQ(ierr);
+    ierr = (*hcg->inner)(x,y,d,hcg->rctx);CHKERRQ(ierr);
   } else {
     ierr = VecDot(x,y,d);CHKERRQ(ierr);
   }
@@ -257,7 +260,25 @@ static PetscErrorCode KSPSolve_HilbertCG(KSP ksp)
       }
     }
   } while (ksp->its < ksp->max_it);
+  /* always return converged */
   if (ksp->its >= ksp->max_it) ksp->reason = KSP_CONVERGED_ITS;
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode KSPHilbertCGSetMaps(KSP ksp, PetscErrorCode (*inner)(Vec,Vec,PetscScalar*,void*), PetscErrorCode (*riesz)(Vec,Vec,void*), void* ctx)
+{
+  PetscErrorCode ierr;
+  KSP_HilbertCG  *hcg;
+  PetscBool      ishcg;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(ksp,KSP_CLASSID,1);
+  ierr = PetscObjectTypeCompare((PetscObject)ksp,KSPHILBERTCG,&ishcg);CHKERRQ(ierr);
+  if (!ishcg) PetscFunctionReturn(0);
+  hcg = (KSP_HilbertCG*)ksp->data;
+  hcg->inner = inner;
+  hcg->riesz = riesz;
+  hcg->rctx  = ctx;
   PetscFunctionReturn(0);
 }
 
@@ -267,10 +288,7 @@ PETSC_EXTERN PetscErrorCode KSPCreate_HilbertCG(KSP ksp)
   KSP_HilbertCG  *hcg;
 
   PetscFunctionBegin;
-  ierr = KSPSetSupportedNorm(ksp,KSP_NORM_NONE,PC_LEFT,3);CHKERRQ(ierr);
-  ierr = KSPSetSupportedNorm(ksp,KSP_NORM_NONE,PC_RIGHT,2);CHKERRQ(ierr);
-  ierr = KSPSetSupportedNorm(ksp,KSP_NORM_UNPRECONDITIONED,PC_LEFT,2);CHKERRQ(ierr);
-  ierr = KSPSetSupportedNorm(ksp,KSP_NORM_UNPRECONDITIONED,PC_RIGHT,2);CHKERRQ(ierr);
+  ierr = KSPSetSupportedNorm(ksp,KSP_NORM_NONE,PC_LEFT,1);CHKERRQ(ierr);
   ierr = KSPSetSupportedNorm(ksp,KSP_NORM_NATURAL,PC_LEFT,2);CHKERRQ(ierr);
 
   ierr = PetscNew(&hcg);CHKERRQ(ierr);

@@ -8,6 +8,7 @@
 #include <mfem/linalg/petsc.hpp>
 #include <mfem/fem/coefficient.hpp>
 #include <mfem/fem/pgridfunc.hpp>
+#include <mfem/fem/pbilinearform.hpp>
 #include <mfem/general/error.hpp>
 #include <mfem/general/socketstream.hpp>
 
@@ -68,11 +69,18 @@ private:
       void Update(mfem::Array<int>&,mfem::Array<double>&);
       virtual void Eval(double,mfem::Vector&);
    };
-   mfem::Array<int> ess_tdof_list;
+   mfem::Array<int>    ess_tdof_list;
    mfem::Array<double> ess_tdof_vals;
 
    BCHandler bchandler;
 
+   /* riesz support */
+   mfem::ParBilinearForm *mass;
+   mfem::Solver          *cg;
+   mfem::PetscParMatrix  *M,*bM;
+   mfem::Operator::Type  mid;
+
+   /* GLVis (partial) */
    std::vector<mfem::socketstream*> souts;
 
    void Init();
@@ -81,6 +89,7 @@ private:
    void SetUpOperators();
    void FillExcl();
    void UpdateExcl();
+   void ProjectCoefficientInternal(mfem::Coefficient*,mfem::VectorCoefficient*,mfem::MatrixCoefficient*,mfem::Array<mfem::ParGridFunction*>);
 
 protected:
    friend class PDBilinearFormIntegrator;
@@ -120,6 +129,7 @@ public:
    bool Scalar() { return scalar; }
    int GetComponents() { return ngf; }
    void GetCurrentVector(mfem::Vector&);
+   void GetCurrentVector(mfem::Vector&,mfem::Array<mfem::ParGridFunction*>&);
    void GetInitialVector(mfem::Vector&);
    void SetUseDerivCoefficients(bool=true);
    void EvalDerivCoefficient(mfem::ElementTransformation&,const mfem::Vector&,double*);
@@ -134,6 +144,12 @@ public:
    void SaveVisIt(const char*);
    void SaveParaView(const char*);
    void Visualize(const char* = NULL);
+
+   void Project(const mfem::Vector&,mfem::Vector&);
+   void ProjectCoefficient(mfem::Coefficient&);
+   void ProjectCoefficient(mfem::VectorCoefficient&);
+
+   mfem::PetscParMatrix* GetInner() { return bM ? bM : M; }
 
    mfem::PetscBCHandler* GetBCHandler() { return &bchandler; }
 

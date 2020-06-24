@@ -1,6 +1,9 @@
 #include <fstream>
 #include <mfemopt/mfemextra.hpp>
 #include <mfemopt/private/mfemoptpetscmacros.h>
+#include <mfem/linalg/petsc.hpp>
+#include <mfem/fem/plinearform.hpp>
+#include <mfem/fem/pbilinearform.hpp>
 #include <petscsf.h>
 
 namespace mfemopt
@@ -218,17 +221,34 @@ void MeshGetElementsTagged(Mesh *mesh, const Array<int>& which_tag, Array<bool>&
    }
 }
 
-void FiniteElementSpaceGetRangeAndDeriv(FiniteElementSpace& fes, int* r, int* d)
+void FiniteElementSpaceGetRangeAndDerivType(FiniteElementSpace& fes, int* r, int* d)
 {
    const FiniteElement* fe = fes.GetFE(0);
-   if (r) *r = fe ? fe->GetRangeType() : -1;
-   if (d) *d = fe ? fe->GetDerivType() : -1;
+   if (r) *r = fe ? fe->GetRangeType() : INT_MIN;
+   if (d) *d = fe ? fe->GetDerivType() : INT_MIN;
 }
 
-void ParFiniteElementSpaceGetRangeAndDeriv(ParFiniteElementSpace& fes, int* r, int* d)
+void FiniteElementSpaceGetRangeAndDerivMapType(FiniteElementSpace& fes, int* r, int* d)
 {
-   int lr[2] = {-1,-1}, gr[2];
-   FiniteElementSpaceGetRangeAndDeriv(fes,lr,lr+1);
+   const FiniteElement* fe = fes.GetFE(0);
+   if (r) *r = fe ? fe->GetMapType() : INT_MIN;
+   if (d) *d = fe ? fe->GetDerivMapType() : INT_MIN;
+}
+
+void ParFiniteElementSpaceGetRangeAndDerivType(ParFiniteElementSpace& fes, int* r, int* d)
+{
+   int lr[2], gr[2];
+   FiniteElementSpaceGetRangeAndDerivType(fes,lr,lr+1);
+   /* reduce for empty meshes */
+   MPI_Allreduce(lr,gr,2,MPI_INT,MPI_MAX,fes.GetParMesh()->GetComm());
+   if (r) *r = gr[0];
+   if (d) *d = gr[1];
+}
+
+void ParFiniteElementSpaceGetRangeAndDerivMapType(ParFiniteElementSpace& fes, int* r, int* d)
+{
+   int lr[2], gr[2];
+   FiniteElementSpaceGetRangeAndDerivMapType(fes,lr,lr+1);
    /* reduce for empty meshes */
    MPI_Allreduce(lr,gr,2,MPI_INT,MPI_MAX,fes.GetParMesh()->GetComm());
    if (r) *r = gr[0];
@@ -280,6 +300,86 @@ DiagonalMatrixCoefficient::~DiagonalMatrixCoefficient()
 {
   if (own) delete VQ;
 }
+
+#if 0
+void ProjectCoefficient_internal(Coefficient* Q, VectorCoefficient* VQ, ParGridFunction& proj)
+{
+  ParFiniteElementSpace *pfes = proj.ParFESpace();
+  int map_type;
+  ParFiniteElementSpaceGetRangeAndDerivMapType(*pfes,&map_type,NULL);
+
+  BilinearFormIntegrator *mass_integ = NULL;
+  LinearFormIntegrator *b_integ = NULL;
+  if (map_type == FiniteElement::VALUE ||
+      map_type == FiniteElement::INTEGRAL)
+  {
+     if (VQ)
+     {
+        mass_integ = new VectorMassIntegrator;
+        b_integ = new VectorDomainLFIntegrator(*VQ);
+     }
+     else
+     {
+        mass_integ = new MassIntegrator;
+        b_integ = new DomainLFIntegrator(*Q);
+     }
+  }
+  else if (map_type == FiniteElement::H_DIV ||
+           map_type == FiniteElement::H_CURL)
+  {
+     if (Q)
+     {
+        MFEM_ABORT("Not supported scalar + vectorFE");
+     }
+     else
+     {
+       mass_integ = new VectorFEMassIntegrator;
+       b_integ = new VectorFEDomainLFIntegrator(*VQ);
+     }
+  }
+  else
+  {
+     MFEM_ABORT("unknown type of FE space");
+  }
+  if (Q)
+  {
+     proj.ProjectDiscCoefficient(*Q,GridFunction::ARITHMETIC);
+  }
+  else
+  {
+     proj.ProjectDiscCoefficient(*VQ,GridFunction::ARITHMETIC);
+  }
+  Vector B(pfes->GetTrueVSize());
+  Vector X(pfes->GetTrueVSize());
+  ParLinearForm b(pfes);
+  b.AddDomainIntegrator(b_integ);
+  b.Assemble();
+  b.ParallelAssemble(B);
+
+  OperatorHandle A(Operator::PETSC_MATAIJ);
+  ParBilinearForm a(pfes);
+  a.AddDomainIntegrator(mass_integ);
+  a.Assemble(0);
+  a.Finalize(0);
+  a.ParallelAssemble(A);
+  proj.ParallelProject(X);
+  PetscPCGSolver cg(pfes->GetParMesh()->GetComm(),"coeff_l2_");
+  cg.SetOperator(*A.Ptr());
+  cg.iterative_mode = true;
+  cg.Mult(B, X);
+  proj.Distribute(X);
+}
+
+void ProjectCoefficient(Coefficient& Q, ParGridFunction& proj)
+{
+   ProjectCoefficient_internal(&Q,NULL,proj);
+}
+
+void ProjectCoefficient(VectorCoefficient& VQ, ParGridFunction& proj)
+{
+   ProjectCoefficient_internal(NULL,&VQ,proj);
+}
+#endif
 
 SymmetricSolver::SymmetricSolver(Solver *solver, bool owner, Operator* op, bool opowner)
 {

@@ -53,6 +53,16 @@ public:
    virtual ~ReducedFunctional() {}
 };
 
+// Abstract class for functions of the type f : R^m -> R to be minimized in an Hilbert space
+class HilbertReducedFunctional : public ReducedFunctional
+{
+public:
+   virtual void Riesz(const mfem::Vector&, mfem::Vector&) const = 0;
+   virtual void Inner(const mfem::Vector&, const mfem::Vector&, double*) const = 0;
+   virtual mfem::Operator& GetOperatorNorm() const = 0;
+   virtual ~HilbertReducedFunctional() {}
+};
+
 }
 #endif
 

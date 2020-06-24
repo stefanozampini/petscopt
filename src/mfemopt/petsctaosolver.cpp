@@ -93,6 +93,16 @@ void PetscOptimizationSolver::Init(ReducedFunctional& f)
    PetscParVector pH(PetscObjectComm((PetscObject)tao),h,true);
    ierr = TaoSetVariableBounds(tao,pL,pH); PCHKERRQ(tao,ierr);
 
+   /* LMVM support */
+   HilbertReducedFunctional *hf = const_cast<HilbertReducedFunctional *>
+                          (dynamic_cast<const HilbertReducedFunctional *>(&f));
+   if (hf)
+   {
+      ierr = TaoSetType(tao,TAOBLMVM); PCHKERRQ(tao,ierr);
+      PetscParMatrix pM(PetscObjectComm((PetscObject)tao),&hf->GetOperatorNorm(),Operator::ANY_TYPE);
+      ierr = TaoSetGradientNorm(tao,pM); PCHKERRQ(tao,ierr);
+      ierr = TaoLMVMSetH0(tao,pM); PCHKERRQ(tao,ierr);
+   }
 }
 
 void PetscOptimizationSolver::SetHessianType(Operator::Type hessType)

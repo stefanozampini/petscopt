@@ -36,8 +36,8 @@ private:
    void CreatePrivateContext();
 
 public:
-   PetscOptimizationSolver(MPI_Comm, const std::string &prefix = std::string());
-   PetscOptimizationSolver(MPI_Comm, ReducedFunctional&, const std::string &prefix = std::string());
+   PetscOptimizationSolver(MPI_Comm,const std::string &prefix = std::string());
+   PetscOptimizationSolver(MPI_Comm,ReducedFunctional&,const std::string &prefix = std::string());
    operator Tao() const { return tao; }
 
    virtual void Init(ReducedFunctional&);
@@ -50,9 +50,7 @@ public:
 class PetscNonlinearSolverOpt : public mfem::PetscNonlinearSolver
 {
 public:
-   PetscNonlinearSolverOpt(MPI_Comm,ReducedFunctional&,
-                           const std::string& = std::string(),
-                           bool = true);
+   PetscNonlinearSolverOpt(MPI_Comm,ReducedFunctional&,const std::string& = std::string(),bool = true);
 };
 
 }
