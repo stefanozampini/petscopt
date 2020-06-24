@@ -10,8 +10,9 @@ static const char help[] = "A simple total-variation based, primal-dual image re
 using namespace mfem;
 using namespace mfemopt;
 
-/* an Image represented through the MFEM Coefficient class */
 class Image;
+
+/* an Image represented through the MFEM Coefficient class */
 class ImageCoefficient : public Coefficient
 {
 private:
@@ -34,7 +35,7 @@ public:
    ~ImageVectorCoefficient() {};
 };
 
-/* an Image is represented through the MFEM Coefficient class */
+/* an Image as pixeled data on a mesh */
 class Image
 {
 private:
@@ -50,6 +51,7 @@ protected:
    int    nex,ney;
    double hx,hy;
    int    vdim;
+   double Lx,Ly;
 
    /* FEM representation */
    FiniteElementCollection *fec;
@@ -62,7 +64,7 @@ protected:
 
 public:
    Image() : imgcoeff(NULL), imgcoeffv(NULL), data(NULL), nex(0), ney(0), fec(NULL), pfes(NULL), sfes(NULL), pmesh(NULL) {}
-   Image(MPI_Comm,const char*,int=1,bool=true,bool=true,bool=false);
+   Image(MPI_Comm,const char*,int=1,bool=true,bool=true,bool=false,int=-1,int=-1,int=0,double=0.0,bool=false);
 
    PDCoefficient* CreatePDCoefficient();
 
@@ -74,7 +76,7 @@ public:
    ~Image() { delete imgcoeff; delete imgcoeffv; delete[] data; delete fec; delete pfes; delete sfes; delete pmesh; }
 };
 
-Image::Image(MPI_Comm comm, const char* filename, int ord, bool quad, bool vector, bool test_part)
+Image::Image(MPI_Comm comm, const char* filename, int ord, bool quad, bool vector, bool test_part, int mnex, int mney, int refit, double rerr, bool viz)
 {
    nex = ney = 0;
    std::string fname(filename);
@@ -93,16 +95,22 @@ Image::Image(MPI_Comm comm, const char* filename, int ord, bool quad, bool vecto
       std::cout << "Unkwnown extension (" << fext << ") in " << fname << std::endl;
       mfem_error("Unsupported filename");
    }
+   MFEM_VERIFY(nex > 0,"Must have at least 1 pixel in X direction");
+   MFEM_VERIFY(ney > 0,"Must have at least 1 pixel in Y direction");
 
-   double Lx = double(ney)/double(nex);
-   double Ly = 1.0;
+   Lx = double(ney)/double(nex);
+   Ly = 1.0;
 
-   hx = Lx/(nex-1.0);
-   hy = Ly/(ney-1.0);
+   hx = Lx/nex;
+   hy = Ly/ney;
 
-   Mesh *mesh = new Mesh(nex,ney,quad ? Element::QUADRILATERAL : Element::TRIANGLE,1,Lx,Ly);
+   /* 2D mesh (may have different number of elements) */
+   mnex = mnex < 1 ? nex : mnex;
+   mney = mney < 1 ? nex : mney;
+   Mesh *mesh = new Mesh(mnex,mney,quad ? Element::QUADRILATERAL : Element::TRIANGLE,1,Lx,Ly);
+   if (refit && quad) mesh->EnsureNCMesh();
 
-   /* For testing purposes, we speficy a partitioning */
+   /* For testing purposes, we specify a partitioning */
    if (test_part)
    {
       pmesh = ParMeshTest(comm,*mesh);
@@ -112,12 +120,58 @@ Image::Image(MPI_Comm comm, const char* filename, int ord, bool quad, bool vecto
       pmesh = new ParMesh(comm,*mesh);
    }
    delete mesh;
-   fec = new H1_FECollection(std::max(ord,1), 2);
+
+   ord = std::max(ord,1);
+   fec = new H1_FECollection(ord, 2);
    pfes = new ParFiniteElementSpace(pmesh, fec, vdim, Ordering::byVDIM);
    sfes = new ParFiniteElementSpace(pmesh, fec, 1, Ordering::byVDIM);
-
    imgcoeffv = new ImageVectorCoefficient(this);
    imgcoeff = new ImageCoefficient(this);
+
+   /* test refinements */
+   if (refit)
+   {
+      int rank;
+      MPI_Comm_rank(comm,&rank);
+
+      PDCoefficient tpm(*imgcoeff,pmesh,fec);
+      Array<ParGridFunction*> pgf = tpm.GetCoeffs();
+      ConstantCoefficient one(1.0);
+      DiffusionIntegrator integ(one);
+      L2_FECollection flux_fec(ord, 2);
+      ParFiniteElementSpace flux_fes(pmesh, &flux_fec, 2);
+      RT_FECollection smooth_flux_fec(ord-1, 2);
+      ParFiniteElementSpace smooth_flux_fes(pmesh, &smooth_flux_fec);
+      L2ZienkiewiczZhuEstimator estimator(integ, *pgf[0], flux_fes, smooth_flux_fes);
+
+      ThresholdRefiner refiner(estimator);
+      if (rerr > 0.0)
+      {
+         refiner.SetTotalErrorFraction(rerr);
+      }
+      else if (rerr < 0.0)
+      {
+         refiner.SetLocalErrorGoal(-rerr);
+      }
+
+      for (int i = 0; i < refit; i++)
+      {
+         if (viz) tpm.Visualize("RJlc");
+         refiner.Apply(*pmesh);
+         if (refiner.Stop() && !rank)
+         {
+            std::cout << "Stopping criterion satisfied. Stop." << std::endl;
+            break;
+         }
+         pfes->Update();
+         sfes->Update();
+         tpm.Update();
+         tpm.ProjectCoefficient(*imgcoeff);
+         if (i == refit -1 && !rank) { std::cout << "Maximum number of mesh refinement iterations reached. Stop." << std::endl; }
+      }
+      tpm.ProjectCoefficient(*imgcoeff);
+      if (viz) tpm.Visualize("RJlc");
+   }
 }
 
 void Image::Normalize()
@@ -143,7 +197,7 @@ void Image::Normalize()
             data[vdim*i+v] = (data[vdim*i+v] - im[v])/(iM[v] - im[v]);
          }
       }
-      else
+      else /* just to avoid division by zero */
       {
          for (int i = 0; i < ney*nex; i++)
          {
@@ -273,6 +327,7 @@ void Image::Save(const char* filename)
    gf.Save(ofs);
 }
 
+/* Uses mfem's ProjectDiscCoefficient, not a proper L2 projection */
 void Image::Visualize(const char* name)
 {
    MPI_Comm comm = pmesh->GetComm();
@@ -338,6 +393,7 @@ PDCoefficient* Image::CreatePDCoefficient()
    }
 }
 
+/* Evaluate the coefficient */
 double ImageCoefficient::Eval(ElementTransformation &T,
                          const IntegrationPoint &ip)
 {
@@ -345,11 +401,19 @@ double ImageCoefficient::Eval(ElementTransformation &T,
    Vector transip(x, 3);
 
    T.Transform(ip, transip);
+   if (x[0] >= img->Lx) x[0] = img->Lx-(img->hx/2);
+   if (x[0] < 0.0) x[0] = 0.0;
+   if (x[1] >= img->Ly) x[1] = img->Ly-(img->hy/2);
+   if (x[1] < 0.0) x[1] = 0.0;
    int ix = std::floor(x[0]/img->hx);
    int iy = std::floor(x[1]/img->hy);
-   MFEM_VERIFY(0 <= ix && ix < img->nex,"Wrong ix " << ix);
-   MFEM_VERIFY(0 <= iy && iy < img->ney,"Wrong iy " << iy);
-   return img->data[iy + ix*img->ney];
+   MFEM_VERIFY(0 <= ix && ix < img->nex,"Wrong ix " << ix << ", nex = " << img->nex << ", x = " << x[0] << ", hx = " << img->hx);
+   MFEM_VERIFY(0 <= iy && iy < img->ney,"Wrong iy " << iy << ", ney = " << img->ney << ", y = " << x[1] << ", hy = " << img->hy);
+
+   double val = 0.0;
+   const int vdim = img->vdim;
+   for (int v = 0; v < vdim; v++) val += img->data[vdim*(iy + ix*img->ney)+v] * img->data[vdim*(iy + ix*img->ney)+v];
+   return std::sqrt(val);
 }
 
 ImageVectorCoefficient::ImageVectorCoefficient(Image *_img) : VectorCoefficient(0)
@@ -359,6 +423,7 @@ ImageVectorCoefficient::ImageVectorCoefficient(Image *_img) : VectorCoefficient(
    time = 0;
 }
 
+/* Evaluate the vector coefficient */
 void ImageVectorCoefficient::Eval(Vector &V,
                                   ElementTransformation &T,
                                   const IntegrationPoint &ip)
@@ -367,34 +432,40 @@ void ImageVectorCoefficient::Eval(Vector &V,
    Vector transip(x, 3);
 
    T.Transform(ip, transip);
+   if (x[0] >= img->Lx) x[0] = img->Lx-(img->hx/2);
+   if (x[0] < 0.0) x[0] = 0.0;
+   if (x[1] >= img->Ly) x[1] = img->Ly-(img->hy/2);
+   if (x[1] < 0.0) x[1] = 0.0;
    int ix = std::floor(x[0]/img->hx);
    int iy = std::floor(x[1]/img->hy);
-   MFEM_VERIFY(0 <= ix && ix < img->nex,"Wrong ix " << ix);
-   MFEM_VERIFY(0 <= iy && iy < img->ney,"Wrong iy " << iy);
+   MFEM_VERIFY(0 <= ix && ix < img->nex,"Wrong ix " << ix << ", nex = " << img->nex << ", x = " << x[0] << ", hx = " << img->hx);
+   MFEM_VERIFY(0 <= iy && iy < img->ney,"Wrong iy " << iy << ", ney = " << img->ney << ", y = " << x[1] << ", hy = " << img->hy);
    for (int v = 0; v < vdim; v++) V[v] = img->data[vdim*(iy + ix*img->ney)+v];
 }
 
 /* the objective functional as a sum of Tikhonov and TV terms */
+/* obj(u) = 1/2 int_Omega (u - u0)^2 + TV(u) */
 class ImageFunctional : public ReducedFunctional
 {
 private:
+   PDCoefficient *imgpd;
    mutable PetscParMatrix H;
    mutable TikhonovRegularizer *tk;
    mutable TVRegularizer *tv;
 
 public:
-   ImageFunctional(int,TikhonovRegularizer*,TVRegularizer*);
+   ImageFunctional(PDCoefficient*,TikhonovRegularizer*,TVRegularizer*);
    virtual void ComputeObjective(const Vector&,double*) const;
    virtual void ComputeGradient(const Vector&,Vector&) const;
    virtual Operator& GetHessian(const Vector&) const;
    virtual void Init(const Vector&);
    virtual void Update(int,const Vector&,const Vector&,const Vector&,const Vector&);
-   //virtual void PostCheck(const Vector&,Vector&,Vector&,bool&,bool&) const;
+   PDCoefficient* GetPDCoefficient() const { return imgpd; }
 };
 
-ImageFunctional::ImageFunctional(int _lsize, TikhonovRegularizer *_tk, TVRegularizer *_tv) : H(), tk(_tk), tv(_tv)
+ImageFunctional::ImageFunctional(PDCoefficient *_imgpd, TikhonovRegularizer *_tk, TVRegularizer *_tv) : imgpd(_imgpd), H(), tk(_tk), tv(_tv)
 {
-   height = width = _lsize;
+   height = width = imgpd->GetLocalSize();
 }
 
 void ImageFunctional::ComputeObjective(const Vector& u, double *f) const
@@ -435,8 +506,9 @@ Operator& ImageFunctional::GetHessian(const Vector& u) const
    if (pHtv) H = *pHtv;
    else if (pHtk) H = *pHtk;
 
-   /* These matrices have the same (or possibly a subset, if using vector TV with fully coupled channels) pattern,
-      the MFEM overloaded += operator uses DIFFERENT_NONZERO_PATTERN */
+   /* These matrices have the same pattern (or possibly a subset, if using vector TV with fully coupled channels),
+      the MFEM overloaded += operator uses DIFFERENT_NONZERO_PATTERN for generality
+      Here, we directly use PETSc API */
    if (pHtv && pHtk) {
       PetscErrorCode ierr;
 
@@ -470,23 +542,52 @@ void ImageFunctional::Update(int it, const Vector& F, const Vector& X,
    }
 }
 
+/* This method is called at beginning of the optimization loop
+   it only updates the dual variables of TV */
 void ImageFunctional::Init(const Vector& X)
 {
    if (tv) tv->UpdateDual(X);
 }
 
-/* This method is called after a successful line search
-   We use it to update the dual variable for the TV regularizer */
-#if 0
-void ImageFunctional::PostCheck(const Vector& X, Vector& Y, Vector &W, bool& cy, bool& cw) const
+/* The reduced functional, now in Hilbert space.
+   We need to provide methods to compute Riesz representers and inner products */
+class HilbertImageFunctional : public HilbertReducedFunctional
 {
-   /* we don't change the step (Y) or the updated solution (W = X - lambda*Y) */
-   cy = false;
-   cw = false;
-   double lambda = X.Size() ? (X[0] - W[0])/Y[0] : 0.0;
-   tv->UpdateDual(X,Y,lambda);
+private:
+   ImageFunctional img;
+public:
+   HilbertImageFunctional(PDCoefficient* c, TikhonovRegularizer* tk, TVRegularizer* tv) : img(c,tk,tv) { height = width = c->GetLocalSize(); }
+   /* ReducedFunctional interface */
+   virtual void ComputeObjective(const Vector& x,double* f) const { img.ComputeObjective(x,f); }
+   virtual void ComputeGradient(const Vector& x,Vector& y) const { img.ComputeGradient(x,y); }
+   virtual Operator& GetHessian(const Vector& x) const { return img.GetHessian(x); }
+   virtual void Init(const Vector& x) { img.Init(x); }
+   virtual void Update(int a,const Vector& b,const Vector& c,const Vector& d,const Vector& e) { img.Update(a,b,c,d,e); }
+   /* HilbertReducedFunctional interface */
+   virtual void Riesz(const Vector&,Vector&) const;
+   virtual void Inner(const Vector&,const Vector&,double*) const;
+   virtual Operator& GetOperatorNorm() const;
+};
+
+void HilbertImageFunctional::Riesz(const Vector &x, Vector& y) const
+{
+   PDCoefficient* pd = img.GetPDCoefficient();
+   pd->Project(x,y); /* y = mass^{-1} x */
 }
-#endif
+
+void HilbertImageFunctional::Inner(const Vector &x, const Vector& y, double *f) const
+{
+   PetscParMatrix *M = img.GetPDCoefficient()->GetInner();
+   Vector t(y);
+   M->Mult(x,t);
+   *f = InnerProduct(M->GetComm(),y,t);
+}
+
+Operator& HilbertImageFunctional::GetOperatorNorm() const
+{
+   PDCoefficient* pd = img.GetPDCoefficient();
+   return *(pd->GetInner());
+}
 
 /* the main routine */
 int main(int argc, char* argv[])
@@ -501,7 +602,9 @@ int main(int argc, char* argv[])
    PetscBool quad = PETSC_FALSE, normalize = PETSC_TRUE, mataij = PETSC_FALSE;
    PetscReal noise = 0.0, tv_alpha = 0.0007, tv_beta = 0.1, tk_alpha = 1.0;
    PetscInt  ord = 1, randseed = 1; /* make the tests reproducible on a given machine */
-   PetscBool test = PETSC_FALSE, test_progress = PETSC_FALSE, test_part = PETSC_FALSE, test_taylor = PETSC_FALSE;
+   PetscInt  mnex = -1, mney = -1, mref = 0; /* Image mesh elements, can be different from number of pixels (if positive), and number of refinements */
+   PetscReal merr = 0.5;
+   PetscBool test = PETSC_FALSE, test_progress = PETSC_FALSE, test_part = PETSC_FALSE, test_taylor = PETSC_FALSE, hilbert = PETSC_FALSE;
 
    ierr = PetscOptionsGetBool(NULL,NULL,"-normalize",&normalize,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetBool(NULL,NULL,"-visit",&visit,NULL);CHKERRQ(ierr);
@@ -517,6 +620,11 @@ int main(int argc, char* argv[])
    ierr = PetscOptionsGetBool(NULL,NULL,"-mataij",&mataij,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetBool(NULL,NULL,"-quad",&quad,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetInt(NULL,NULL,"-order",&ord,NULL);CHKERRQ(ierr);
+   ierr = PetscOptionsGetInt(NULL,NULL,"-mesh_nex",&mnex,NULL);CHKERRQ(ierr);
+   ierr = PetscOptionsGetInt(NULL,NULL,"-mesh_ney",&mney,NULL);CHKERRQ(ierr);
+   ierr = PetscOptionsGetInt(NULL,NULL,"-mesh_nref",&mref,NULL);CHKERRQ(ierr);
+   ierr = PetscOptionsGetReal(NULL,NULL,"-mesh_rerr",&merr,NULL);CHKERRQ(ierr);
+   ierr = PetscOptionsGetBool(NULL,NULL,"-hilbert",&hilbert,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetReal(NULL,NULL,"-noise",&noise,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetReal(NULL,NULL,"-tk_alpha",&tk_alpha,NULL);CHKERRQ(ierr);
    ierr = PetscOptionsGetReal(NULL,NULL,"-tv_alpha",&tv_alpha,NULL);CHKERRQ(ierr);
@@ -530,7 +638,7 @@ int main(int argc, char* argv[])
 
    /* indent to have stacked objects destroyed before PetscFinalize() is called */
    {
-      Image img(PETSC_COMM_WORLD,imgfile,ord,quad,vector,test_part);
+      Image img(PETSC_COMM_WORLD,imgfile,ord,quad,vector,test_part,mnex,mney,mref,merr,viz);
       if (normalize) img.Normalize();
 
       /* The optimization variable */
@@ -538,12 +646,12 @@ int main(int argc, char* argv[])
 
       if (viz)
       {
-         img.Visualize("Image to be reconstructed");
+         imgpd->Visualize("RJlc");
       }
       img.AddNoise(noise);
       if (viz && noise != 0.0)
       {
-         img.Visualize("Image to be reconstructed (noisy)");
+         imgpd->Visualize("RJlc");
       }
 
       /* Regularizers : obj = tk_alpha * 0.5 * || u - u0 || ^2 + tv_alpha * TV(u,tv_beta) */
@@ -556,7 +664,9 @@ int main(int argc, char* argv[])
       tv.Project(project);
 
       /* The full objective */
-      ImageFunctional objective(imgpd->GetLocalSize(),&tk,&tv);
+      ReducedFunctional *objective;
+      if (hilbert) objective = new HilbertImageFunctional(imgpd,&tk,&tv);
+      else objective = new ImageFunctional(imgpd,&tk,&tv);
 
       Vector dummy;
       Vector u(imgpd->GetLocalSize());
@@ -582,10 +692,10 @@ int main(int argc, char* argv[])
          tk.TestFDHessian(PETSC_COMM_WORLD,dummy,u,0.0);
          ierr = PetscPrintf(PETSC_COMM_WORLD,"---------------------------------------\n");CHKERRQ(ierr);
          ierr = PetscPrintf(PETSC_COMM_WORLD,"Image tests\n");CHKERRQ(ierr);
-         objective.ComputeObjective(u,&f);
+         objective->ComputeObjective(u,&f);
          ierr = PetscPrintf(PETSC_COMM_WORLD,"Obj %g\n",f);CHKERRQ(ierr);
-         objective.TestFDGradient(PETSC_COMM_WORLD,u,1.e-6,test_progress);
-         objective.TestFDHessian(PETSC_COMM_WORLD,u);
+         objective->TestFDGradient(PETSC_COMM_WORLD,u,1.e-6,test_progress);
+         objective->TestFDHessian(PETSC_COMM_WORLD,u);
          ierr = PetscPrintf(PETSC_COMM_WORLD,"---------------------------------------\n");CHKERRQ(ierr);
          MFEM_VERIFY(std::abs(f1+f2-f) < PETSC_SMALL,"Error eval " << std::abs(f1+f2-f));
       }
@@ -594,10 +704,10 @@ int main(int argc, char* argv[])
       {
 	 u.Randomize(randseed);
          tv.UpdateDual(u);
-         objective.TestTaylor(PETSC_COMM_WORLD,u,true);
+         objective->TestTaylor(PETSC_COMM_WORLD,u,true);
       }
       /* Test newton solver */
-      PetscNonlinearSolverOpt newton(PETSC_COMM_WORLD,objective);
+      PetscNonlinearSolverOpt newton(PETSC_COMM_WORLD,*objective);
 
       NewtonMonitor mymonitor;
       if (mon) newton.SetMonitor(&mymonitor);
@@ -620,7 +730,7 @@ int main(int argc, char* argv[])
       }
 
       /* Test optimization solver */
-      PetscOptimizationSolver opt(PETSC_COMM_WORLD,objective,"opt_");
+      PetscOptimizationSolver opt(PETSC_COMM_WORLD,*objective,"opt_");
 
       OptimizationMonitor myoptmonitor;
       if (mon) opt.SetMonitor(&myoptmonitor);
@@ -642,6 +752,7 @@ int main(int argc, char* argv[])
          if (paraview) imgpd->SaveParaView("reconstructed_image_opt_paraview");
       }
 
+      delete objective;
       delete imgpd;
    }
    MFEMOptFinalize();
@@ -658,6 +769,12 @@ int main(int argc, char* argv[])
     nsize: 2
     suffix: test
     args: -glvis 0 -test_partitioning -test -test_progress 0 -image ${petscopt_dir}/share/petscopt/data/img_small.bmp -monitor 0 -snes_converged_reason -quad 0 -order 2 -opt_tao_converged_reason -opt_tao_type bnls -test_taylor -taylor_seed 2
+
+  test:
+    filter: sed -e "s/-nan/nan/g"
+    nsize: 2
+    suffix: test_hilbert
+    args: -glvis 0 -test_partitioning -image ${petscopt_dir}/share/petscopt/data/logo_noise.txt -quad {{0 1}separate output} -order 1 -hilbert -mesh_nex 4 -mesh_ney 12 -mesh_rerr 0.4 -mesh_nref 3 -snes_converged_reason -snes_rtol 1.e-10 -snes_atol 1.e-10 -ksp_rtol 1.e-2 -ksp_atol 1.e-10 -primaldual 0 -symmetrize 0 -monitor 0 -snes_converged_reason -snes_type {{newtonls newtontr}separate output} -opt_tao_converged_reason -opt_tao_converged_reason -opt_tao_gatol 1.e-10
 
   test:
     filter: sed -e "s/-nan/nan/g"

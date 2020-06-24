@@ -1,0 +1,3 @@
+Maximum number of mesh refinement iterations reached. Stop.
+Nonlinear  solve converged due to CONVERGED_FNORM_ABS iterations 20
+TAO solve converged due to CONVERGED_GATOL iterations 65
