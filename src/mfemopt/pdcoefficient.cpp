@@ -654,11 +654,9 @@ void PDCoefficient::SetUpOperators()
          }
       }
       /* mass matrix */
-      PetscParMatrix *nM = RAP(M,P);
+      PetscParMatrix *nM = new PetscParMatrix(*M,global_cols,global_cols);
       delete M;
       M = nM;
-      PetscParVector dummy(pfes->GetParMesh()->GetComm(),0);
-      M->EliminateRowsCols(ess_tdof_list,dummy,dummy);
       cg->SetOperator(*M);
    }
 
@@ -676,7 +674,7 @@ void PDCoefficient::SetUpOperators()
    }
 
    /* Update local size */
-   lsize = pcoeffgf.Size()*P->Width();
+   lsize = ngf*P->Width();
 
    /* Update work vector */
    pwork.SetSize(pfes->GetTrueVSize());
