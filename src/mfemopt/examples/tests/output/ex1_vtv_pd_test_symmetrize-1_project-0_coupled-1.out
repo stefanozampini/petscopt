@@ -1,27 +1,27 @@
 ---------------------------------------
 TV tests
-Obj 0.0113776
+Obj 0.0121805
 ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing design gradient
-||g|| = 0.00245451, ||g_fd|| = 0.00245451, ||g - g_fd|| = 1.03527e-11, ||g-g_fd||/||g_fd|| = 4.21784e-09, cos() = 1.
+||g|| = 0.00182507, ||g_fd|| = 0.00182507, ||g - g_fd|| = 1.47652e-11, ||g-g_fd||/||g_fd|| = 8.09023e-09, cos() = 1.
 ObjectiveFunction::TestFDHessian design x design
-||H||_F = 0.0120755, ||H_fd||_F = 0.0120755, ||H - H_fd||_F = 1.12058e-08, ||H-H_fd||_F/||H_fd||_F = 9.27979e-07
+||H||_F = 0.015119, ||H_fd||_F = 0.015119, ||H - H_fd||_F = 1.86312e-08, ||H-H_fd||_F/||H_fd||_F = 1.23231e-06
 ---------------------------------------
 Tikhonov tests
-Obj 0.210439
+Obj 0.21602
 ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing design gradient
-||g|| = 0.0423127, ||g_fd|| = 0.0423127, ||g - g_fd|| = 2.36318e-10, ||g-g_fd||/||g_fd|| = 5.58503e-09, cos() = 1.
+||g|| = 0.0311185, ||g_fd|| = 0.0311185, ||g - g_fd|| = 3.2229e-10, ||g-g_fd||/||g_fd|| = 1.03568e-08, cos() = 1.
 ObjectiveFunction::TestFDHessian design x design
-||H||_F = 0.0564733, ||H_fd||_F = 0.0564733, ||H - H_fd||_F = 1.73896e-11, ||H-H_fd||_F/||H_fd||_F = 3.07927e-10
+||H||_F = 0.040174, ||H_fd||_F = 0.040174, ||H - H_fd||_F = 9.56453e-11, ||H-H_fd||_F/||H_fd||_F = 2.38078e-09
 ---------------------------------------
 Image tests
-Obj 0.221816
+Obj 0.2282
 ReducedFunctional::TestFDGradient, delta: 1e-06
 -> hang tight while computing state gradient
-||g|| = 0.0429971, ||g_fd|| = 0.0429971, ||g - g_fd|| = 2.66191e-10, ||g-g_fd||/||g_fd|| = 6.19089e-09, cos() = 1.
+||g|| = 0.0316349, ||g_fd|| = 0.0316349, ||g - g_fd|| = 3.68494e-10, ||g-g_fd||/||g_fd|| = 1.16483e-08, cos() = 1.
 ReducedFunctional::TestFDHessian
-||H||_F = 0.0614279, ||H_fd||_F = 0.0614279, ||H - H_fd||_F = 1.12103e-08, ||H-H_fd||_F/||H_fd||_F = 1.82495e-07
+||H||_F = 0.0473162, ||H_fd||_F = 0.0473162, ||H - H_fd||_F = 1.86267e-08, ||H-H_fd||_F/||H_fd||_F = 3.93665e-07
 ---------------------------------------
-it=0	lit=0	obj=6.930925e-01	(g,du)=-0.000000e+00	||g||=7.994422e-02	step=1.000000e+00
-it=0	lit=0	obj=6.930925e-01	(g,du)=-0.000000e+00	||g||=7.994422e-02	step=1.000000e+00
+it=0	lit=0	obj=6.716487e-01	(g,du)=-0.000000e+00	||g||=5.622377e-02	step=1.000000e+00
+it=0	lit=0	obj=6.716487e-01	(g,du)=-0.000000e+00	||g||=5.622377e-02	step=1.000000e+00

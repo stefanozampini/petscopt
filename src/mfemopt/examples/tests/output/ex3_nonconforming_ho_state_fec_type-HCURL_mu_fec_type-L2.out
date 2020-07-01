@@ -1,17 +1,17 @@
 Using param fec type L2, order 2
 Using state fec type HCURL, order 2
-[SP_VS] ||   op_M_pd - op_M||: 0.000499678
+[SP_VS] ||   op_M_pd - op_M||: 0.000551706
 [SP_VS] ||    op_M_m - op_M||: 9.46231e-16
-[SP_VS] || op_M_pd_m - op_M||: 0.000499678
+[SP_VS] || op_M_pd_m - op_M||: 0.000551706
 [SP_VS] Test null parameter
 PDOperator::TestFDGradient wrt design
 ||G|| = 0., ||G^T|| = 0., ||G - (G^T)^T||/||G|| = 0., ||G_fd|| = 0., ||G_fd - G|| = 0.
 [SP_VS] Test non-null parameter
 PDOperator::TestFDGradient wrt design
 ||G|| = 1.09428, ||G^T|| = 1.09428, ||G - (G^T)^T||/||G|| = 1.00599e-16, ||G_fd|| = 1.09428, ||G_fd - G|| = 1.755e-08
-[SP_VS_VI] ||   op_M_pd - op_M||: 6.6978e-05
+[SP_VS_VI] ||   op_M_pd - op_M||: 7.82687e-05
 [SP_VS_VI] ||    op_M_m - op_M||: 1.76508e-16
-[SP_VS_VI] || op_M_pd_m - op_M||: 6.6978e-05
+[SP_VS_VI] || op_M_pd_m - op_M||: 7.82687e-05
 [SP_VS_VI] Test null parameter
 PDOperator::TestFDGradient wrt design
 ||G|| = 0., ||G^T|| = 0., ||G - (G^T)^T||/||G|| = 0., ||G_fd|| = 0., ||G_fd - G|| = 0.

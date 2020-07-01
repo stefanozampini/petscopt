@@ -1,27 +1,27 @@
 ---------------------------------------
 TV tests
-Obj 0.00728639
+Obj 0.00775781
 ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing design gradient
-||g|| = 0.00154236, ||g_fd|| = 0.00154236, ||g - g_fd|| = 5.09807e-12, ||g-g_fd||/||g_fd|| = 3.30537e-09, cos() = 1.
+||g|| = 0.00115562, ||g_fd|| = 0.00115562, ||g - g_fd|| = 6.49016e-12, ||g-g_fd||/||g_fd|| = 5.61616e-09, cos() = 1.
 ObjectiveFunction::TestFDHessian design x design
-||H||_F = 0.00530276, ||H_fd||_F = 0.00530276, ||H - H_fd||_F = 3.18043e-10, ||H-H_fd||_F/||H_fd||_F = 5.9977e-08
+||H||_F = 0.00457921, ||H_fd||_F = 0.00457921, ||H - H_fd||_F = 4.51524e-10, ||H-H_fd||_F/||H_fd||_F = 9.8603e-08
 ---------------------------------------
 Tikhonov tests
-Obj 0.210439
+Obj 0.21602
 ObjectiveFunction::TestFDGradient, delta: 1e-06
 -> hang tight while computing design gradient
-||g|| = 0.0423127, ||g_fd|| = 0.0423127, ||g - g_fd|| = 2.36318e-10, ||g-g_fd||/||g_fd|| = 5.58503e-09, cos() = 1.
+||g|| = 0.0311185, ||g_fd|| = 0.0311185, ||g - g_fd|| = 3.2229e-10, ||g-g_fd||/||g_fd|| = 1.03568e-08, cos() = 1.
 ObjectiveFunction::TestFDHessian design x design
-||H||_F = 0.0564733, ||H_fd||_F = 0.0564733, ||H - H_fd||_F = 1.73896e-11, ||H-H_fd||_F/||H_fd||_F = 3.07927e-10
+||H||_F = 0.040174, ||H_fd||_F = 0.040174, ||H - H_fd||_F = 9.56453e-11, ||H-H_fd||_F/||H_fd||_F = 2.38078e-09
 ---------------------------------------
 Image tests
-Obj 0.217725
+Obj 0.223778
 ReducedFunctional::TestFDGradient, delta: 1e-06
 -> hang tight while computing state gradient
-||g|| = 0.0427075, ||g_fd|| = 0.0427075, ||g - g_fd|| = 2.63897e-10, ||g-g_fd||/||g_fd|| = 6.17918e-09, cos() = 1.
+||g|| = 0.0314473, ||g_fd|| = 0.0314473, ||g - g_fd|| = 3.644e-10, ||g-g_fd||/||g_fd|| = 1.15876e-08, cos() = 1.
 ReducedFunctional::TestFDHessian
-||H||_F = 0.0597881, ||H_fd||_F = 0.0597881, ||H - H_fd||_F = 4.33255e-10, ||H-H_fd||_F/||H_fd||_F = 7.24651e-09
+||H||_F = 0.0432028, ||H_fd||_F = 0.0432028, ||H - H_fd||_F = 5.01945e-10, ||H-H_fd||_F/||H_fd||_F = 1.16184e-08
 ---------------------------------------
-it=0	lit=0	obj=6.928711e-01	(g,du)=-0.000000e+00	||g||=7.994422e-02	step=1.000000e+00
-it=0	lit=0	obj=6.928711e-01	(g,du)=-0.000000e+00	||g||=7.994422e-02	step=1.000000e+00
+it=0	lit=0	obj=6.714274e-01	(g,du)=-0.000000e+00	||g||=5.622377e-02	step=1.000000e+00
+it=0	lit=0	obj=6.714274e-01	(g,du)=-0.000000e+00	||g||=5.622377e-02	step=1.000000e+00
