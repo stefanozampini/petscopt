@@ -103,7 +103,7 @@ Vec Object: 1 MPI processes
   max-norm ||G - Gfd||/||G|| = 2.46836e-07, ||G - Gfd|| = 1.8177e-14
  11 TAO,  Function value: 1.44286e-14,  Residual: 1.17642e-07 
   ---------- Testing Gradient -------------
-  ||Gfd|| 1.48335e-11, ||G|| = 0., angle cosine = (Gfd'G)/||Gfd||||G|| = -nan.
+  ||Gfd|| 1.48335e-11, ||G|| = 0., angle cosine = (Gfd'G)/||Gfd||||G|| = nan.
   2-norm ||G - Gfd||/||G|| = 1., ||G - Gfd|| = 1.48335e-11
   max-norm ||G - Gfd||/||G|| = 1., ||G - Gfd|| = 1.45326e-11
  12 TAO,  Function value: 2.43758e-22,  Residual: 0. 

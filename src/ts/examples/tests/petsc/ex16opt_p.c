@@ -673,6 +673,7 @@ PetscErrorCode FormHessian_AO(Tao tao,Vec P,Mat H,Mat Hp,void *ctx)
       args: -ts_trajectory_type memory -adjointode -tao_view -tao_monitor -tao_gttol 1.e-5 -tsgradient_adjoint_ts_atol 1.e-9
 
     test:
+      filter: sed -e "s/-nan/nan/g"
       suffix: ao_discrete
       args: -ts_trajectory_type memory -adjointode -tao_view -tao_monitor -tao_gttol 1.e-5 -tao_type tron -tao_mf_hessian -ts_type {{rk cn}separate output} -ts_adapt_type none -tao_test_gradient -tsgradient_adjoint_discrete
 

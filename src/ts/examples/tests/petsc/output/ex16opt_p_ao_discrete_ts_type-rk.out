@@ -32,8 +32,8 @@
   2-norm ||G - Gfd||/||G|| = 2.30866e-08, ||G - Gfd|| = 4.26477e-10
   max-norm ||G - Gfd||/||G|| = 2.30866e-08, ||G - Gfd|| = 4.26477e-10
   ---------- Testing Gradient -------------
-  ||Gfd|| -nan., ||G|| = -nan., angle cosine = (Gfd'G)/||Gfd||||G|| = -nan.
-  2-norm ||G - Gfd||/||G|| = -nan., ||G - Gfd|| = -nan.
+  ||Gfd|| nan., ||G|| = nan., angle cosine = (Gfd'G)/||Gfd||||G|| = nan.
+  2-norm ||G - Gfd||/||G|| = nan., ||G - Gfd|| = nan.
   max-norm ||G - Gfd||/||G|| = nan., ||G - Gfd|| = nan.
   ---------- Testing Gradient -------------
   ||Gfd|| 3.18131, ||G|| = 3.18131, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
