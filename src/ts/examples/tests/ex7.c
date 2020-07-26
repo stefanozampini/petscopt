@@ -1,6 +1,7 @@
 static const char help[] = "Reproduced from CVODE testuite.\n";
 /*
   This example from https://github.com/LLNL/sundials/blob/master/examples/cvodes/serial/cvsHessian_ASA_FSA.c
+  Output can be checked against https://github.com/LLNL/sundials/blob/master/examples/cvodes/serial/cvsHessian_ASA_FSA.out
   Computes the gradient and the Hessian of
 
   Obj(y) = \int^2_0  0.5 * ( y1^2 + y2^2 + y3^2 ) dt
@@ -385,12 +386,13 @@ int main(int argc, char* argv[])
 {
   OptCtx         opt;
   TS             ts;
+  TSAdapt        adapt;
   Mat            J,H;
   Vec            U,M,G;
   PetscScalar    *g;
   PetscReal      t0,tf,dt,obj;
-  PetscBool      testtao = PETSC_FALSE, testtaylor = PETSC_FALSE;
-  PetscBool      flg, check_dae = PETSC_FALSE;
+  PetscBool      testtao = PETSC_FALSE, testtaylor = PETSC_TRUE, testtlm = PETSC_TRUE;
+  PetscBool      check_dae = PETSC_FALSE, viewhessian = PETSC_TRUE;
   PetscReal      AppCtx[2];
   PetscErrorCode ierr;
 
@@ -407,6 +409,8 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsBool("-check","Check Hessian DAE terms","",check_dae,&check_dae,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_tao","Solve the optimization problem","",testtao,&testtao,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_taylor","Run Taylor test","",testtaylor,&testtaylor,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-test_tlm","Test Tangent Linear Model to compute the gradient","",testtlm,&testtlm,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-view_hessian","View Hessian matrix","",viewhessian,&viewhessian,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsEnd();CHKERRQ(ierr);
 
   /* state vectors */
@@ -417,7 +421,9 @@ int main(int argc, char* argv[])
   /* ODE solver */
   ierr = TSCreate(PETSC_COMM_SELF,&ts);CHKERRQ(ierr);
   ierr = TSSetTolerances(ts,1.e-8,NULL,1.e-8,NULL);CHKERRQ(ierr);
-  ierr = TSSetType(ts,TSTHETA);CHKERRQ(ierr);
+  ierr = TSSetType(ts,TSRK);CHKERRQ(ierr);
+  ierr = TSGetAdapt(ts,&adapt);CHKERRQ(ierr);
+  ierr = TSAdaptSetType(adapt,TSADAPTNONE);CHKERRQ(ierr);
   ierr = TSSetSolution(ts,U);CHKERRQ(ierr);
   ierr = VecDestroy(&U);CHKERRQ(ierr);
   ierr = MatCreateSeqDense(PETSC_COMM_SELF,3,3,NULL,&J);CHKERRQ(ierr);
@@ -481,21 +487,52 @@ int main(int argc, char* argv[])
     ierr = PetscRandomDestroy(&r);CHKERRQ(ierr);
   }
 
-  /* null test */
+  /* Evaluate objective and gradient */
   opt.t0 = t0;
   opt.dt = dt;
   opt.tf = tf;
   opt.ts = ts;
-  ierr = FormFunction(NULL,M,&obj,&opt);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"Function test: %g\n",(double)obj);CHKERRQ(ierr);
+  ierr = TSComputeObjectiveAndGradient(ts,opt.t0,opt.dt,opt.tf,NULL,M,NULL,&obj);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"Objective: %g\n",(double)obj);CHKERRQ(ierr);
+  ierr = TSGetSolution(ts,&U);CHKERRQ(ierr);
+  ierr = VecGetArrayRead(U,(const PetscScalar**)&g);CHKERRQ(ierr);
+  ierr = PetscScalarView(3,g,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+  ierr = VecRestoreArrayRead(U,(const PetscScalar**)&g);CHKERRQ(ierr);
 
   /* check gradient */
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"Gradient test\n");CHKERRQ(ierr);
   ierr = VecDuplicate(M,&G);CHKERRQ(ierr);
-  ierr = FormGradient(NULL,M,G,&opt);CHKERRQ(ierr);
+  ierr = TSComputeObjectiveAndGradient(ts,opt.t0,opt.dt,opt.tf,NULL,M,G,NULL);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"Gradient:\n");CHKERRQ(ierr);
   ierr = VecGetArrayRead(G,(const PetscScalar**)&g);CHKERRQ(ierr);
   ierr = PetscScalarView(2,g,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
   ierr = VecRestoreArrayRead(G,(const PetscScalar**)&g);CHKERRQ(ierr);
+
+  /* check tangent linear model */
+  if (testtlm) {
+    Mat Phi,Phie,PhiT,PhiTe,TLMe;
+
+    ierr = TSGetSolution(ts,&U);CHKERRQ(ierr);
+    ierr = VecSet(U,1.0);CHKERRQ(ierr);
+    ierr = TSCreatePropagatorMat(ts,opt.t0,opt.dt,opt.tf,U,M,NULL,&Phi);CHKERRQ(ierr);
+
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"\nTLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)\n");
+    ierr = MatComputeOperator(Phi,NULL,&Phie);CHKERRQ(ierr);
+    ierr = MatView(Phie,NULL);CHKERRQ(ierr);
+
+    ierr = MatCreateTranspose(Phi,&PhiT);CHKERRQ(ierr);
+    ierr = MatComputeOperator(PhiT,NULL,&PhiTe);CHKERRQ(ierr);
+    ierr = MatView(PhiTe,NULL);CHKERRQ(ierr);
+
+    ierr = MatTranspose(PhiTe,MAT_INITIAL_MATRIX,&TLMe);CHKERRQ(ierr);
+    ierr = MatAXPY(TLMe,-1.0,Phie,DIFFERENT_NONZERO_PATTERN);CHKERRQ(ierr);
+    ierr = MatView(TLMe,NULL);CHKERRQ(ierr);
+
+    ierr = MatDestroy(&TLMe);CHKERRQ(ierr);
+    ierr = MatDestroy(&Phie);CHKERRQ(ierr);
+    ierr = MatDestroy(&Phi);CHKERRQ(ierr);
+    ierr = MatDestroy(&PhiTe);CHKERRQ(ierr);
+    ierr = MatDestroy(&PhiT);CHKERRQ(ierr);
+  }
 
   /* check gradient and hessian with Tao */
   if (testtao) {
@@ -519,20 +556,18 @@ int main(int argc, char* argv[])
   }
 
   /* view hessian */
-  ierr = PetscOptionsHasName(NULL,NULL,"-tshessian_view",&flg);CHKERRQ(ierr);
-  if (flg) {
+  if (viewhessian) {
     Mat He,HeT;
 
-    ierr = VecSetRandom(M,NULL);CHKERRQ(ierr);
     ierr = MatCreate(PETSC_COMM_SELF,&H);CHKERRQ(ierr);
     ierr = TSComputeHessian(ts,opt.t0,opt.dt,opt.tf,NULL,M,H);CHKERRQ(ierr);
     ierr = MatComputeOperator(H,MATAIJ,&He);CHKERRQ(ierr);
     ierr = MatConvert(He,MATDENSE,MAT_INPLACE_MATRIX,&He);CHKERRQ(ierr);
     ierr = PetscObjectSetName((PetscObject)He,"H");CHKERRQ(ierr);
-    ierr = MatViewFromOptions(He,NULL,"-tshessian_view");CHKERRQ(ierr);
+    ierr = MatView(He,NULL);CHKERRQ(ierr);
     ierr = MatTranspose(He,MAT_INITIAL_MATRIX,&HeT);CHKERRQ(ierr);
     ierr = MatAXPY(HeT,-1.0,He,DIFFERENT_NONZERO_PATTERN);CHKERRQ(ierr);
-    ierr = MatViewFromOptions(HeT,NULL,"-tshessian_view");CHKERRQ(ierr);
+    ierr = MatView(HeT,NULL);CHKERRQ(ierr);
     ierr = MatDestroy(&HeT);CHKERRQ(ierr);
     ierr = MatDestroy(&He);CHKERRQ(ierr);
     ierr = MatDestroy(&H);CHKERRQ(ierr);
@@ -540,6 +575,7 @@ int main(int argc, char* argv[])
 
   /* run taylor test */
   if (testtaylor) {
+    ierr = PetscOptionsSetValue(NULL,"-taylor_ts_hessian","1");CHKERRQ(ierr);
     ierr = VecSetRandom(M,NULL);CHKERRQ(ierr);
     ierr = TSTaylorTest(ts,opt.t0,opt.dt,opt.tf,NULL,M,NULL);CHKERRQ(ierr);
   }
@@ -556,12 +592,12 @@ int main(int argc, char* argv[])
   test:
     requires: !complex !single
     suffix: 1
-    args: -ts_adapt_type none -ts_type {{theta rk}separate output} -ts_trajectory_type memory -check -test_tao -tsgradient_adjoint_discrete -tao_test_gradient -tshessian_foadjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_view -test_taylor -taylor_ts_hessian
+    args: -ts_adapt_type none -ts_type {{theta rk}separate output} -ts_trajectory_type memory -check -test_tao -tsgradient_adjoint_discrete -tao_test_gradient -tshessian_foadjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -test_taylor -tlm_discrete -adjoint_tlm_discrete -test_tlm
 
   test:
     requires: !complex !single
     suffix: 2
-    args: -ts_adapt_type none -ts_type {{theta rk}separate output} -ts_trajectory_type memory -check -test_tao -tsgradient_adjoint_discrete -tao_test_hessian -tshessian_foadjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_view -test_taylor -taylor_ts_hessian
+    args: -ts_adapt_type none -ts_type {{theta rk}separate output} -ts_trajectory_type memory -check -test_tao -tsgradient_adjoint_discrete -tao_test_hessian -tshessian_foadjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -test_taylor -tlm_discrete -adjoint_tlm_discrete -test_tlm
 
 TEST*/
 

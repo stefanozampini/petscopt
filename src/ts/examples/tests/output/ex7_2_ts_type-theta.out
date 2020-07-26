@@ -12,9 +12,26 @@
   HessianDAE_MU: ||H - Hmffd||_F/||H||_F = 6.55862e-09, ||H - Hmffd||_F = 1.89056e-09
   HessianDAE_MUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
   HessianDAE_MM: ||H - Hmffd||_F/||H||_F = 8.33195e-09, ||H - Hmffd||_F = 1.01557e-11
-Function test: 0.53088
-Gradient test
+Objective: 0.53088
+ 0:   2.2732e-01   1.3533e-01   3.1468e-02
+Gradient:
  0:  -1.2838e-01   1.8038e-02
+
+TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
+Mat Object: 1 MPI processes
+  type: seqdense
+-1.6713909478932673e-01 2.1338918497190734e-01 
+0.0000000000000000e+00 0.0000000000000000e+00 
+0.0000000000000000e+00 -1.0884872199568038e-01 
+Mat Object: 1 MPI processes
+  type: seqdense
+-1.6713932479537236e-01 0.0000000000000000e+00 0.0000000000000000e+00 
+2.1338868827732338e-01 0.0000000000000000e+00 -1.0884872199568027e-01 
+Mat Object: 1 MPI processes
+  type: seqdense
+-2.3000604562617433e-07 -4.9669458396239818e-07 
+0.0000000000000000e+00 0.0000000000000000e+00 
+0.0000000000000000e+00 1.1102230246251565e-16 
   ---------- Testing Hessian -------------
   Run with -tao_test_hessian_view and optionally -tao_test_hessian <threshold> to show difference
     of hand-coded and finite difference Hessian entries greater than <threshold>.
@@ -23,12 +40,12 @@ Gradient test
   ||H - Hfd||_F/||H||_F = 4.19246e-07, ||H - Hfd||_F = 2.04765e-06
 Mat Object: H 1 MPI processes
   type: seqdense
-1.6545362929185374e+00 -3.0908830063155740e-01 
--3.0908828638689856e-01 -4.5744901119388786e+00 
+1.5627992943190894e-01 -7.8678844022353658e-02 
+-7.8678634032020425e-02 8.9815418469349095e-02 
 Mat Object: 1 MPI processes
   type: seqdense
-0.0000000000000000e+00 1.4244658841366942e-08 
--1.4244658841366942e-08 0.0000000000000000e+00 
+0.0000000000000000e+00 2.0999033323310101e-07 
+-2.0999033323310101e-07 0.0000000000000000e+00 
 -------------------------- Taylor test results ---------------------------
 		Gradient				Hessian
 --------------------------------------------------------------------------
