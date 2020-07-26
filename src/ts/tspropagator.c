@@ -266,7 +266,7 @@ static PetscErrorCode TSCreatePropagatorMat_Private(TS ts, PetscReal t0, PetscRe
   TSAdapt           adapt;
   Vec               X;
   PetscInt          M,N,m,n,rbs,cbs;
-  PetscBool         has;
+  PetscBool         has,hasm;
   PetscErrorCode    ierr;
 
   PetscFunctionBegin;
@@ -345,7 +345,8 @@ static PetscErrorCode TSCreatePropagatorMat_Private(TS ts, PetscReal t0, PetscRe
   ierr = TSSetTSOpt(prop->lts,tsopt);CHKERRQ(ierr);
 
   ierr = TSOptHasGradientIC(tsopt,&has);CHKERRQ(ierr);
-  if (!has) { /* we compute a linear dependence on u_0 by default */
+  ierr = TSOptHasGradientDAE(tsopt,&hasm,NULL);CHKERRQ(ierr);
+  if (!has && !hasm) { /* we compute a linear dependence on u_0 by default */
     ierr = TSSetGradientIC(prop->lts,NULL,NULL,TSEvalGradientICDefault,NULL);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
