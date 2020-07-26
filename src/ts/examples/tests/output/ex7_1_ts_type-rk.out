@@ -1,0 +1,40 @@
+  ---------- Testing Gradient DAE terms -------------
+  GradientDAE_U: ||H - Hmffd||_F/||H||_F = 1.04167e-09, ||H - Hmffd||_F = 1.47314e-09
+  GradientDAE_Udot: ||H - Hmffd||_F/||H||_F = 1.9084e-10, ||H - Hmffd||_F = 3.30544e-10
+  GradientDAE_M: ||H - Hmffd||_F/||H||_F = 2.48349e-09, ||H - Hmffd||_F = 1.28757e-09
+  ---------- Testing Hessian DAE terms -------------
+  HessianDAE_UU: ||H - Hmffd||_F/||H||_F = 2.64952e-08, ||H - Hmffd||_F = 1.47592e-07
+  HessianDAE_UUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_UM: ||H - Hmffd||_F/||H||_F = 7.01022e-09, ||H - Hmffd||_F = 2.02074e-09
+  HessianDAE_UdotU: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_UdotUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_UdotM: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_MU: ||H - Hmffd||_F/||H||_F = 6.55862e-09, ||H - Hmffd||_F = 1.89056e-09
+  HessianDAE_MUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
+  HessianDAE_MM: ||H - Hmffd||_F/||H||_F = 8.33195e-09, ||H - Hmffd||_F = 1.01557e-11
+Function test: 0.530879
+Gradient test
+ 0:  -1.2838e-01   1.8037e-02
+  ---------- Testing Gradient -------------
+  Run with -tao_test_gradient_view and optionally -tao_test_gradient <threshold> to show difference
+    of hand-coded and finite difference gradient entries greater than <threshold>.
+  Testing hand-coded Gradient, if (for double precision runs) ||G - Gfd||/||G|| is
+    O(1.e-8), the hand-coded Gradient is probably correct.
+  ||Gfd|| 0.695948, ||G|| = 0.695948, angle cosine = (Gfd'G)/||Gfd||||G|| = 1.
+  2-norm ||G - Gfd||/||G|| = 1.038e-07, ||G - Gfd|| = 7.22395e-08
+  max-norm ||G - Gfd||/||G|| = 8.87228e-08, ||G - Gfd|| = 5.62361e-08
+Mat Object: H 1 MPI processes
+  type: seqdense
+1.6541056075003939e+00 -3.0903853940571474e-01 
+-3.0903853940571469e-01 -4.5744145420084434e+00 
+Mat Object: 1 MPI processes
+  type: seqdense
+0.0000000000000000e+00 5.5511151231257827e-17 
+-5.5511151231257827e-17 0.0000000000000000e+00 
+-------------------------- Taylor test results ---------------------------
+		Gradient				Hessian
+--------------------------------------------------------------------------
+0.00713570	0.00000 	0	0.000787294	0.00000 	0
+0.00167969	2.08686 	2	9.25909e-05	3.08796 	3
+0.000408017	2.04150 	2	1.12411e-05	3.04208 	3
+0.000100579	2.02030 	2	1.38522e-06	3.02060 	3
