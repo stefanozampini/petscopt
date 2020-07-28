@@ -274,13 +274,13 @@ int main(int argc, char* argv[])
   ierr = TSAddObjective(ts,PETSC_MIN_REAL,EvalObjective_ASAi,EvalObjectiveGradient_ASAi_U,NULL,
                         NULL,NULL,NULL,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
   ierr = TSComputeObjectiveAndGradient(ts,0.0,dt,fatf,NULL,M,G,&obj);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"Objective at tB=%g: %g\n",(double)fatf,(double)obj);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"Gradient (tB=%g)\n",(double)fatf);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"\nObjective at tB=%g: %g\n",(double)fatf,(double)obj);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"\nGradient (tB=%g)\n",(double)fatf);CHKERRQ(ierr);
   ierr = VecGetArrayRead(G,(const PetscScalar**)&g);CHKERRQ(ierr);
   ierr = PetscScalarView(3,g,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
   ierr = VecRestoreArrayRead(G,(const PetscScalar**)&g);CHKERRQ(ierr);
   ierr = TSComputeObjectiveAndGradient(ts,0.0,PETSC_DECIDE,5.e1,NULL,M,G,NULL);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"Gradient (tB=%g)\n",5.e1);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"\nGradient (tB=%g)\n",5.e1);CHKERRQ(ierr);
   ierr = VecGetArrayRead(G,(const PetscScalar**)&g);CHKERRQ(ierr);
   ierr = PetscScalarView(3,g,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
   ierr = VecRestoreArrayRead(G,(const PetscScalar**)&g);CHKERRQ(ierr);
@@ -380,7 +380,7 @@ int main(int argc, char* argv[])
 
   test:
     requires: !complex !single
-    suffix: 1
+    suffix: cvode
     args: -ts_trajectory_type memory
 
 TEST*/

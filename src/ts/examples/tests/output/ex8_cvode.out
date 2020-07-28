@@ -1,8 +1,11 @@
 
 Running sensitivity tests from cvsRoberts_ASAi_dns.c
+
 Objective at tB=4e+07: 3.99825e+07
+
 Gradient (tB=4e+07)
  0:   7.7185e+05  -3.0826e+00   5.1378e-04
+
 Gradient (tB=50.)
  0:   1.7341e+02  -5.0592e-04   8.4324e-08
 

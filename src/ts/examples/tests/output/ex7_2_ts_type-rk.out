@@ -12,8 +12,16 @@
   HessianDAE_MU: ||H - Hmffd||_F/||H||_F = 6.55862e-09, ||H - Hmffd||_F = 1.89056e-09
   HessianDAE_MUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
   HessianDAE_MM: ||H - Hmffd||_F/||H||_F = 8.33195e-09, ||H - Hmffd||_F = 1.01557e-11
+
 Objective: 0.530879
+
+Final state:
  0:   2.2732e-01   1.3534e-01   3.1472e-02
+
+Sensitivity matrix:
+ 0:  -1.6714e-01   0.0000e+00   0.0000e+00
+ 3:   2.1339e-01   0.0000e+00  -1.0885e-01
+
 Gradient:
  0:  -1.2838e-01   1.8037e-02
 
@@ -38,6 +46,8 @@ Mat Object: 1 MPI processes
   Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Hessian is probably correct.
   ||H - Hfd||_F/||H||_F = 3.69418e-08, ||H - Hfd||_F = 1.8042e-07
+
+Hessian:
 Mat Object: H 1 MPI processes
   type: seqdense
 1.5628045173307548e-01 -7.8677849544038989e-02 
