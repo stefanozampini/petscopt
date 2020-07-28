@@ -1,4 +1,4 @@
-static const char help[] = "Reproduced from CVODE testuite.\n";
+static const char help[] = "Reproduces cvsHessian_ASA_FSA from CVODE testuite.\n";
 /*
   This example from https://github.com/LLNL/sundials/blob/master/examples/cvodes/serial/cvsHessian_ASA_FSA.c
   Output can be checked against https://github.com/LLNL/sundials/blob/master/examples/cvodes/serial/cvsHessian_ASA_FSA.out
