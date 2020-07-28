@@ -161,7 +161,7 @@ static PetscErrorCode SNESSolve_Augmented(SNES asnes)
   PetscErrorCode (*oJ)(SNES,Vec,Mat,Mat,void*);
   void           *octx,*oJctx;
   DM             dm;
-  PetscInt       i,z=0,ol;
+  PetscInt       i,z=0,ol,iter;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -171,14 +171,16 @@ static PetscErrorCode SNESSolve_Augmented(SNES asnes)
   aF   = asnes->vec_func;
   ierr = SNESComputeFunction(asnes,aU,aF);CHKERRQ(ierr);
 
+  iter = 0;
   asnes->iter = 0;
+  asnes->linear_its = 0;
 
   ierr = VecNorm(aF,NORM_2,&asnes->norm);CHKERRQ(ierr);
   SNESCheckFunctionNorm(asnes,asnes->norm);
   ierr = PetscObjectSAWsTakeAccess((PetscObject)asnes);CHKERRQ(ierr);
   ierr = PetscObjectSAWsGrantAccess((PetscObject)asnes);CHKERRQ(ierr);
   ierr = SNESLogConvergenceHistory(asnes,asnes->norm,0);CHKERRQ(ierr);
-  ierr = SNESMonitor(asnes,asnes->iter,asnes->norm);CHKERRQ(ierr);
+  ierr = SNESMonitor(asnes,iter,asnes->norm);CHKERRQ(ierr);
 
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
   ierr = TSGetDM(ats,&dm);CHKERRQ(ierr);
@@ -202,8 +204,9 @@ static PetscErrorCode SNESSolve_Augmented(SNES asnes)
   ierr = DMCompositeRestoreAccessArray(dm,aF,1,&z,&F);CHKERRQ(ierr);
   ierr = SNESGetConvergedReason(snes,&asnes->reason);CHKERRQ(ierr);
   if (asnes->reason<=0) PetscFunctionReturn(0);
-
-  asnes->iter++;
+  ierr = SNESGetIterationNumber(snes,&asnes->iter);CHKERRQ(ierr);
+  ierr = SNESGetLinearSolveIterations(snes,&asnes->linear_its);CHKERRQ(ierr);
+  iter++;
 
   for (i=0;i<actx->nqts;i++) {
     z = i+1;
@@ -213,8 +216,8 @@ static PetscErrorCode SNESSolve_Augmented(SNES asnes)
     SNESCheckFunctionNorm(asnes,asnes->norm);
     ierr = PetscObjectSAWsTakeAccess((PetscObject)asnes);CHKERRQ(ierr);
     ierr = PetscObjectSAWsGrantAccess((PetscObject)asnes);CHKERRQ(ierr);
-    ierr = SNESLogConvergenceHistory(asnes,asnes->norm,asnes->iter);CHKERRQ(ierr);
-    ierr = SNESMonitor(asnes,asnes->iter,asnes->norm);CHKERRQ(ierr);
+    ierr = SNESLogConvergenceHistory(asnes,asnes->norm,iter);CHKERRQ(ierr);
+    ierr = SNESMonitor(asnes,iter,asnes->norm);CHKERRQ(ierr);
 
     ierr = DMCompositeGetAccessArray(dm,aU,1,&z,&U);CHKERRQ(ierr);
     ierr = DMCompositeGetAccessArray(dm,aF,1,&z,&F);CHKERRQ(ierr);
@@ -235,15 +238,15 @@ static PetscErrorCode SNESSolve_Augmented(SNES asnes)
     ierr = DMCompositeRestoreAccessArray(dm,aF,1,&z,&F);CHKERRQ(ierr);
     ierr = DMCompositeRestoreAccessArray(dm,aU,1,&z,&U);CHKERRQ(ierr);
     if (snes->reason < 0) { asnes->reason = SNES_DIVERGED_INNER; break; }
-    asnes->iter++;
+    iter++;
   }
   ierr = SNESComputeFunction(asnes,aU,aF);CHKERRQ(ierr); 
   ierr = VecNorm(aF,NORM_2,&asnes->norm);CHKERRQ(ierr);
   SNESCheckFunctionNorm(asnes,asnes->norm);
   ierr = PetscObjectSAWsTakeAccess((PetscObject)asnes);CHKERRQ(ierr);
   ierr = PetscObjectSAWsGrantAccess((PetscObject)asnes);CHKERRQ(ierr);
-  ierr = SNESLogConvergenceHistory(asnes,asnes->norm,asnes->iter);CHKERRQ(ierr);
-  ierr = SNESMonitor(asnes,asnes->iter,asnes->norm);CHKERRQ(ierr);
+  ierr = SNESLogConvergenceHistory(asnes,asnes->norm,iter);CHKERRQ(ierr);
+  ierr = SNESMonitor(asnes,iter,asnes->norm);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
