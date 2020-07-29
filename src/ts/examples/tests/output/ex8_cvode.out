@@ -1,132 +1,132 @@
 
 Running sensitivity tests from cvsRoberts_ASAi_dns.c
 
-Objective at tB=4e+07: 3.99825e+07
+Objective at tB=  4.000000e+07:   3.998253e+07
 
-Gradient (tB=4e+07)
- 0:   7.7185e+05  -3.0826e+00   5.1378e-04
+Gradient (tB=  4.000000e+07)
+  7.718523e+05  -3.082646e+00   5.137766e-04
 
-Gradient (tB=50.)
- 0:   1.7341e+02  -5.0592e-04   8.4324e-08
+Gradient (tB=  5.000000e+01)
+  1.734144e+02  -5.059250e-04   8.432444e-08
 
 Running sensitivity tests from cvsRoberts_FSA_dns.c
 
-Solution and sensitivity matrix step 0 tf=0.4
+Solution and sensitivity matrix step 0 tf=  4.000000e-01
 
-Solution at step 0 tf=0.4
- 0:   9.8517e-01   3.3864e-05   1.4794e-02
+Solution at step 0 tf=  4.000000e-01
+  9.851721e-01   3.386395e-05   1.479403e-02
 
-Sensitivity matrix at step 0 tf=0.4
- 0:  -3.5595e-01   3.9025e-04   3.5556e-01
- 3:   9.5420e-08  -2.1310e-10  -9.5207e-08
- 6:  -1.5831e-11  -5.2900e-13   1.6360e-11
+Sensitivity matrix at step 0 tf=  4.000000e-01
+ -3.559534e-01   3.902542e-04   3.555631e-01
+  9.541995e-08  -2.130969e-10  -9.520685e-08
+ -1.583112e-11  -5.290040e-13   1.636013e-11
 
-Solution and sensitivity matrix step 1 tf=4.
+Solution and sensitivity matrix step 1 tf=  4.000000e+00
 
-Solution at step 1 tf=4.
- 0:   9.0552e-01   2.2405e-05   9.4459e-02
+Solution at step 1 tf=  4.000000e+00
+  9.055184e-01   2.240472e-05   9.445920e-02
 
-Sensitivity matrix at step 1 tf=4.
- 0:  -1.8761e+00   1.7922e-04   1.8759e+00
- 3:   2.9613e-06  -5.8305e-10  -2.9607e-06
- 6:  -4.9334e-10  -2.7626e-13   4.9361e-10
+Sensitivity matrix at step 1 tf=  4.000000e+00
+ -1.876096e+00   1.792165e-04   1.875917e+00
+  2.961326e-06  -5.830536e-10  -2.960743e-06
+ -4.933351e-10  -2.762604e-13   4.936114e-10
 
-Solution and sensitivity matrix step 2 tf=40.
+Solution and sensitivity matrix step 2 tf=  4.000000e+01
 
-Solution at step 2 tf=40.
- 0:   7.1583e-01   9.1855e-06   2.8416e-01
+Solution at step 2 tf=  4.000000e+01
+  7.158266e-01   9.185515e-06   2.841642e-01
 
-Sensitivity matrix at step 2 tf=40.
- 0:  -4.2476e+00   4.5912e-05   4.2475e+00
- 3:   1.3731e-05  -2.3572e-10  -1.3731e-05
- 6:  -2.2884e-09  -1.1381e-13   2.2885e-09
+Sensitivity matrix at step 2 tf=  4.000000e+01
+ -4.247569e+00   4.591159e-05   4.247524e+00
+  1.373081e-05  -2.357193e-10  -1.373058e-05
+ -2.288356e-09  -1.138056e-13   2.288470e-09
 
-Solution and sensitivity matrix step 3 tf=400.
+Solution and sensitivity matrix step 3 tf=  4.000000e+02
 
-Solution at step 3 tf=400.
- 0:   4.5052e-01   3.2229e-06   5.4948e-01
+Solution at step 3 tf=  4.000000e+02
+  4.505181e-01   3.222894e-06   5.494787e-01
 
-Sensitivity matrix at step 3 tf=400.
- 0:  -5.9584e+00   3.5426e-06   5.9584e+00
- 3:   2.2738e-05  -2.2601e-11  -2.2738e-05
- 6:  -3.7897e-09  -4.9948e-14   3.7897e-09
+Sensitivity matrix at step 3 tf=  4.000000e+02
+ -5.958378e+00   3.542601e-06   5.958375e+00
+  2.273818e-05  -2.260100e-11  -2.273815e-05
+ -3.789676e-09  -4.994813e-14   3.789726e-09
 
-Solution and sensitivity matrix step 4 tf=4000.
+Solution and sensitivity matrix step 4 tf=  4.000000e+03
 
-Solution at step 4 tf=4000.
- 0:   1.8320e-01   8.9423e-07   8.1680e-01
+Solution at step 4 tf=  4.000000e+03
+  1.832018e-01   8.942343e-07   8.167973e-01
 
-Sensitivity matrix at step 4 tf=4000.
- 0:  -4.7501e+00  -5.9937e-06   4.7501e+00
- 3:   1.8809e-05   2.3127e-11  -1.8809e-05
- 6:  -3.1348e-09  -1.8758e-14   3.1348e-09
+Sensitivity matrix at step 4 tf=  4.000000e+03
+ -4.750071e+00  -5.993688e-06   4.750077e+00
+  1.880886e-05   2.312703e-11  -1.880889e-05
+ -3.134814e-09  -1.875845e-14   3.134832e-09
 
-Solution and sensitivity matrix step 5 tf=40000.
+Solution and sensitivity matrix step 5 tf=  4.000000e+04
 
-Solution at step 5 tf=40000.
- 0:   3.8983e-02   1.6218e-07   9.6102e-01
+Solution at step 5 tf=  4.000000e+04
+  3.898306e-02   1.621755e-07   9.610168e-01
 
-Sensitivity matrix at step 5 tf=40000.
- 0:  -1.5750e+00  -2.7620e-06   1.5750e+00
- 3:   6.2875e-06   1.1002e-11  -6.2875e-06
- 6:  -1.0479e-09  -4.5367e-15   1.0479e-09
+Sensitivity matrix at step 5 tf=  4.000000e+04
+ -1.574966e+00  -2.761961e-06   1.574969e+00
+  6.287471e-06   1.100243e-11  -6.287482e-06
+ -1.047914e-09  -4.536672e-15   1.047918e-09
 
-Solution and sensitivity matrix step 6 tf=400000.
+Solution and sensitivity matrix step 6 tf=  4.000000e+05
 
-Solution at step 6 tf=400000.
- 0:   4.9381e-03   1.9849e-08   9.9506e-01
+Solution at step 6 tf=  4.000000e+05
+  4.938092e-03   1.984920e-08   9.950619e-01
 
-Sensitivity matrix at step 6 tf=400000.
- 0:  -2.3633e-01  -4.5840e-07   2.3633e-01
- 3:   9.4500e-07   1.8325e-12  -9.4500e-07
- 6:  -1.5750e-10  -6.3623e-16   1.5750e-10
+Sensitivity matrix at step 6 tf=  4.000000e+05
+ -2.363267e-01  -4.583976e-07   2.363272e-01
+  9.449992e-07   1.832466e-12  -9.450010e-07
+ -1.575002e-10  -6.362324e-16   1.575008e-10
 
-Solution and sensitivity matrix step 7 tf=4e+06
+Solution and sensitivity matrix step 7 tf=  4.000000e+06
 
-Solution at step 7 tf=4e+06
- 0:   5.1671e-04   2.0679e-09   9.9948e-01
+Solution at step 7 tf=  4.000000e+06
+  5.167062e-04   2.067881e-09   9.994833e-01
 
-Sensitivity matrix at step 7 tf=4e+06
- 0:  -2.5661e-02  -5.1051e-08   2.5661e-02
- 3:   1.0264e-07   2.0419e-13  -1.0264e-07
- 6:  -1.7106e-11  -6.8496e-17   1.7106e-11
+Sensitivity matrix at step 7 tf=  4.000000e+06
+ -2.566079e-02  -5.105134e-08   2.566084e-02
+  1.026384e-07   2.041875e-13  -1.026386e-07
+ -1.710643e-11  -6.849607e-17   1.710650e-11
 
-Solution and sensitivity matrix step 8 tf=4e+07
+Solution and sensitivity matrix step 8 tf=  4.000000e+07
 
-Solution at step 8 tf=4e+07
- 0:   5.1978e-05   2.0792e-10   9.9995e-01
+Solution at step 8 tf=  4.000000e+07
+  5.197828e-05   2.079238e-10   9.999480e-01
 
-Sensitivity matrix at step 8 tf=4e+07
- 0:  -2.5964e-03  -5.1885e-09   2.5964e-03
- 3:   1.0385e-08   2.0753e-14  -1.0385e-08
- 6:  -1.7310e-12  -6.9248e-18   1.7310e-12
+Sensitivity matrix at step 8 tf=  4.000000e+07
+ -2.596390e-03  -5.188535e-09   2.596395e-03
+  1.038521e-08   2.075274e-14  -1.038523e-08
+ -1.731023e-12  -6.924806e-18   1.731029e-12
 
-Solution and sensitivity matrix step 9 tf=4e+08
+Solution and sensitivity matrix step 9 tf=  4.000000e+08
 
-Solution at step 9 tf=4e+08
- 0:   5.1807e-06   2.0723e-11   9.9999e-01
+Solution at step 9 tf=  4.000000e+08
+  5.180659e-06   2.072274e-11   9.999948e-01
 
-Sensitivity matrix at step 9 tf=4e+08
- 0:  -2.4093e-04  -4.4567e-10   2.4093e-04
- 3:   1.0978e-09   2.3189e-15  -1.0978e-09
- 6:  -1.7267e-13  -6.9070e-19   1.7267e-13
+Sensitivity matrix at step 9 tf=  4.000000e+08
+ -2.409320e-04  -4.456695e-10   2.409325e-04
+  1.097782e-09   2.318900e-15  -1.097785e-09
+ -1.726742e-13  -6.907039e-19   1.726749e-13
 
-Solution and sensitivity matrix step 10 tf=4e+09
+Solution and sensitivity matrix step 10 tf=  4.000000e+09
 
-Solution at step 10 tf=4e+09
- 0:   5.0842e-07   2.0337e-12   1.0000e+00
+Solution at step 10 tf=  4.000000e+09
+  5.084198e-07   2.033680e-12   9.999995e-01
 
-Sensitivity matrix at step 10 tf=4e+09
- 0:   2.3545e-04   9.9265e-10  -2.3545e-04
- 3:  -1.8449e-09  -7.5828e-15   1.8449e-09
- 6:  -1.6947e-14  -6.7787e-20   1.6947e-14
+Sensitivity matrix at step 10 tf=  4.000000e+09
+  2.354524e-04   9.926525e-10  -2.354534e-04
+ -1.844868e-09  -7.582848e-15   1.844945e-09
+ -1.694686e-14  -6.778750e-20   1.694692e-14
 
-Solution and sensitivity matrix step 11 tf=4e+10
+Solution and sensitivity matrix step 11 tf=  4.000000e+10
 
-Solution at step 11 tf=4e+10
- 0:   4.6932e-08   1.8773e-13   1.0000e+00
+Solution at step 11 tf=  4.000000e+10
+  4.693195e-08   1.877278e-13   1.000000e+00
 
-Sensitivity matrix at step 11 tf=4e+10
- 0:   2.6907e-03   1.0767e-08  -2.6907e-03
- 3:  -1.0983e-08  -4.3950e-14   1.0948e-08
- 6:  -1.5612e-15  -6.2449e-21   1.5612e-15
+Sensitivity matrix at step 11 tf=  4.000000e+10
+  2.690660e-03   1.076733e-08  -2.690680e-03
+ -1.098269e-08  -4.394952e-14   1.094833e-08
+ -1.561232e-15  -6.244928e-21   1.561238e-15

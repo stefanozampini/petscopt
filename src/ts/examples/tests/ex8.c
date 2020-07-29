@@ -274,15 +274,15 @@ int main(int argc, char* argv[])
   ierr = TSAddObjective(ts,PETSC_MIN_REAL,EvalObjective_ASAi,EvalObjectiveGradient_ASAi_U,NULL,
                         NULL,NULL,NULL,NULL,NULL,NULL,NULL);CHKERRQ(ierr);
   ierr = TSComputeObjectiveAndGradient(ts,0.0,dt,fatf,NULL,M,G,&obj);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"\nObjective at tB=%g: %g\n",(double)fatf,(double)obj);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"\nGradient (tB=%g)\n",(double)fatf);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"\nObjective at tB=%14.6e: %14.6e\n",(double)fatf,(double)obj);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"\nGradient (tB=%14.6e)\n",(double)fatf);CHKERRQ(ierr);
   ierr = VecGetArrayRead(G,(const PetscScalar**)&g);CHKERRQ(ierr);
-  ierr = PetscScalarView(3,g,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e %14.6e\n",(double)g[0],(double)g[1],(double)g[2]);CHKERRQ(ierr);
   ierr = VecRestoreArrayRead(G,(const PetscScalar**)&g);CHKERRQ(ierr);
   ierr = TSComputeObjectiveAndGradient(ts,0.0,PETSC_DECIDE,5.e1,NULL,M,G,NULL);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"\nGradient (tB=%g)\n",5.e1);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"\nGradient (tB=%14.6e)\n",5.e1);CHKERRQ(ierr);
   ierr = VecGetArrayRead(G,(const PetscScalar**)&g);CHKERRQ(ierr);
-  ierr = PetscScalarView(3,g,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e %14.6e\n",(double)g[0],(double)g[1],(double)g[2]);CHKERRQ(ierr);
   ierr = VecRestoreArrayRead(G,(const PetscScalar**)&g);CHKERRQ(ierr);
 
   /* run taylor test if you want to check correctness of the computed gradient */
@@ -312,17 +312,19 @@ int main(int argc, char* argv[])
     ierr = VecSetValue(U,2,0,INSERT_VALUES);CHKERRQ(ierr);
     ierr = VecAssemblyBegin(U);CHKERRQ(ierr);
     ierr = VecAssemblyEnd(U);CHKERRQ(ierr);
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"\nSolution and sensitivity matrix step %D tf=%g\n",tlmi,(double)tlmtf);CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"\nSolution and sensitivity matrix step %D tf=%14.6e\n",tlmi,(double)tlmtf);CHKERRQ(ierr);
     ierr = TSCreatePropagatorMat(ts,0.0,dt,tlmtf,U,M,NULL,&Phi);CHKERRQ(ierr);
 
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"\nSolution at step %D tf=%g\n",tlmi,(double)tlmtf);CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"\nSolution at step %D tf=%14.6e\n",tlmi,(double)tlmtf);CHKERRQ(ierr);
     ierr = VecGetArrayRead(U,(const PetscScalar**)&g);CHKERRQ(ierr);
-    ierr = PetscScalarView(3,g,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e %14.6e\n",(double)g[0],(double)g[1],(double)g[2]);CHKERRQ(ierr);
     ierr = VecRestoreArrayRead(U,(const PetscScalar**)&g);CHKERRQ(ierr);
     ierr = MatComputeOperator(Phi,NULL,&Phie);CHKERRQ(ierr);
-    ierr = PetscPrintf(PETSC_COMM_WORLD,"\nSensitivity matrix at step %D tf=%g\n",tlmi,(double)tlmtf);CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"\nSensitivity matrix at step %D tf=%14.6e\n",tlmi,(double)tlmtf);CHKERRQ(ierr);
     ierr = MatDenseGetArrayRead(Phie,(const PetscScalar**)&g);CHKERRQ(ierr);
-    ierr = PetscScalarView(3*3,g,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e %14.6e\n",(double)g[0],(double)g[1],(double)g[2]);CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e %14.6e\n",(double)g[3],(double)g[4],(double)g[5]);CHKERRQ(ierr);
+    ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e %14.6e\n",(double)g[6],(double)g[7],(double)g[8]);CHKERRQ(ierr);
     ierr = MatDenseRestoreArrayRead(Phie,(const PetscScalar**)&g);CHKERRQ(ierr);
 
     if (testtlm) { /* checks correctness of the TLM matrices */

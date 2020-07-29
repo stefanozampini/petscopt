@@ -13,17 +13,17 @@
   HessianDAE_MUdot: ||H - Hmffd||_F/||H||_F = 0., ||H - Hmffd||_F = 0.
   HessianDAE_MM: ||H - Hmffd||_F/||H||_F = 8.33195e-09, ||H - Hmffd||_F = 1.01557e-11
 
-Objective: 0.53088
+Objective:   5.308802e-01
 
 Final state:
- 0:   2.2732e-01   1.3533e-01   3.1468e-02
+  2.273223e-01   1.353339e-01   3.146836e-02
 
 Sensitivity matrix:
- 0:  -1.6714e-01   0.0000e+00   0.0000e+00
- 3:   2.1339e-01   0.0000e+00  -1.0885e-01
+ -1.671391e-01   0.000000e+00   0.000000e+00
+  2.133892e-01   0.000000e+00  -1.088487e-01
 
 Gradient:
- 0:  -1.2838e-01   1.8038e-02
+ -1.283784e-01   1.803839e-02
 
 TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
 Mat Object: 1 MPI processes
@@ -48,10 +48,8 @@ Mat Object: 1 MPI processes
   ||H - Hfd||_F/||H||_F = 4.19246e-07, ||H - Hfd||_F = 2.04765e-06
 
 Hessian:
-Mat Object: H 1 MPI processes
-  type: seqdense
-1.5627992943190894e-01 -7.8678844022353658e-02 
--7.8678634032020425e-02 8.9815418469349095e-02 
+  1.562799e-01  -7.867884e-02
+ -7.867863e-02   8.981542e-02
 Mat Object: 1 MPI processes
   type: seqdense
 0.0000000000000000e+00 2.0999033323310101e-07 
