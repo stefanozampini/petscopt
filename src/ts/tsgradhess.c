@@ -876,7 +876,7 @@ static PetscErrorCode Residual_Private(void *ctx, Vec X, Vec Y)
     ierr = DMRestoreGlobalVector(dm,&U0);CHKERRQ(ierr);
   }
   ierr = PetscObjectStateIncrease((PetscObject)mffd->U);CHKERRQ(ierr);
-  ierr = PetscObjectStateIncrease((PetscObject)mffd->Udot);CHKERRQ(ierr);
+  if (mffd->Udot) { ierr = PetscObjectStateIncrease((PetscObject)mffd->Udot);CHKERRQ(ierr); }
   if (!mffd->hessian) {
     ierr = VecSet(Y,0);CHKERRQ(ierr);
     if (mffd->ic) { /* TODO */
