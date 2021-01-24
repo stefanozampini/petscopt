@@ -11,11 +11,11 @@
 #include <mfem/general/error.hpp>
 #include <mfem/linalg/vector.hpp>
 #include <mfem/linalg/handle.hpp>
+#include <mfem/linalg/petsc.hpp>
 #include <mfem/fem/pgridfunc.hpp>
 #include <mfem/fem/plinearform.hpp>
 #include <mfem/fem/pbilinearform.hpp>
 #include <limits>
-#include <petscvec.h>
 
 namespace mfemopt
 {
@@ -182,6 +182,7 @@ public:
 }
 
 /* TODO move to *.h file */
+#include <petscvec.h>
 PETSC_EXTERN PetscErrorCode mfemopt_eval_tdobj(Vec,Vec,PetscReal,PetscReal*,void*);
 PETSC_EXTERN PetscErrorCode mfemopt_eval_tdobj_x(Vec,Vec,PetscReal,Vec,void*);
 PETSC_EXTERN PetscErrorCode mfemopt_eval_tdobj_xx(Vec,Vec,PetscReal,Mat,void*);

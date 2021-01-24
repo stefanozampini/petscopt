@@ -497,7 +497,7 @@ int main(int argc, char* argv[])
   ierr = PetscPrintf(PETSC_COMM_WORLD,"\nFinal state:\n");CHKERRQ(ierr);
   ierr = TSGetSolution(ts,&U);CHKERRQ(ierr);
   ierr = VecGetArrayRead(U,(const PetscScalar**)&g);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e %14.6e\n",(double)g[0],(double)g[1],(double)g[2]);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e %14.6e\n",(double)PetscRealPart(g[0]),(double)PetscRealPart(g[1]),(double)PetscRealPart(g[2]));CHKERRQ(ierr);
   ierr = VecRestoreArrayRead(U,(const PetscScalar**)&g);CHKERRQ(ierr);
 
   /* Compute sensitivity matrix */
@@ -508,8 +508,8 @@ int main(int argc, char* argv[])
   ierr = MatComputeOperator(Phi,NULL,&Phie);CHKERRQ(ierr);
   ierr = PetscPrintf(PETSC_COMM_WORLD,"\nSensitivity matrix:\n");CHKERRQ(ierr);
   ierr = MatDenseGetArrayRead(Phie,(const PetscScalar**)&g);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e %14.6e\n",(double)g[0],(double)g[1],(double)g[2]);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e %14.6e\n",(double)g[3],(double)g[4],(double)g[5]);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e %14.6e\n",(double)PetscRealPart(g[0]),(double)PetscRealPart(g[1]),(double)PetscRealPart(g[2]));CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e %14.6e\n",(double)PetscRealPart(g[3]),(double)PetscRealPart(g[4]),(double)PetscRealPart(g[5]));CHKERRQ(ierr);
   ierr = MatDenseRestoreArrayRead(Phie,(const PetscScalar**)&g);CHKERRQ(ierr);
 
   /* Compute gradient */
@@ -517,7 +517,7 @@ int main(int argc, char* argv[])
   ierr = TSComputeObjectiveAndGradient(ts,opt.t0,opt.dt,opt.tf,NULL,M,G,NULL);CHKERRQ(ierr);
   ierr = PetscPrintf(PETSC_COMM_WORLD,"\nGradient:\n");CHKERRQ(ierr);
   ierr = VecGetArrayRead(G,(const PetscScalar**)&g);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e\n",(double)g[0],(double)g[1]);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e\n",(double)PetscRealPart(g[0]),(double)PetscRealPart(g[1]));CHKERRQ(ierr);
   ierr = VecRestoreArrayRead(G,(const PetscScalar**)&g);CHKERRQ(ierr);
 
   /* check tangent linear model */
@@ -569,8 +569,8 @@ int main(int argc, char* argv[])
   ierr = MatComputeOperator(H,NULL,&He);CHKERRQ(ierr);
   ierr = PetscPrintf(PETSC_COMM_WORLD,"\nHessian:\n");CHKERRQ(ierr);
   ierr = MatDenseGetArrayRead(He,(const PetscScalar**)&g);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e\n",(double)g[0],(double)g[2]);CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e\n",(double)g[1],(double)g[3]);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e\n",(double)PetscRealPart(g[0]),(double)PetscRealPart(g[2]));CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD,"%14.6e %14.6e\n",(double)PetscRealPart(g[1]),(double)PetscRealPart(g[3]));CHKERRQ(ierr);
   ierr = MatDenseRestoreArrayRead(He,(const PetscScalar**)&g);CHKERRQ(ierr);
   if (testhessian) { /* Check symmetricity of Hessian */
     Mat HeT;

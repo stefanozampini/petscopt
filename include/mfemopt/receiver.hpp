@@ -10,7 +10,6 @@
 #include <mfem/fem/pgridfunc.hpp>
 #include <mfem/fem/intrules.hpp>
 #include <mfem/general/array.hpp>
-#include <petscts.h>
 #include <fstream>
 #include <ostream>
 #include <vector>

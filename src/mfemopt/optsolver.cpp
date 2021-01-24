@@ -1,3 +1,4 @@
+#include <petscsnes.h>
 #include <petscopt/petscopt_types.h>
 #include <petscopt/ksp.h>
 #include <mfemopt/optsolver.hpp>

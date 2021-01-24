@@ -66,6 +66,7 @@ static PetscErrorCode KSPDestroy_HilbertCG(KSP ksp)
 
 static PetscErrorCode KSPComputeEigenvalues_HilbertCG(KSP ksp,PetscInt nmax,PetscReal *r,PetscReal *c,PetscInt *neig)
 {
+#if PETSC_VERSION_GE(3,13,0)
   KSP_HilbertCG  *hcg = (KSP_HilbertCG*)ksp->data;
   char           jobz = 'N',range = 'A';
   PetscReal      *work,dummyr = 0.;
@@ -93,6 +94,17 @@ static PetscErrorCode KSPComputeEigenvalues_HilbertCG(KSP ksp,PetscInt nmax,Pets
   if (no != nb) SETERRQ1(PETSC_COMM_SELF,PETSC_ERR_PLIB,"xSTEGR error, returned %d",(int)no);
   ierr = PetscFree2(work,iwork);CHKERRQ(ierr);
   PetscFunctionReturn(0);
+#else
+  KSP_HilbertCG  *hcg = (KSP_HilbertCG*)ksp->data;
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  if (nmax < hcg->ne) SETERRQ(PetscObjectComm((PetscObject)ksp),PETSC_ERR_ARG_SIZ,"Not enough room in work space r and c for eigenvalues");
+  ierr = PetscArrayzero(c,nmax);CHKERRQ(ierr);
+  ierr = PetscArrayzero(r,nmax);CHKERRQ(ierr);
+  *neig = 0;
+  PetscFunctionReturn(0);
+#endif
 }
 
 static PetscErrorCode KSPComputeExtremeSingularValues_HilbertCG(KSP ksp,PetscReal *emax,PetscReal *emin)

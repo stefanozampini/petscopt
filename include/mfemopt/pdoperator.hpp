@@ -8,7 +8,6 @@
 #include <mfem/linalg/operator.hpp>
 #include <mfem/linalg/vector.hpp>
 #include <mfem/linalg/petsc.hpp>
-#include <petscts.h>
 
 namespace mfemopt
 {
@@ -111,6 +110,7 @@ public:
 }
 
 /* TODO move to *.h file */
+#include <petscts.h>
 PETSC_EXTERN PetscErrorCode mfemopt_setupts(TS,Vec,Vec,void*);
 PETSC_EXTERN PetscErrorCode mfemopt_gradientdae(TS,PetscReal,Vec,Vec,Vec,Mat,void*);
 PETSC_EXTERN PetscErrorCode mfemopt_hessiandae_xtm(TS,PetscReal,Vec,Vec,Vec,Vec,Vec,Vec,void*);

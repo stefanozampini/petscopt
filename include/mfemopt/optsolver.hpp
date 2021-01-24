@@ -8,7 +8,9 @@
 #include <mfemopt/reducedfunctional.hpp>
 #include <mfem/linalg/vector.hpp>
 #include <mfem/linalg/petsc.hpp>
-#include <petsctao.h>
+
+// Forward declare Tao type
+typedef struct _p_Tao *Tao;
 
 namespace mfemopt
 {
