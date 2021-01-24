@@ -311,10 +311,10 @@ void PDVectorFEMassIntegrator::AssembleElementMatrix(const FiniteElement &el,
                                                      DenseMatrix &elmat)
 {
    Coefficient       *oQ = VectorFEMassIntegrator::Q;
-   VectorCoefficient *VQ = VectorFEMassIntegrator::VQ;
+   VectorCoefficient *VQ = VectorFEMassIntegrator::DQ;
    MatrixCoefficient *MQ = VectorFEMassIntegrator::MQ;
    VectorFEMassIntegrator::Q = pdcoeff->GetActiveCoefficient();
-   VectorFEMassIntegrator::VQ = NULL;
+   VectorFEMassIntegrator::DQ = NULL;
    VectorFEMassIntegrator::MQ = pdcoeff->GetActiveMatrixCoefficient();
 
    const IntegrationRule *oir = VectorFEMassIntegrator::IntRule;
@@ -325,7 +325,7 @@ void PDVectorFEMassIntegrator::AssembleElementMatrix(const FiniteElement &el,
    VectorFEMassIntegrator::IntRule = oir;
 
    VectorFEMassIntegrator::Q  = oQ;
-   VectorFEMassIntegrator::VQ = VQ;
+   VectorFEMassIntegrator::DQ = VQ;
    VectorFEMassIntegrator::MQ = MQ;
 }
 
@@ -335,10 +335,10 @@ void PDVectorFEMassIntegrator::AssembleElementMatrix2(const FiniteElement &trial
                                                       DenseMatrix &elmat)
 {
    Coefficient       *oQ = VectorFEMassIntegrator::Q;
-   VectorCoefficient *VQ = VectorFEMassIntegrator::VQ;
+   VectorCoefficient *VQ = VectorFEMassIntegrator::DQ;
    MatrixCoefficient *MQ = VectorFEMassIntegrator::MQ;
    VectorFEMassIntegrator::Q = pdcoeff->GetActiveCoefficient();
-   VectorFEMassIntegrator::VQ = NULL;
+   VectorFEMassIntegrator::DQ = NULL;
    VectorFEMassIntegrator::MQ = pdcoeff->GetActiveMatrixCoefficient();
 
    const IntegrationRule *oir = VectorFEMassIntegrator::IntRule;
@@ -349,7 +349,7 @@ void PDVectorFEMassIntegrator::AssembleElementMatrix2(const FiniteElement &trial
    VectorFEMassIntegrator::IntRule = oir;
 
    VectorFEMassIntegrator::Q  = oQ;
-   VectorFEMassIntegrator::VQ = VQ;
+   VectorFEMassIntegrator::DQ = VQ;
    VectorFEMassIntegrator::MQ = MQ;
 }
 

@@ -28,7 +28,8 @@ env:
     - CXXFLAGS='-std=c++11'
     - PETSC_COMMIT=
     - CLANGUAGE=C
-    - MFEM_COMMIT=v4.2
+    #- MFEM_COMMIT=v4.3
+    - MFEM_COMMIT=origin/master
 
   matrix:
 # default builds using PETSc master. Keep one origin/release build

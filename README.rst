@@ -40,9 +40,9 @@ Example codes are located at ``src/ts/examples/tests`` and ``src/tao/examples/te
 MFEM support
 ------------
 
-In order to enable the MFEM based FEM layer (MFEM version greater or equal 4.0 must be used), you have two options
+In order to enable the MFEM based FEM layer (MFEM version greater or equal 4.3 must be used), you have two options
 
-  **recommended**: Configure PETSc using --download-mfem --download-mfem-commit=v4.0 --download-hypre --download-metis --with-cxx-dialect=C++11
+  **recommended**: Configure PETSc using --download-mfem --download-mfem-commit=v4.3 --download-hypre --download-metis --with-cxx-dialect=C++11
 
   **harder**: After having built PETSc, follow the instructions to `build MFEM <https://mfem.org/building/>`_, and enable PETSc as a third-party package via ``MFEM_USE_PETSC=YES``. Then set the environment variable ``MFEM_DIR``::
 
