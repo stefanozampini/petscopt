@@ -9,7 +9,7 @@ compiler:
 
 os: linux
 sudo: required
-dist: trusty
+dist: focal
 
 cache:
   directories:
@@ -26,34 +26,34 @@ env:
     - PETSC_OPTIONS='-check_pointer_intensity 0 -malloc_test'
     - OPTFLAGS='-O'
     - CXXFLAGS='-std=c++11'
-    - CPPFLAGS='-Wno-unused-command-line-argument'
     - PETSC_COMMIT=
-    #- MFEM_COMMIT=v4.0
-    - MFEM_COMMIT=5d24697
+    - CLANGUAGE=C
+    - MFEM_COMMIT=v4.2
 
   matrix:
-
+# default builds using PETSc master. Keep one origin/release build
     - MPI=mpich  INT64=0  SCALAR=real     PRECISION=double MFEM=1
     - MPI=mpich  INT64=1  SCALAR=real     PRECISION=double MFEM=1
-    - MPI=mpich  INT64=0  SCALAR=complex  PRECISION=double     LANGUAGE=C++
+    - MPI=mpich  INT64=0  SCALAR=complex  PRECISION=double     CLANGUAGE=C++
+    - MPI=mpich  INT64=0  SCALAR=real     PRECISION=double MFEM=1 PETSC_COMMIT=origin/release
 ###    - MPI=mpich  INT64=0  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
 ###    - MPI=mpich  INT64=1  SCALAR=real     PRECISION=__float128 BLASLAPACK="--download-f2cblaslapack=1"
-###    - MPI=mpich  INT64=1  SCALAR=complex  PRECISION=double     LANGUAGE=C++
+###    - MPI=mpich  INT64=1  SCALAR=complex  PRECISION=double     CLANGUAGE=C++
 
 matrix:
 
   include:
 
 # OSX
-   - env: MPI=mpich INT64=0 SCALAR=real LANGUAGE=C MFEM=1
+   - env: MPI=mpich INT64=0 SCALAR=real MFEM=1
      compiler: clang
      os: osx
-     osx_image: xcode9.4
-#   - env: MPI=mpich INT64=1 SCALAR=complex LANGUAGE=C++
+     osx_image: xcode12.2
+#   - env: MPI=mpich INT64=1 SCALAR=complex CLANGUAGE=C++
 #     compiler: clang
 #     os: osx
-# backward compatibility
-   - env: PETSC_COMMIT=v3.11.1 MPI=mpich INT64=0 SCALAR=real LANGUAGE=C MFEM=1
+# backward compatibility # cannot use 3.11.x or earlier since github.com/LLNL/hypre disappeared!
+   - env: PETSC_COMMIT=v3.12.5 MPI=mpich INT64=0 SCALAR=real MFEM=1
 
 git:
   depth: 3
@@ -65,19 +65,9 @@ branches:
 
 addons:
   apt:
-    sources:
-      - ubuntu-toolchain-r-test
-      - llvm-toolchain-precise-3.6
     packages:
-      - realpath
-      - g++-5
-      - clang-3.6
-      - ccache
-      - make
-      - cmake
       - libblas-dev
       - liblapack-dev
-      - mpich
       - libmpich-dev
   homebrew:
     packages:
@@ -87,7 +77,10 @@ addons:
 
 
 before_install:
-  - if [[ "$TRAVIS_COMPILER" == "gcc" ]]; then CC=gcc-5 && CXX=g++-5; fi
+  - which gcc
+  - echo "CC is "$CC
+  - which clang
+  - if [[ "$TRAVIS_COMPILER" == "gcc" ]]; then CC=gcc && CXX=g++; fi
 #  - if [[ "$TRAVIS_OS_NAME" == "linux" && "$TRAVIS_COMPILER" == "clang" ]]; then CC=clang-3.6 && CXX=clang++-3.6; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export PATH=/usr/local/opt/ccache/libexec:$PATH; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export CCACHE_BINDIR=/usr/local/bin; fi
@@ -118,7 +111,7 @@ install:
   - git clean -q -d -x -f
   - git reset --hard ${PETSC_COMMIT:-origin/master}
   - rm -rf arch-test
-  - ./configure PETSC_ARCH=arch-test --with-cc=mpicc --with-cxx=mpicxx --with-fc=0 --with-debugging=${DBG:-0} --with-clanguage=${LANGUAGE:-C} --with-64-bit-indices=${INT64:-0} --with-scalar-type=${SCALAR:-real} --with-precision=${PRECISION:-double} --download-mfem=${MFEM:-0} --download-hypre=${MFEM:-0} --download-metis=${MFEM:-0} --download-mfem-commit=${MFEM_COMMIT:-master} --with-cxx-dialect=C++11 $BLASLAPACK COPTFLAGS="$OPTFLAGS" CXXOPTFLAGS="$OPTFLAGS" FOPTFLAGS="$OPTFLAGS" --CXXFLAGS="$CXXFLAGS" --CPPFLAGS="$CPPFLAGS" --CXXPPFLAGS="$CPPFLAGS" || /bin/sh -c "tail -2500 configure.log; false"
+  - ./configure PETSC_ARCH=arch-test --with-cc=mpicc --with-cxx=mpicxx --with-fc=0 --with-debugging=${DBG:-0} --with-clanguage=${CLANGUAGE} --with-64-bit-indices=${INT64:-0} --with-scalar-type=${SCALAR:-real} --with-precision=${PRECISION:-double} --download-mfem=${MFEM:-0} --download-hypre=${MFEM:-0} --download-metis=${MFEM:-0} --download-mfem-commit=${MFEM_COMMIT:-master} --with-cxx-dialect=C++11 $BLASLAPACK COPTFLAGS="$OPTFLAGS" CXXOPTFLAGS="$OPTFLAGS" FOPTFLAGS="$OPTFLAGS" CXXFLAGS="$CXXFLAGS" CPPFLAGS="$CPPFLAGS" CXXPPFLAGS="$CPPFLAGS" || /bin/sh -c "tail -2500 configure.log; false"
   - make MAKE_NP=$(nproc) PETSC_ARCH=arch-test || /bin/sh -c "if [ -f arch-test/lib/petsc/conf/mfem.errorflg ]; then tail -200 arch-test/lib/petsc/conf/mfem.log; fi; tail -200 make.log; false"
   - cd $PETSCOPT_DIR
   - make with_mfem=${MFEM:-0} MAKE_NP=$(nproc) PETSC_ARCH=arch-test
@@ -126,6 +119,6 @@ install:
 
 script:
   - cd $PETSCOPT_DIR
-  - make -i -j1 PETSC_ARCH=arch-test test | tee alltests.log
+  - make -i -j1 PETSC_ARCH=arch-test TIMEOUT=120 test | tee alltests.log
   - test -z "$(grep FAILED alltests.log)"
   - cd $PETSC_DIR && git clean -q -x -d -f
