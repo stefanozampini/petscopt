@@ -173,12 +173,10 @@ static void f1_a(PetscInt dim, PetscInt Nf, PetscInt NfAuxE,
   const PetscScalar* da_x = a_x + aOff_x[NfAux];
   const PetscScalar* M0   = g1_a0;
   const PetscScalar* M1   = g1_a1;
-//printf("ok\n");
   uf1_a(dim, Nf, NfAux, uOff, uOff_x, u, u_t, u_x, aOff, aOff_x, a, a_t, a_x, t, x, numConstants, constants, f1_a0_h, f1_a1_h, g1_a0, g1_a1);
   /* f1 is zeroed outside */
   for (af = 0; af < NfAux; af++) {
     const PetscInt aNc = aOff[af + 1] - aOff[af];
-//printf("f1_a0: %d / %d ->  %d (aNc %d uNc %d)\n",af,NfAux,f1_a0_h[af],aNc,uNc);
     if (f1_a0_h[af]) {
       for (uc = 0; uc < uNc; uc++) {
         for (d = 0; d < dim; d++) {
@@ -189,7 +187,6 @@ static void f1_a(PetscInt dim, PetscInt Nf, PetscInt NfAuxE,
         }
       }
     }
-//printf("f1_a1: %d / %d ->  %d (aNc %d uNc %d)\n",af,NfAux,f1_a0_h[af],aNc,uNc);
     if (f1_a1_h[af]) {
       for (uc = 0; uc < uNc; uc++) {
         for (d = 0; d < dim; d++) {
