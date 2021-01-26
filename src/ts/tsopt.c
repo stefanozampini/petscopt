@@ -512,7 +512,7 @@ $  setup(TS ts, Vec x0, Vec design, void *ctx);
 PetscErrorCode TSSetSetUpFromDesign(TS ts,PetscErrorCode (*setup)(TS,Vec,Vec,void*),void* setupctx)
 {
   PetscErrorCode ierr;
-  TSOpt          tsopt;
+  TSOpt          tsopt = NULL;
 
   PetscFunctionBegin;
   ierr = PetscOptInitializePackage();CHKERRQ(ierr);
