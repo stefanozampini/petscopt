@@ -290,6 +290,7 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
   ierr = TSGetStepNumber(ts,&astep);CHKERRQ(ierr);
   ierr = TSTrajectoryGetNumSteps(fwdts->trajectory,&tstep);CHKERRQ(ierr);
   step = tstep - astep - 1;
+#if PETSC_VERSION_LT(3,15,0)
   if (beuler && !endpoint) {
     ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
     ierr = DMGetGlobalVector(dm,&beY0);CHKERRQ(ierr);
@@ -297,6 +298,7 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
     ierr = TSGetSolution(fwdts,&fwdYSol);CHKERRQ(ierr);
     ierr = VecCopy(fwdYSol,beY0);CHKERRQ(ierr);
   }
+#endif
   ierr = TSTrajectoryGet(fwdts->trajectory,fwdts,step,&dummy);CHKERRQ(ierr);
 
   ierr = TSGetSolution(fwdts,&fwdYSol);CHKERRQ(ierr);
@@ -322,6 +324,7 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
     ierr = AdjointTSGetTLMTSAndFOATS(ts,&tlmts,&foats);CHKERRQ(ierr);
     ierr = TSTrajectoryGetSolutionOnly(tlmts->trajectory,&flg);CHKERRQ(ierr);
     if (flg) SETERRQ(PetscObjectComm((PetscObject)tlmts->trajectory),PETSC_ERR_SUP,"TSTrajectory did not save the stages! Rerun with TSTrajectorySetSolutionOnly(tj,PETSC_TRUE)");
+#if PETSC_VERSION_LT(3,15,0)
     if (beuler && !endpoint) {
       ierr = TSGetDM(tlmts,&dm);CHKERRQ(ierr);
       ierr = DMGetGlobalVector(dm,&beTLM0);CHKERRQ(ierr);
@@ -329,6 +332,7 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
       ierr = TSGetSolution(tlmts,&TLMSol);CHKERRQ(ierr);
       ierr = VecCopy(TLMSol,beTLM0);CHKERRQ(ierr);
     }
+#endif
     ierr = TSTrajectoryGet(tlmts->trajectory,tlmts,step,&dummy);CHKERRQ(ierr);
     ierr = TSGetStages(tlmts,&i,&TLMY);CHKERRQ(ierr);
     if (i != 1) SETERRQ1(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Mismatch number of stages %D != 1",i);
@@ -416,12 +420,16 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
     }
   } else { /* theta case or beuler (endpoint or not) */
     Vec fwdU = fwdY[0];
+#if PETSC_VERSION_LT(3,15,0)
     /* need to reconstruct x0 from loaded solution (next time step) and stage solution
        to properly compute fwdYdot.
        This is not doable with BEULER, unless we have the endpoint variant which stores
        it as a stage vector.
     */
     if (endpoint) { beY0 = fwdY[0]; beTLM0 = TLMY ? TLMY[0] : NULL; fwdU = fwdYSol; }
+#else
+    if (endpoint || beuler) { beY0 = fwdY[0]; beTLM0 = TLMY ? TLMY[0] : NULL; fwdU = fwdYSol; }
+#endif
     if (!beY0) {
       s    = 1.0/(h*(theta-1.0));
       ierr = VecAXPBYPCZ(fwdYdot,-s,s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
@@ -477,7 +485,11 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
     }
     ierr = MatMultTranspose(J,LY[0],F);CHKERRQ(ierr);
     ierr = VecAXPY(L,-h,F);CHKERRQ(ierr);
+#if PETSC_VERSION_LT(3,15,0)
     if (endpoint) { beY0 = NULL; beTLM0 = NULL; }
+#else
+    if (endpoint || beuler) { beY0 = NULL; beTLM0 = NULL; }
+#endif
   }
   ierr = TSGetDM(ts,&dm);CHKERRQ(ierr);
   ierr = DMRestoreGlobalVector(dm,&Q);CHKERRQ(ierr);
@@ -544,6 +556,7 @@ PetscErrorCode TSStep_TLM_Theta(TS ts)
   ierr = TSTrajectoryGetSolutionOnly(fwdts->trajectory,&flg);CHKERRQ(ierr);
   if (flg) SETERRQ(PetscObjectComm((PetscObject)fwdts->trajectory),PETSC_ERR_SUP,"TSTrajectory did not save the stages! Rerun with TSTrajectorySetSolutionOnly(tj,PETSC_TRUE)");
   ierr = TSGetStepNumber(ts,&i);CHKERRQ(ierr);
+#if PETSC_VERSION_LT(3,15,0)
   if (beuler && !endpoint) {
     ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
     ierr = DMGetGlobalVector(dm,&beY0);CHKERRQ(ierr);
@@ -551,6 +564,7 @@ PetscErrorCode TSStep_TLM_Theta(TS ts)
     ierr = TSGetSolution(fwdts,&fwdYSol);CHKERRQ(ierr);
     ierr = VecCopy(fwdYSol,beY0);CHKERRQ(ierr);
   }
+#endif
   ierr = TSTrajectoryGet(fwdts->trajectory,fwdts,i+1,&dummy);CHKERRQ(ierr);
   ierr = TSGetSolution(fwdts,&fwdYSol);CHKERRQ(ierr);
   ierr = TSGetStages(fwdts,&i,&fwdY);CHKERRQ(ierr);
@@ -599,9 +613,13 @@ PetscErrorCode TSStep_TLM_Theta(TS ts)
     ierr = VecLockReadPop(Y[0]);CHKERRQ(ierr);
   } else {
     Vec fwdU = fwdY[0];
-    if (endpoint) { beY0 = fwdY[0]; fwdU = fwdYSol; }
+#if PETSC_VERSION_LT(3,15,0)
     /* need to reconstruct x0 from loaded solution (next time step) and stage solution
        to properly compute fwdYdot */
+    if (endpoint) { beY0 = fwdY[0]; fwdU = fwdYSol; }
+#else
+    if (endpoint || beuler) { beY0 = fwdY[0]; fwdU = fwdYSol; }
+#endif
     if (!beY0) {
       s    = 1.0/(h*(theta-1.0));
       ierr = VecAXPBYPCZ(fwdYdot,-s,s,0.0,fwdYSol,fwdY[0]);CHKERRQ(ierr);
@@ -624,12 +642,20 @@ PetscErrorCode TSStep_TLM_Theta(TS ts)
     ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
     ierr = KSPSetOperators(ksp,J,Jp);CHKERRQ(ierr);
     ierr = KSPSolve(ksp,F,F);CHKERRQ(ierr);
-    /* TLM stage */
+    /* save TLM stage */
+#if PETSC_VERSION_LT(3,15,0)
     if (endpoint) { ierr = VecCopy(U,Y[0]);CHKERRQ(ierr); }
+#else
+    if (endpoint || beuler) { ierr = VecCopy(U,Y[0]);CHKERRQ(ierr); }
+#endif
     else { ierr = VecWAXPY(Y[0],1.0,F,U);CHKERRQ(ierr); }
     /* Advance TLM solution */
     ierr = VecAXPY(U,1.0/theta,F);CHKERRQ(ierr);
+#if PETSC_VERSION_LT(3,15,0)
     if (endpoint) { beY0 = NULL; }
+#else
+    if (endpoint || beuler) { beY0 = NULL; }
+#endif
   }
 
   ierr = DMRestoreGlobalVector(dm,&F2);CHKERRQ(ierr);
