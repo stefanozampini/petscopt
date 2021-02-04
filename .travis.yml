@@ -29,7 +29,7 @@ env:
     - PETSC_COMMIT=
     - CLANGUAGE=C
     #- MFEM_COMMIT=v4.3
-    - MFEM_COMMIT=origin/master
+    - MFEM_COMMIT=origin/stefanozampini/smallfixes
 
   matrix:
 # default builds using PETSc master. Keep one origin/release build
