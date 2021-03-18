@@ -88,8 +88,13 @@ void ReplicatedParFiniteElementSpace::Broadcast(const Vector& x, Vector &y)
    double *xd,*yd;
    xd = x.GetData();
    yd = y.GetData();
+#if PETSC_VERSION_LT(3,15,0)
    ierr = PetscSFBcastBegin(red_V_sf,MPI_DOUBLE_PRECISION,xd,yd); PCHKERRQ(red_V_sf,ierr);
    ierr = PetscSFBcastEnd(red_V_sf,MPI_DOUBLE_PRECISION,xd,yd); PCHKERRQ(red_V_sf,ierr);
+#else
+   ierr = PetscSFBcastBegin(red_V_sf,MPI_DOUBLE_PRECISION,xd,yd,MPI_REPLACE); PCHKERRQ(red_V_sf,ierr);
+   ierr = PetscSFBcastEnd(red_V_sf,MPI_DOUBLE_PRECISION,xd,yd,MPI_REPLACE); PCHKERRQ(red_V_sf,ierr);
+#endif
 }
 
 void ReplicatedParFiniteElementSpace::Reduce(const Vector& x, Vector &y, MPI_Op op)
@@ -120,8 +125,13 @@ void ReplicatedParFiniteElementSpace::TBroadcast(const Vector& x, Vector &y)
    double *xd,*yd;
    xd = x.GetData();
    yd = y.GetData();
-   ierr = PetscSFBcastBegin(red_T_sf,MPI_DOUBLE_PRECISION,xd,yd); PCHKERRQ(red_T_sf,ierr);
-   ierr = PetscSFBcastEnd(red_T_sf,MPI_DOUBLE_PRECISION,xd,yd); PCHKERRQ(red_T_sf,ierr);
+#if PETSC_VERSION_LT(3,15,0)
+   ierr = PetscSFBcastBegin(red_T_sf,MPI_DOUBLE_PRECISION,xd,yd); PCHKERRQ(red_V_sf,ierr);
+   ierr = PetscSFBcastEnd(red_T_sf,MPI_DOUBLE_PRECISION,xd,yd); PCHKERRQ(red_V_sf,ierr);
+#else
+   ierr = PetscSFBcastBegin(red_T_sf,MPI_DOUBLE_PRECISION,xd,yd,MPI_REPLACE); PCHKERRQ(red_V_sf,ierr);
+   ierr = PetscSFBcastEnd(red_T_sf,MPI_DOUBLE_PRECISION,xd,yd,MPI_REPLACE); PCHKERRQ(red_V_sf,ierr);
+#endif
 }
 
 void ReplicatedParFiniteElementSpace::TReduce(const Vector& x, Vector &y, MPI_Op op)

@@ -150,8 +150,13 @@ void DataReplicator::Broadcast(const std::string& name, int nin, const void* dat
    MFEM_VERIFY(nin >= nroots,"Invalid size for input: " << nin << " < " << nroots);
    MFEM_VERIFY(nout >= nleaves,"Invalid size for output: " << nout << " < " << nleaves);
 
+#if PETSC_VERSION_LT(3,15,0)
    ierr = PetscSFBcastBegin(sf,unit,datain,dataout); PCHKERRQ(sf,ierr);
    ierr = PetscSFBcastEnd(sf,unit,datain,dataout); PCHKERRQ(sf,ierr);
+#else
+   ierr = PetscSFBcastBegin(sf,unit,datain,dataout,MPI_REPLACE); PCHKERRQ(sf,ierr);
+   ierr = PetscSFBcastEnd(sf,unit,datain,dataout,MPI_REPLACE); PCHKERRQ(sf,ierr);
+#endif
    if (!name.length())
    {
       ierr = PetscSFDestroy(&sf); CCHKERRQ(PETSC_COMM_SELF,ierr);

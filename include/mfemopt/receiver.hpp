@@ -14,6 +14,7 @@
 #include <ostream>
 #include <vector>
 #include <string>
+#include <petscts.h>
 
 namespace mfemopt
 {
