@@ -304,7 +304,7 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
   ierr = TSGetSolution(fwdts,&fwdYSol);CHKERRQ(ierr);
   ierr = TSGetStages(fwdts,&i,&fwdY);CHKERRQ(ierr);
   ierr = TSGetStages(ts,&j,&LY);CHKERRQ(ierr);
-  if (i != j || i != 1) SETERRQ3(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Mismatch number of stages %D != %D || %D != 1",i,j,i);
+  if (i != j) SETERRQ2(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Mismatch number of stages %D != %D",i,j);
   ierr = VecLockReadPush(fwdYSol);CHKERRQ(ierr);
   ierr = VecLockReadPush(fwdY[0]);CHKERRQ(ierr);
   ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
@@ -335,7 +335,7 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
 #endif
     ierr = TSTrajectoryGet(tlmts->trajectory,tlmts,step,&dummy);CHKERRQ(ierr);
     ierr = TSGetStages(tlmts,&i,&TLMY);CHKERRQ(ierr);
-    if (i != 1) SETERRQ1(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Mismatch number of stages %D != 1",i);
+    if (i != j) SETERRQ2(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Mismatch number of stages %D != %D",i,j);
     ierr = TSGetSolution(tlmts,&TLMSol);CHKERRQ(ierr);
     ierr = VecLockReadPush(TLMSol);CHKERRQ(ierr);
     ierr = VecLockReadPush(TLMY[0]);CHKERRQ(ierr);
@@ -346,7 +346,7 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
       if (flg) SETERRQ(PetscObjectComm((PetscObject)foats->trajectory),PETSC_ERR_SUP,"TSTrajectory did not save the stages! Rerun with TSTrajectorySetSolutionOnly(tj,PETSC_TRUE)");
       ierr = TSTrajectoryGet(foats->trajectory,foats,astep+1,&dummy);CHKERRQ(ierr);
       ierr = TSGetStages(foats,&i,&FOAY);CHKERRQ(ierr);
-      if (i != 1) SETERRQ1(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Mismatch number of stages %D != 1",i);
+      if (i != j) SETERRQ2(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Mismatch number of stages %D != %D",i,j);
       ierr = TSGetSolution(foats,&FOASol);CHKERRQ(ierr);
       ierr = VecLockReadPush(FOASol);CHKERRQ(ierr);
       ierr = VecLockReadPush(FOAY[0]);CHKERRQ(ierr);
@@ -569,7 +569,7 @@ PetscErrorCode TSStep_TLM_Theta(TS ts)
   ierr = TSGetSolution(fwdts,&fwdYSol);CHKERRQ(ierr);
   ierr = TSGetStages(fwdts,&i,&fwdY);CHKERRQ(ierr);
   ierr = TSGetStages(ts,&j,&Y);CHKERRQ(ierr);
-  if (i != j || i != 1) SETERRQ3(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Mismatch number of stages %D != %D || %D != 1",i,j,i);
+  if (i != j) SETERRQ2(PetscObjectComm((PetscObject)ts),PETSC_ERR_PLIB,"Mismatch number of stages %D != %D",i,j);
   ierr = VecLockReadPush(fwdYSol);CHKERRQ(ierr);
   ierr = VecLockReadPush(fwdY[0]);CHKERRQ(ierr);
   ierr = TSGetDM(fwdts,&dm);CHKERRQ(ierr);
