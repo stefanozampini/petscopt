@@ -445,7 +445,11 @@ PetscErrorCode TSStep_Adjoint_Theta(TS ts)
         s    = 1.0/(theta*h);
         ierr = VecAXPBYPCZ(TLMUdot,s,-s,0.0,TLMSol,beTLM0);CHKERRQ(ierr);
       }
+#if PETSC_VERSION_LT(3,15,0)
       TLMU = endpoint ? TLMSol : TLMY[0];
+#else
+      TLMU = (endpoint || beuler) ? TLMSol : TLMY[0];
+#endif
       FOAL = FOAY ? FOAY[0] : NULL;
       if (FOAL) {
         s    = 1.0/(h*theta);
