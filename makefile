@@ -89,21 +89,15 @@ FCMOD = cd $(MODDIR) && $(FC)
 COMPILE.fc = $(call quiet,FCMOD) $(FC_FLAGS) $(FFLAGS) $(FCPPFLAGS) $(FC_DEPFLAGS) -c
 endif
 
-generated := $(PETSCOPT_DIR)/$(PETSCOPT_ARCH)/lib/petscopt/conf/files
+PETSCOPT_SRC_DIRS := src/sys src/ksp src/snes src/ts src/tao
+ifeq ($(with_mfem),1)
+PETSCOPT_SRC_DIRS += src/mfemopt
+endif
+PETSCOPT_SRC_C_LIST   := $(wildcard $(addsuffix /*.c, $(PETSCOPT_SRC_DIRS)))
+PETSCOPT_SRC_CPP_LIST := $(wildcard $(addsuffix /*.cpp, $(PETSCOPT_SRC_DIRS)))
+PETSCOPT_OBJ_LIST := $(PETSCOPT_SRC_C_LIST:%.c=$(OBJDIR)/%.o) $(PETSCOPT_SRC_CPP_LIST:%.cpp=$(OBJDIR)/%.o)
 
-spkgs := sys,ksp,snes,ts,tao,mfemopt
-pkgs := sys ksp snes ts tao mfemopt
-langs := c cpp
-
-$(generated) : $(config-confheader) $(petscconf) $(petscvariables) $(PETSC_DIR)/config/gmakegen.py | $$(@D)/.DIR
-	$(PYTHON) $(PETSC_DIR)/config/gmakegen.py --petsc-arch=$(PETSC_ARCH) --pkg-dir=$(PETSCOPT_DIR) --pkg-name=petscopt --pkg-arch=$(PETSCOPT_ARCH) --pkg-pkgs=$(spkgs)
-
--include $(generated)
-
-concatlang = $(foreach lang, $(langs), $(srcs-$(1).$(lang):src/%.$(lang)=$(OBJDIR)/%.o))
-srcs.o := $(foreach pkg, $(pkgs), $(call concatlang,$(pkg)))
-
-objects.o := $(srcs.o)
+objects.o := $(PETSCOPT_OBJ_LIST)
 .SECONDARY: $(objects.o)
 
 $(libpetscopt_static) : objs := $(objects.o)
@@ -136,13 +130,13 @@ else
 	@$(RM) $@.args
 endif
 
-$(OBJDIR)/%.o : src/%.c | $$(@D)/.DIR
+$(OBJDIR)/%.o : %.c | $$(@D)/.DIR
 	$(COMPILE.cc) $(abspath $<) -o $@
 
-$(OBJDIR)/%.o : src/%.cpp | $$(@D)/.DIR
+$(OBJDIR)/%.o : %.cpp | $$(@D)/.DIR
 	$(COMPILE.cpp) $(abspath $<) -o $@
 
-$(OBJDIR)/%.o : src/%.F90 | $$(@D)/.DIR $(MODDIR)/.DIR
+$(OBJDIR)/%.o : %.F90 | $$(@D)/.DIR $(MODDIR)/.DIR
 	$(COMPILE.fc) $(abspath $<) -o $(if $(FCMOD),$(abspath $@),$@)
 
 %/.DIR :
