@@ -1,6 +1,10 @@
 # -*- mode: makefile-gmake -*-
 
+ifneq ($(PETSC_ARCH),)
 CONFIGDIR := $(PETSC_DIR)/config
+else
+CONFIGDIR := $(PETSC_DIR)/share/petsc/examples/config
+endif
 
 # TESTSRCDIR is always relative to makefile.test
 #  This must be before includes

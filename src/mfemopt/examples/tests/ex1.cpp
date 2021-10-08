@@ -107,20 +107,20 @@ Image::Image(MPI_Comm comm, const char* filename, int ord, bool quad, bool vecto
    /* 2D mesh (may have different number of elements) */
    mnex = mnex < 1 ? nex : mnex;
    mney = mney < 1 ? nex : mney;
-   Mesh *mesh = new Mesh(mnex,mney,quad ? Element::QUADRILATERAL : Element::TRIANGLE,1,Lx,Ly);
-   if (refit && quad) mesh->EnsureNCMesh();
-
-   /* For testing purposes, we specify a partitioning */
-   if (test_part)
    {
-      pmesh = ParMeshTest(comm,*mesh);
-   }
-   else
-   {
-      pmesh = new ParMesh(comm,*mesh);
-   }
-   delete mesh;
+      Mesh mesh = Mesh::MakeCartesian2D(mnex,mney,quad ? Element::QUADRILATERAL : Element::TRIANGLE,1,Lx,Ly);
+      if (refit && quad) mesh.EnsureNCMesh();
 
+      /* For testing purposes, we specify a partitioning */
+      if (test_part)
+      {
+         pmesh = ParMeshTest(comm,mesh);
+      }
+      else
+      {
+         pmesh = new ParMesh(comm,mesh);
+      }
+   }
    ord = std::max(ord,1);
    fec = new H1_FECollection(ord, 2);
    pfes = new ParFiniteElementSpace(pmesh, fec, vdim, Ordering::byVDIM);
