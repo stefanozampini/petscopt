@@ -1,28 +1,28 @@
 
 Initial state
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.5
 0.5
 
 Final state
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.899589
 0.36043
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 1.0100727327122083e+00 -1.4282103881980063e-01 
 0.0000000000000000e+00 1.0000000051371400e+00 
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 1.0100727296545742e+00 -1.4282101898620311e-01 
 0.0000000000000000e+00 1.0000000000000000e+00 
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 7.2728466867337316e-01 -4.4127372210224572e-03 0.0000000000000000e+00 
 0.0000000000000000e+00 0.0000000000000000e+00 -1.4885132795848548e+00 
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 7.2728466139607928e-01 -4.4127386343728956e-03 0.0000000000000000e+00 
 0.0000000000000000e+00 0.0000000000000000e+00 -1.4885132591966901e+00 
@@ -60,72 +60,72 @@ Mat Object: 1 MPI processes
  12 TAO,  Function value: 3.33351e-19,  Residual: 4.24952e-10 
 
 Tao solution
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -0.346574
 0.346574
 -0.693147
 
 Initial state solution
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.5
 0.5
 
 Gradient via adjoint
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.0339846
 -0.0339846
 0.20238
 
 Gradient of objective function
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -0.261764
 0.292955
 
 Gradient via adjoint (TLM)
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.0339846
 -0.0339846
 0.20238
 
 TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 -5.1187730415755750e-01 5.1187730415755750e-01 5.4418779449346288e-01 
 -3.4137581791631844e-01 3.4137581791631844e-01 1.1770798910550828e+00 
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 -5.1187723983531408e-01 -3.4137068701960949e-01 
 5.1187723983531408e-01 3.4137068701960949e-01 
 5.4419394394146248e-01 1.1770733464081022e+00 
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 6.4322243420456005e-08 -6.4322243420456005e-08 6.1494479995927165e-06 
 5.1308967089491730e-06 -5.1308967089491730e-06 -6.5446469805774399e-06 
 
 Gradient via TLM (explicit fwd via multtrans)
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.0339831
 -0.0339831
 0.202383
 
 Gradient via TLM (explicit adj via mult)
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.0339846
 -0.0339846
 0.20238
-Mat Object: H 1 MPI processes
+Mat Object: H 1 MPI process
   type: seqdense
 4.4802529972930072e-01 -4.4802529972930077e-01 -9.6727241610638703e-01 
 -4.4802529972930072e-01 4.4802529972930077e-01 9.6727241610638703e-01 
 -9.6728250569408691e-01 9.6728250569408669e-01 2.6595340482011132e+00 
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 0.0000000000000000e+00 5.5511151231257827e-17 -1.0089587699879665e-05 
 -5.5511151231257827e-17 0.0000000000000000e+00 1.0089587699657621e-05 

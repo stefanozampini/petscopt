@@ -8,5 +8,6 @@
 #include <petscopt/adjointts.h>
 #include <petscopt/tlmts.h>
 #include <petscopt/augmentedts.h>
+#include <petscopt/petsctao_cl.h>
 
 #endif

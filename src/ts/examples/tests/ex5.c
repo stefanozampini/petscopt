@@ -12,7 +12,6 @@ static const char help[] = "Tests state dependent mass matrix.\n";
      | -u1   u0 | | u1_dot |   | -u0^2 - u1^2 |
 */
 #include <petscopt.h>
-#include <petsctao.h>
 
 static PetscErrorCode EvalObjective(Vec U, Vec M, PetscReal time, PetscReal *val, void *ctx)
 {
@@ -305,7 +304,7 @@ int main(int argc, char* argv[])
   t0   = 0.0;
   tf   = 1.57;
   dt   = 1.e-3;
-  ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"","");CHKERRQ(ierr);
+  PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"","");
   ierr = PetscOptionsReal("-t0","Initial time","",t0,&t0,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-tf","Final time","",tf,&tf,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-dt","Initial time step","",dt,&dt,NULL);CHKERRQ(ierr);
@@ -315,7 +314,7 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsBool("-test_taylor","Run Taylor test","",testtaylor,&testtaylor,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_history","Run objective using the initially generated history","",testhistory,&testhistory,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-paper","Use objective from the paper","",paper,&paper,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsEnd();CHKERRQ(ierr);
+  PetscOptionsEnd();
 
   /* state vectors */
   ierr = VecCreate(PETSC_COMM_WORLD,&U);CHKERRQ(ierr);
@@ -493,12 +492,12 @@ int main(int argc, char* argv[])
     ierr = VecDuplicate(M,&X);CHKERRQ(ierr);
     ierr = VecSetRandom(X,NULL);CHKERRQ(ierr);
     ierr = TaoCreate(PETSC_COMM_WORLD,&tao);CHKERRQ(ierr);
-    ierr = TaoSetInitialVector(tao,X);CHKERRQ(ierr);
+    ierr = TaoSetSolution(tao,X);CHKERRQ(ierr);
     ierr = TaoSetType(tao,TAOLMVM);CHKERRQ(ierr);
-    ierr = TaoSetObjectiveRoutine(tao,FormFunction,&opt);CHKERRQ(ierr);
-    ierr = TaoSetObjectiveAndGradientRoutine(tao,FormFunctionGradient,&opt);CHKERRQ(ierr);
+    ierr = TaoSetObjective(tao,FormFunction,&opt);CHKERRQ(ierr);
+    ierr = TaoSetObjectiveAndGradient(tao,NULL,FormFunctionGradient,&opt);CHKERRQ(ierr);
     ierr = MatCreate(PETSC_COMM_WORLD,&H);CHKERRQ(ierr);
-    ierr = TaoSetHessianRoutine(tao,H,H,FormFunctionHessian,&opt);CHKERRQ(ierr);
+    ierr = TaoSetHessian(tao,H,H,FormFunctionHessian,&opt);CHKERRQ(ierr);
     ierr = TaoComputeGradient(tao,X,G);CHKERRQ(ierr);
     ierr = TaoComputeHessian(tao,X,H,H);CHKERRQ(ierr);
     ierr = MatDestroy(&H);CHKERRQ(ierr);
@@ -545,11 +544,13 @@ int main(int argc, char* argv[])
   test:
     requires: !complex !single
     suffix: paper_discrete
+    filter: sed -e "s/1 MPI process/1 MPI process/g"
     args: -paper -ts_trajectory_type memory -check -test_tao -test_tlm -tsgradient_adjoint_discrete -tao_test_gradient -tlm_discrete -adjoint_tlm_discrete -tshessian_foadjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_view
 
   test:
     requires: !complex !single
     suffix: hessian_discrete
+    filter: sed -e "s/1 MPI process/1 MPI process/g"
     args: -paper 0 -ts_trajectory_type memory -check -test_tao -test_tlm -tsgradient_adjoint_discrete -tao_test_hessian -tshessian_foadjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tlm_discrete -adjoint_tlm_discrete -ts_rtol 1.e-4 -ts_atol 1.e-4 -test_history {{0 1}separate output} -tshessian_view
 
 TEST*/

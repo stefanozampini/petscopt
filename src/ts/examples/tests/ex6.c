@@ -268,7 +268,7 @@ static PetscErrorCode ProcessOptions(MPI_Comm comm, AppCtx *ctx)
   ctx->Nfs     = 0;
   ctx->Nfa     = 0;
 
-  ierr = PetscOptionsBegin(comm, "", "XXX", "YYY");CHKERRQ(ierr);
+  PetscOptionsBegin(comm, "", "XXX", "YYY");
   ierr = PetscOptionsInt("-dim", "The topological mesh dimension", __FILE__, ctx->dim, &ctx->dim, NULL);CHKERRQ(ierr);
   ierr = PetscOptionsInt("-testcase", "The test case", __FILE__, testcase, &testcase, NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-simplex", "Simplicial (true) or tensor (false) mesh", __FILE__, ctx->simplex, &ctx->simplex, NULL);CHKERRQ(ierr);
@@ -353,7 +353,7 @@ static PetscErrorCode ProcessOptions(MPI_Comm comm, AppCtx *ctx)
   default:
     SETERRQ1(PETSC_COMM_WORLD,PETSC_ERR_SUP,"Unknown test case %d\n",(int)testcase);
   }
-  ierr = PetscOptionsEnd();CHKERRQ(ierr);
+  PetscOptionsEnd();
 
   /* XXX */
   {

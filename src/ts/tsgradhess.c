@@ -1006,13 +1006,13 @@ static PetscErrorCode TSOptCheckTS_Private(TS ts, PetscReal t, Vec U, Vec Udot, 
   PetscErrorCode    ierr;
 
   PetscFunctionBegin;
-  ierr = PetscObjectOptionsBegin((PetscObject)ts);CHKERRQ(ierr);
+  PetscObjectOptionsBegin((PetscObject)ts);
   if (hessian) {
     ierr = PetscOptionsViewer("-ts_test_hessian_view","View difference between hand-coded and finite difference Hessian terms","None",&mviewer,&format,&mview);CHKERRQ(ierr);
   } else {
     ierr = PetscOptionsViewer("-ts_test_gradient_view","View difference between hand-coded and finite difference Gradient terms","None",&mviewer,&format,&mview);CHKERRQ(ierr);
   }
-  ierr = PetscOptionsEnd();CHKERRQ(ierr);
+  PetscOptionsEnd();
   if (mview) {
     ierr = PetscViewerPushFormat(mviewer,format);CHKERRQ(ierr);
   }

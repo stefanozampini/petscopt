@@ -1,18 +1,18 @@
 Objective function: time [0.01,0.1], val 8.67549 (should be 8.67549)
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 20.1027
 0.211783
 0.0675659
-Mat Object: Phi 1 MPI processes
+Mat Object: Phi 1 MPI process
   type: seqdense
 3.4930505292900178e+00 2.6721836429180568e-01 8.6158402089500818e-02 
-Mat Object: PhiT 1 MPI processes
+Mat Object: PhiT 1 MPI process
   type: seqdense
 3.4930505292900174e+00 
 2.6721836429180579e-01 
 8.6158402089500818e-02 
-Mat Object: ||Phi - (Phi^T)^T||/||Phi|| 1 MPI processes
+Mat Object: ||Phi - (Phi^T)^T||/||Phi|| 1 MPI process
   type: seqdense
 -1.1545498607235597e-16 2.8863746518088992e-17 0.0000000000000000e+00 
 -------------------------- Taylor test results ---------------------------

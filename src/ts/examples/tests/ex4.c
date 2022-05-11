@@ -17,7 +17,6 @@ static const char help[] = "Tests second order initial condition dependence.";
   This code tests second order dependence of initial conditions wrt parameters.
 */
 #include <petscopt.h>
-#include <petsctao.h>
 #include <petsc/private/vecimpl.h>
 
 static PetscErrorCode EvalObjective(Vec U, Vec M, PetscReal time, PetscReal *val, void *ctx)
@@ -405,7 +404,7 @@ int main(int argc, char* argv[])
   k[2] =  1.0;
   k[3] =  0.0;
   k[4] =  0.0;
-  ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"Lotka-Volterra parameters","");CHKERRQ(ierr);
+  PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"Lotka-Volterra parameters","");
   ierr = PetscOptionsScalar("-k1","k1","",k[0],&k[0],NULL);CHKERRQ(ierr);
   ierr = PetscOptionsScalar("-k2","k2","",k[1],&k[1],NULL);CHKERRQ(ierr);
   ierr = PetscOptionsScalar("-k3","k3","",k[2],&k[2],NULL);CHKERRQ(ierr);
@@ -420,7 +419,7 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsBool("-test_mffd","Run MFFD tests on DAE callbacks","",testmffd,&testmffd,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_taylor","Run Taylor test","",testtaylor,&testtaylor,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_taylor_gn","Run Taylor test (use tao solution)","",testtaylorgn,&testtaylorgn,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsEnd();CHKERRQ(ierr);
+  PetscOptionsEnd();
 
   if (testtaylorgn) { testtaylor = PETSC_TRUE; testtao = PETSC_TRUE; }
 
@@ -586,11 +585,11 @@ int main(int argc, char* argv[])
     ierr = VecSet(X,0.0);CHKERRQ(ierr);
     ierr = TaoCreate(PETSC_COMM_SELF,&tao);CHKERRQ(ierr);
     ierr = TaoSetType(tao,TAOLMVM);CHKERRQ(ierr);
-    ierr = TaoSetObjectiveRoutine(tao,FormFunction,(void *)&taoctx);CHKERRQ(ierr);
-    ierr = TaoSetObjectiveAndGradientRoutine(tao,FormFunctionGradient,(void *)&taoctx);CHKERRQ(ierr);
+    ierr = TaoSetObjective(tao,FormFunction,(void *)&taoctx);CHKERRQ(ierr);
+    ierr = TaoSetObjectiveAndGradient(tao,NULL,FormFunctionGradient,(void *)&taoctx);CHKERRQ(ierr);
     ierr = MatCreate(PETSC_COMM_SELF,&H);CHKERRQ(ierr);
-    ierr = TaoSetHessianRoutine(tao,H,H,FormFunctionHessian,(void *)&taoctx);CHKERRQ(ierr);
-    ierr = TaoSetInitialVector(tao,X);CHKERRQ(ierr);
+    ierr = TaoSetHessian(tao,H,H,FormFunctionHessian,(void *)&taoctx);CHKERRQ(ierr);
+    ierr = TaoSetSolution(tao,X);CHKERRQ(ierr);
     ierr = TaoSetFromOptions(tao);CHKERRQ(ierr);
     ierr = TaoSolve(tao);CHKERRQ(ierr);
     ierr = PetscPrintf(PETSC_COMM_SELF,"\nTao solution\n");CHKERRQ(ierr);
@@ -710,54 +709,61 @@ int main(int argc, char* argv[])
 test:
     requires: !complex !single
     suffix: 1
+    filter: sed -e "s/1 MPI process/1 MPI process/g"
     args: -ts_rk_type 3bs -ts_adapt_type dsp -ts_atol 1.e-8 -ts_rtol 1.e-8 -ts_trajectory_type memory -tao_monitor -test_tao -tf 1 -test_tlm -tsgradient_adjoint_ts_adapt_type history -test_taylor -taylor_ts_hessian
 
 test:
     requires: !complex !single
     suffix: 2
+    filter: sed -e "s/1 MPI process/1 MPI process/g"
     args: -test_mffd -ts_type cn -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tf 1 -tshessian_view -tshessian_mffd {{0 1}separate output} -test_taylor -taylor_ts_hessian
 
 test:
     requires: !complex !single
     suffix: 3
+    filter: sed -e "s/1 MPI process/1 MPI process/g"
     args: -ts_type theta -dt 1.e-2 -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -tao_type nls -tao_nls_pc_type none  -test_tlm 0 -tf 1 -tshessian_gn {{0 1}separate output} -test_taylor_gn -test_taylor -taylor_ts_hessian -tshessian_view
 
 test:
     requires: !complex !single
     suffix: discrete
-    filter: sed -e "s/-nan/nan/g"
+    filter: sed -e "s/1 MPI process/1 MPI process/g" -e "s/-nan/nan/g"
     args: -ts_type rk -ts_rk_type {{1fe 2a 3 3bs 4 5f 5dp 5bs 6vr 7vr 8vr}separate output} -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tlm_discrete -adjoint_tlm_discrete -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_foadjoint_discrete -jactsic_pc_type lu -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tao_test_gradient
 
 test:
     requires: !complex !single
     suffix: discrete_adapt
+    filter: sed -e "s/1 MPI process/1 MPI process/g"
     args: -ts_type rk -ts_rk_type {{2a 3bs 5f 5dp 5bs 6vr 7vr 8vr}separate output} -ts_adapt_type {{dsp basic}separate output} -ts_atol 1.e-6 -ts_rtol 1.e-6 -ts_trajectory_type memory -tao_monitor -test_tao -tao_type nls -tao_nls_pc_type none -test_tlm -t0 0 -tf 0.1 -dt 1.e-2  -tsgradient_adjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_foadjoint_discrete -jactsic_pc_type lu -test_taylor -taylor_ts_hessian -taylor_ts_steps 6 -tshessian_view -tao_test_hessian
 
 test:
     requires: !complex !single
     suffix: discrete_cn
-    filter: sed -e "s/-nan/nan/g"
+    filter: sed -e "s/1 MPI process/1 MPI process/g" -e "s/-nan/nan/g"
     args: -ts_type cn -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tlm_discrete -adjoint_tlm_discrete -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tao_test_gradient -tshessian_mffd
 
 test:
     requires: !complex !single
     suffix: discrete_cn_full
+    filter: sed -e "s/1 MPI process/1 MPI process/g"
     args: -ts_type cn -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tlm_discrete -adjoint_tlm_discrete -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tao_test_hessian -tshessian_foadjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tao_type nls -tao_nls_pc_type none
 
 test:
     requires: !complex !single
     suffix: discrete_theta
-    filter: sed -e "s/-nan/nan/g"
+    filter: sed -e "s/1 MPI process/1 MPI process/g" -e "s/-nan/nan/g"
     args: -ts_type theta -ts_theta_theta {{0.17 0.5 0.88 1.0}separate output} -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tlm_discrete -adjoint_tlm_discrete -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tao_test_gradient -tshessian_mffd
 
 test:
     requires: !complex !single
     suffix: discrete_theta_gn
+    filter: sed -e "s/1 MPI process/1 MPI process/g"
     args: -ts_type theta -ts_theta_theta {{0.17 0.5 0.88 1.0}separate output} -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tlm_discrete -adjoint_tlm_discrete -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tshessian_gn -test_taylor_gn -tao_type nls -tao_nls_pc_type none -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_foadjoint_discrete
 
 test:
     requires: !complex !single
     suffix: discrete_theta_full
+    filter: sed -e "s/1 MPI process/1 MPI process/g"
     args: -ts_type theta -ts_theta_theta {{0.17 0.5 0.88 1.0}separate output} -ts_adapt_type none -ts_trajectory_type memory -tao_monitor -test_tao -test_tlm -tlm_discrete -adjoint_tlm_discrete -t0 0 -tf 1.e-1 -dt 1.e-3  -tsgradient_adjoint_discrete -test_taylor -taylor_ts_hessian -taylor_ts_steps 8 -tshessian_view -tao_type nls -tao_nls_pc_type none -tshessian_tlm_discrete -tshessian_soadjoint_discrete -tshessian_foadjoint_discrete
 
 TEST*/

@@ -180,7 +180,7 @@ int main(int argc, char* argv[])
   params[0] = 8./3.; 
   params[1] = 10;
   params[2] = 28;
-  ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"Testing options","");
+  PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"Testing options","");
   ierr = PetscOptionsBool("-lorentz","Use lorentz","",use_lorentz,&use_lorentz,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsRealArray("-lorentz_params",NULL,NULL,params,&N,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-omega","Omega","",omega,&omega,NULL);CHKERRQ(ierr);
@@ -190,7 +190,7 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsReal("-tf","Final time","",tf,&tf,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-ifunc","Use ifunction","",ifunc,&ifunc,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-testp","Test projector argument","",testP,&testP,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsEnd();CHKERRQ(ierr);
+  PetscOptionsEnd();
   if (use_lorentz) {
     ierr = PetscPrintf(PETSC_COMM_WORLD,"Using Lorentz parameters: %g %g %g\n",(double)params[0],(double)params[1],(double)params[2]);CHKERRQ(ierr);
     N = 3;
@@ -333,43 +333,52 @@ int main(int argc, char* argv[])
 
 /*TEST
     test:
+      filter: sed -e "s/1 MPI process/1 MPI process/g"
       suffix: lorentz
       args: -ts_type rk -tf 3 -lorentz -ts_rtol 1.e-6 -ts_atol 1.e-6 -ts_trajectory_type memory -testp -prop_view -propT_view
 
     test:
+      filter: sed -e "s/1 MPI process/1 MPI process/g"
       suffix: lorentz_i_noifunc
       args: -ts_type bdf -ts_bdf_order 3 -tlm_ts_bdf_order 3 -adjoint_tlm_ts_bdf_order 3 -tf 0.5  -lorentz -ts_rtol 1.e-6 -ts_atol 1.e-6 -ts_trajectory_type memory -prop_view -propT_view
       output_file: output/ex2_lorentz_out.out
 
     test:
+      filter: sed -e "s/1 MPI process/1 MPI process/g"
       suffix: lorentz_i
       args: -ts_type bdf -ts_bdf_order 3 -tlm_ts_bdf_order 3 -adjoint_tlm_ts_bdf_order 3 -tf 0.5  -lorentz -ts_rtol 1.e-6 -ts_atol 1.e-6 -ts_trajectory_type memory -ifunc -prop_view -propT_view
       output_file: output/ex2_lorentz_out_i.out
 
     test:
+      filter: sed -e "s/1 MPI process/1 MPI process/g"
       suffix: oscillator
       args: -ts_type rk -ts_rk_type 5dp -tlm_ts_rk_type 5dp -adjoint_tlm_ts_rk_type 5dp -tf 10 -ts_trajectory_type memory -testp  -adjoint_tlm_constjacobians -prop_view -propT_view
       output_file: output/ex2_oscillator.out
 
     test:
+      filter: sed -e "s/1 MPI process/1 MPI process/g"
       suffix: oscillator_i_noifunc
       args: -ts_type cn -tf 10 -dt 0.1 -ts_trajectory_type memory -tlm_ts_adapt_type none -tlm_constjacobians -adjoint_tlm_reuseksp -prop_view -propT_view
       output_file: output/ex2_oscillator_out.out
 
     test:
+      filter: sed -e "s/1 MPI process/1 MPI process/g"
       suffix: oscillator_i
       args: -ts_type cn -tf 10 -dt 0.1 -ts_trajectory_type memory -ifunc -tlm_userijacobian 0 -tlm_reuseksp -tlm_constjacobians -adjoint_tlm_constjacobians -prop_view -propT_view
       output_file: output/ex2_oscillator_out_i.out
 
     test:
+      filter: sed -e "s/1 MPI process/1 MPI process/g"
       suffix: propagator_rk_discrete
       args: -ts_type rk -tf 3 -ts_rk_type 5bs -lorentz {{0 1}separate output} -ts_adapt_type basic -ts_rtol 1.e-6 -ts_atol 1.e-6 -ts_trajectory_type memory -testp -prop_view -propT_view -err_view -tlm_discrete -adjoint_tlm_discrete
 
     test:
+      filter: sed -e "s/1 MPI process/1 MPI process/g"
       suffix: propagator_cn_discrete
       args: -ts_type cn -tf 0.1 -dt 1.e-2 -lorentz {{0 1}separate output} -ifunc {{0 1}separate output} -ts_adapt_type basic -ts_trajectory_type memory -prop_view -propT_view -err_view -tlm_discrete -adjoint_tlm_discrete
 
     test:
+      filter: sed -e "s/1 MPI process/1 MPI process/g"
       suffix: propagator_theta_discrete
       args: -ts_type theta -ts_theta_theta {{0.31 0.5 0.84 1.0}separate output} -tf 0.1 -dt 1.e-2 -lorentz {{0 1}separate output} -ifunc {{0 1}separate output} -ts_adapt_type basic -ts_trajectory_type memory -prop_view -propT_view -err_view -tlm_discrete -adjoint_tlm_discrete
 

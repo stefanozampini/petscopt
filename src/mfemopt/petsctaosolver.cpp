@@ -74,13 +74,13 @@ void PetscOptimizationSolver::Init(ReducedFunctional& f)
    tao_ctx->objective = objective;
    tao_ctx->hessType = Operator::ANY_TYPE;
 
-   ierr = TaoSetObjectiveRoutine(tao,__mfem_tao_obj,tao_ctx); PCHKERRQ(tao,ierr);
-   ierr = TaoSetGradientRoutine(tao,__mfem_tao_grad,tao_ctx); PCHKERRQ(tao,ierr);
-   ierr = TaoSetObjectiveAndGradientRoutine(tao,__mfem_tao_objgrad,tao_ctx); PCHKERRQ(tao,ierr);
+   ierr = TaoSetObjective(tao,__mfem_tao_obj,tao_ctx); PCHKERRQ(tao,ierr);
+   ierr = TaoSetGradient(tao,NULL,__mfem_tao_grad,tao_ctx); PCHKERRQ(tao,ierr);
+   ierr = TaoSetObjectiveAndGradient(tao,NULL,__mfem_tao_objgrad,tao_ctx); PCHKERRQ(tao,ierr);
 
    Mat H;
    ierr = MatCreate(PetscObjectComm((PetscObject)tao),&H); PCHKERRQ(tao,ierr);
-   ierr = TaoSetHessianRoutine(tao,H,H,__mfem_tao_hessian,tao_ctx); PCHKERRQ(tao,ierr);
+   ierr = TaoSetHessian(tao,H,H,__mfem_tao_hessian,tao_ctx); PCHKERRQ(tao,ierr);
    ierr = MatDestroy(&H); PCHKERRQ(tao,ierr);
 
    ierr = TaoSetUpdate(tao,__mfem_tao_update,tao_ctx); PCHKERRQ(tao,ierr);
@@ -129,7 +129,7 @@ void PetscOptimizationSolver::Solve(Vector& sol)
    PetscParVector X(PetscObjectComm((PetscObject)tao),sol);
    X.PlaceArray(sol.GetData());
 
-   ierr = TaoSetInitialVector(tao,X); PCHKERRQ(tao,ierr);
+   ierr = TaoSetSolution(tao,X); PCHKERRQ(tao,ierr);
    ierr = TaoSolve(tao); PCHKERRQ(tao,ierr);
 
    X.ResetArray();

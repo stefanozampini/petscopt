@@ -508,8 +508,8 @@ static PetscErrorCode AugmentedTSOptionsHandler(PetscOptionItems *PetscOptionsOb
   PetscFunctionBegin;
   PetscCheckAugmentedTS(ats);
   ierr = TSGetApplicationContext(ats,(void*)&actx);CHKERRQ(ierr);
-  ierr = PetscOptionsHead(PetscOptionsObject,"Augmented TS options");CHKERRQ(ierr);
-  ierr = PetscOptionsTail();CHKERRQ(ierr);
+  PetscOptionsHeadBegin(PetscOptionsObject,"Augmented TS options");
+  PetscOptionsHeadEnd();
   PetscFunctionReturn(0);
 }
 

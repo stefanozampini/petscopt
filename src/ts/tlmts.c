@@ -184,7 +184,7 @@ static PetscErrorCode TLMTSOptionsHandler(PetscOptionItems *PetscOptionsObject,P
   PetscFunctionBegin;
   PetscCheckTLMTS(lts);
   ierr = TSGetApplicationContext(lts,(void*)&tlm_ctx);CHKERRQ(ierr);
-  ierr = PetscOptionsHead(PetscOptionsObject,"TLMTS options");CHKERRQ(ierr);
+  PetscOptionsHeadBegin(PetscOptionsObject,"TLMTS options");
   ierr = PetscOptionsBool("-userijacobian","Use the user-provided IJacobian routine, instead of the splits, to compute the Jacobian",NULL,tlm_ctx->userijac,&tlm_ctx->userijac,NULL);CHKERRQ(ierr);
   jcon = PETSC_FALSE;
   ierr = PetscOptionsBool("-constjacobians","Whether or not the DAE Jacobians are constant",NULL,jcon,&jcon,NULL);CHKERRQ(ierr);
@@ -194,7 +194,7 @@ static PetscErrorCode TLMTSOptionsHandler(PetscOptionItems *PetscOptionsObject,P
   if (flg) {
     ierr = TLMTSSetUpStep(lts);CHKERRQ(ierr);
   }
-  ierr = PetscOptionsTail();CHKERRQ(ierr);
+  PetscOptionsHeadEnd();
   ierr = PetscObjectQuery((PetscObject)tlm_ctx->model,"_ts_splitJac",(PetscObject*)&container);CHKERRQ(ierr);
   if (container) {
     TSSplitJacobians *splitJ;

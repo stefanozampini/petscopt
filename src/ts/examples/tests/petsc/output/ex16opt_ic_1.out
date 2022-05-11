@@ -41,12 +41,12 @@ mu 1., steps 9, ftime 0.5
  39 TAO,  Function value: 1.85005e-11,  Residual: 2.00862e-06 
  40 TAO,  Function value: 1.49948e-11,  Residual: 1.7704e-06 
  41 TAO,  Function value: 1.21683e-11,  Residual: 1.57486e-06 
-Tao Object: 1 MPI processes
+Tao Object: 1 MPI process
   type: cg
     CG Type: prp
     Gradient steps: 0
     Reset steps: 0
-  TaoLineSearch Object: 1 MPI processes
+  TaoLineSearch Object: 1 MPI process
     type: more-thuente
     maximum function evaluations=30
     tolerances: ftol=0.0001, rtol=1e-10, gtol=0.9

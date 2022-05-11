@@ -1,12 +1,12 @@
 
 Initial state
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.5
 0.5
 
 Final state
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.556302
 0.454091
@@ -35,72 +35,72 @@ Vec Object: 1 MPI processes
   5 TAO,  Function value: 7.75947e-22,  Residual: 5.22691e-11 
 
 Tao solution
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -0.346574
 0.346574
 -0.693147
 
 Initial state solution
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.5
 0.5
 
 Gradient via adjoint
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -0.0330506
 0.0330506
 0.489537
 
 Gradient of objective function
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -0.02407
 0.463644
 
 Gradient via adjoint (TLM)
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -0.0330534
 0.0330534
 0.489547
 
 TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 -5.2670069145748588e-01 5.2670069145748588e-01 9.4933455217716967e-01 
 -9.8633901087644887e-02 9.8633901087644887e-02 1.1051526727010725e+00 
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 -5.2670069145748544e-01 -9.8633901087644874e-02 
 5.2670069145748544e-01 9.8633901087644874e-02 
 9.4933455217716878e-01 1.1051526727010723e+00 
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 4.4408920985006262e-16 -4.4408920985006262e-16 -8.8817841970012523e-16 
 1.3877787807814457e-17 -1.3877787807814457e-17 -2.2204460492503131e-16 
 
 Gradient via TLM (explicit fwd via multtrans)
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -0.0330534
 0.0330534
 0.489547
 
 Gradient via TLM (explicit adj via mult)
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -0.0330534
 0.0330534
 0.489547
-Mat Object: H 1 MPI processes
+Mat Object: H 1 MPI process
   type: seqdense
 3.2505606904297712e-01 -3.2505606904297724e-01 -7.2798571785258515e-01 
 -3.2505606904297718e-01 3.2505606904297729e-01 7.2798571785258515e-01 
 -7.2798571785258437e-01 7.2798571785258437e-01 2.8612388958085657e+00 
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 0.0000000000000000e+00 5.5511151231257827e-17 7.7715611723760958e-16 
 -5.5511151231257827e-17 0.0000000000000000e+00 -7.7715611723760958e-16 

@@ -6,8 +6,6 @@ static char help[] = "Demonstrates PETScOpt capalibities with index-1 DAEs.\n";
 */
 
 #include <petscopt.h>
-#include <petsctao.h>
-#include <petscts.h>
 #include <petscdmda.h>
 #include <petscdmredundant.h>
 
@@ -593,7 +591,7 @@ int main(int argc,char **argv)
   appctx.d2      = .05;
   appctx.fpi     = 4.0;
 
-  ierr = PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"PDE-constrained options","");
+  PetscOptionsBegin(PETSC_COMM_WORLD,NULL,"PDE-constrained options","");
   ierr = PetscOptionsBool("-ic_snes","Initial conditions with SNES",__FILE__,wsnes,&wsnes,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-alpha","Alpha",__FILE__,appctx.alpha,&appctx.alpha,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-beta","Beta",__FILE__,appctx.beta,&appctx.beta,NULL);CHKERRQ(ierr);
@@ -603,7 +601,7 @@ int main(int argc,char **argv)
   ierr = PetscOptionsRealArray("-A", "A",__FILE__,&Ain[0][0],(n=4,&n),NULL);CHKERRQ(ierr);
   ierr = PetscMemcpy(&appctx.A[0][0],&Ain[0][0],n*sizeof(PetscReal));CHKERRQ(ierr);
   ierr = PetscOptionsBoolArray("-test", "Test component in gradient",__FILE__,test,(n=2,&n),NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsEnd();CHKERRQ(ierr);
+  PetscOptionsEnd();
 
   /* structured uniform 2-D grid with Neumann boundary conditions */
   ierr = DMDACreate2d(PETSC_COMM_WORLD,DM_BOUNDARY_MIRROR,DM_BOUNDARY_MIRROR,DMDA_STENCIL_STAR,20,20,PETSC_DECIDE,PETSC_DECIDE,2,1,NULL,NULL,&da);CHKERRQ(ierr);
@@ -695,7 +693,7 @@ int main(int argc,char **argv)
   ierr = TSComputeObjectiveAndGradient(ts,0.0,dt,tf,NULL,M,G,NULL);CHKERRQ(ierr);
   ierr = VecViewFromOptions(G,NULL,"-gradient_view");CHKERRQ(ierr);
   ierr = TaoCreate(PETSC_COMM_WORLD,&tao);CHKERRQ(ierr);
-  ierr = TaoSetObjectiveRoutine(tao,FormObjective,&opt);CHKERRQ(ierr);
+  ierr = TaoSetObjective(tao,FormObjective,&opt);CHKERRQ(ierr);
   ierr = TaoTestGradient(tao,M,G);CHKERRQ(ierr);
   ierr = TaoDestroy(&tao);CHKERRQ(ierr);
 

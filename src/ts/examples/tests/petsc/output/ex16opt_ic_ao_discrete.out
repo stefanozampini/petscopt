@@ -6,17 +6,17 @@ mu 1., steps 100, ftime 0.1
   2-norm ||G - Gfd||/||G|| = 5.23013e-07, ||G - Gfd|| = 1.05153e-07
   max-norm ||G - Gfd||/||G|| = 3.74304e-07, ||G - Gfd|| = 7.50529e-08
   Hand-coded gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.200513
 0.0147235
   Finite difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.200513
 0.0147235
   Hand-coded minus finite-difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -7.365e-08
 -7.50529e-08
@@ -26,17 +26,17 @@ Vec Object: 1 MPI processes
   2-norm ||G - Gfd||/||G|| = 1.67727e-07, ||G - Gfd|| = 4.89637e-09
   max-norm ||G - Gfd||/||G|| = 1.75505e-07, ||G - Gfd|| = 4.8607e-09
   Hand-coded gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -0.00922787
 0.0276956
   Finite difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -0.00922786
 0.0276956
   Hand-coded minus finite-difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -4.8607e-09
 5.89964e-10
@@ -46,17 +46,17 @@ Vec Object: 1 MPI processes
   2-norm ||G - Gfd||/||G|| = 2.90222e-07, ||G - Gfd|| = 4.57076e-09
   max-norm ||G - Gfd||/||G|| = 2.39497e-07, ||G - Gfd|| = 3.68712e-09
   Hand-coded gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.0153952
 -0.00332012
   Finite difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.0153952
 -0.00332012
   Hand-coded minus finite-difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 3.68712e-09
 -2.70129e-09
@@ -66,17 +66,17 @@ Vec Object: 1 MPI processes
   2-norm ||G - Gfd||/||G|| = 1.53907e-07, ||G - Gfd|| = 2.66759e-09
   max-norm ||G - Gfd||/||G|| = 1.56441e-07, ||G - Gfd|| = 2.6673e-09
   Hand-coded gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -0.0170498
 0.00311738
   Finite difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -0.0170498
 0.00311738
   Hand-coded minus finite-difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 3.95061e-11
 2.6673e-09
@@ -85,17 +85,17 @@ Vec Object: 1 MPI processes
   2-norm ||G - Gfd||/||G|| = 1.32752e-07, ||G - Gfd|| = 3.67994e-11
   max-norm ||G - Gfd||/||G|| = 1.35281e-07, ||G - Gfd|| = 3.67058e-11
   Hand-coded gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -5.67687e-05
 -0.000271329
   Finite difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -5.67687e-05
 -0.000271329
   Hand-coded minus finite-difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 2.62318e-12
 3.67058e-11
@@ -105,17 +105,17 @@ Vec Object: 1 MPI processes
   2-norm ||G - Gfd||/||G|| = 4.72063e-07, ||G - Gfd|| = 4.78238e-12
   max-norm ||G - Gfd||/||G|| = 4.97243e-07, ||G - Gfd|| = 4.46295e-12
   Hand-coded gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 8.97539e-06
 4.69847e-06
   Finite difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 8.97539e-06
 4.69847e-06
   Hand-coded minus finite-difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -4.46295e-12
 -1.71848e-12
@@ -125,17 +125,17 @@ Vec Object: 1 MPI processes
   2-norm ||G - Gfd||/||G|| = 3.40411e-07, ||G - Gfd|| = 2.99471e-12
   max-norm ||G - Gfd||/||G|| = 3.42791e-07, ||G - Gfd|| = 2.97505e-12
   Hand-coded gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -8.67889e-06
 1.43873e-06
   Finite difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -8.67889e-06
 1.43873e-06
   Hand-coded minus finite-difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -3.426e-13
 -2.97505e-12
@@ -145,17 +145,17 @@ Vec Object: 1 MPI processes
   2-norm ||G - Gfd||/||G|| = 2.3393e-07, ||G - Gfd|| = 2.26583e-12
   max-norm ||G - Gfd||/||G|| = 2.37595e-07, ||G - Gfd|| = 2.26421e-12
   Hand-coded gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 9.52971e-06
 -1.73242e-06
   Finite difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 9.52971e-06
 -1.73242e-06
   Hand-coded minus finite-difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -2.26421e-12
 8.54865e-14
@@ -164,27 +164,27 @@ Vec Object: 1 MPI processes
   2-norm ||G - Gfd||/||G|| = 1.27275e-07, ||G - Gfd|| = 9.12387e-15
   max-norm ||G - Gfd||/||G|| = 9.76699e-08, ||G - Gfd|| = 6.90731e-15
   Hand-coded gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -1.17237e-08
 -7.0721e-08
   Finite difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -1.17237e-08
 -7.0721e-08
   Hand-coded minus finite-difference gradient ----------
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 5.96104e-15
 6.90731e-15
   6 TAO,  Function value: 2.5128e-15,  Residual: 7.16862e-08 
-Tao Object: 1 MPI processes
+Tao Object: 1 MPI process
   type: cg
     CG Type: prp
     Gradient steps: 0
     Reset steps: 0
-  TaoLineSearch Object: 1 MPI processes
+  TaoLineSearch Object: 1 MPI process
     type: more-thuente
     maximum function evaluations=30
     tolerances: ftol=0.0001, rtol=1e-10, gtol=0.9

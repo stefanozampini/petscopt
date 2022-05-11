@@ -21,7 +21,6 @@ Input parameters include:\n";
   ------------------------------------------------------------------------- */
 
 #include <petscopt.h>
-#include <petsctao.h>
 
 typedef struct _n_User *User;
 struct _n_User {
@@ -230,21 +229,21 @@ int main(int argc,char **argv)
   ierr = VecGetArray(p,&x_ptr);CHKERRQ(ierr);
   x_ptr[0] = 1.2;
   ierr = VecRestoreArray(p,&x_ptr);CHKERRQ(ierr);
-  ierr = TaoSetInitialVector(tao,p);CHKERRQ(ierr);
+  ierr = TaoSetSolution(tao,p);CHKERRQ(ierr);
 
   /* Set routine for function and gradient evaluation */
   ierr = PetscOptionsGetBool(NULL,NULL,"-adjointode",&adjointode,NULL);CHKERRQ(ierr);
   if (adjointode) { /* use the adjoint ode approach */
     Mat H;
 
-    ierr = TaoSetObjectiveRoutine(tao,FormFunction_AO,(void *)&user);CHKERRQ(ierr);
-    ierr = TaoSetGradientRoutine(tao,FormGradient_AO,(void *)&user);CHKERRQ(ierr);
-    ierr = TaoSetObjectiveAndGradientRoutine(tao,FormFunctionGradient_AO,(void *)&user);CHKERRQ(ierr);
+    ierr = TaoSetObjective(tao,FormFunction_AO,(void *)&user);CHKERRQ(ierr);
+    ierr = TaoSetGradient(tao,NULL,FormGradient_AO,(void *)&user);CHKERRQ(ierr);
+    ierr = TaoSetObjectiveAndGradient(tao,NULL,FormFunctionGradient_AO,(void *)&user);CHKERRQ(ierr);
     ierr = MatCreate(PETSC_COMM_WORLD,&H);CHKERRQ(ierr);
-    ierr = TaoSetHessianRoutine(tao,H,H,FormHessian_AO,(void *)&user);CHKERRQ(ierr);
+    ierr = TaoSetHessian(tao,H,H,FormHessian_AO,(void *)&user);CHKERRQ(ierr);
     ierr = MatDestroy(&H);CHKERRQ(ierr);
   } else {
-    ierr = TaoSetObjectiveAndGradientRoutine(tao,FormFunctionGradient,(void *)&user);CHKERRQ(ierr);
+    ierr = TaoSetObjectiveAndGradient(tao,NULL,FormFunctionGradient,(void *)&user);CHKERRQ(ierr);
   }
 
   /* Check for any TAO command line options */
@@ -284,7 +283,7 @@ int main(int argc,char **argv)
    Input Parameters:
    tao - the Tao context
    X   - the input vector
-   ptr - optional user-defined context, as set by TaoSetObjectiveAndGradientRoutine()
+   ptr - optional user-defined context, as set by TaoSetObjectiveAndGradient()
 
    Output Parameters:
    f   - the newly evaluated function

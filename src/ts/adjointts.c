@@ -388,7 +388,7 @@ static PetscErrorCode AdjointTSOptionsHandler(PetscOptionItems *PetscOptionsObje
   PetscFunctionBegin;
   PetscCheckAdjointTS(adjts);
   ierr = TSGetApplicationContext(adjts,(void*)&adj_ctx);CHKERRQ(ierr);
-  ierr = PetscOptionsHead(PetscOptionsObject,"AdjointTS options");CHKERRQ(ierr);
+  PetscOptionsHeadBegin(PetscOptionsObject,"AdjointTS options");
   jcon = PETSC_FALSE;
   ierr = PetscOptionsBool("-constjacobians","Whether or not the DAE Jacobians are constant",NULL,jcon,&jcon,NULL);CHKERRQ(ierr);
   rksp = PETSC_FALSE;
@@ -397,7 +397,7 @@ static PetscErrorCode AdjointTSOptionsHandler(PetscOptionItems *PetscOptionsObje
   if (flg) {
     ierr = AdjointTSSetUpStep(adjts);CHKERRQ(ierr);
   }
-  ierr = PetscOptionsTail();CHKERRQ(ierr);
+  PetscOptionsHeadEnd();
   ierr = PetscObjectQuery((PetscObject)adj_ctx->fwdts,"_ts_splitJac",(PetscObject*)&container);CHKERRQ(ierr);
   if (container) {
     TSSplitJacobians *splitJ;

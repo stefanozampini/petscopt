@@ -1,5 +1,5 @@
 Objective function: time [1.6,1.7], val 0.0941813 (should be 0.0941812)
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.659524
 0.0100366

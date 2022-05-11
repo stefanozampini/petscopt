@@ -18,7 +18,6 @@ static const char help[] = "Reproduces cvsHessian_ASA_FSA from CVODE testuite.\n
 
 */
 #include <petscopt.h>
-#include <petsctao.h>
 
 static PetscErrorCode EvalObjective(Vec U, Vec M, PetscReal time, PetscReal *val, void *ctx)
 {
@@ -402,7 +401,7 @@ int main(int argc, char* argv[])
   t0   = 0.0;
   tf   = 2.0;
   dt   = 1.0/128.0;
-  ierr = PetscOptionsBegin(PETSC_COMM_SELF,NULL,"","");CHKERRQ(ierr);
+  PetscOptionsBegin(PETSC_COMM_SELF,NULL,"","");
   ierr = PetscOptionsReal("-t0","Initial time","",t0,&t0,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-tf","Final time","",tf,&tf,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-dt","Initial time step","",dt,&dt,NULL);CHKERRQ(ierr);
@@ -411,7 +410,7 @@ int main(int argc, char* argv[])
   ierr = PetscOptionsBool("-test_taylor","Run Taylor test","",testtaylor,&testtaylor,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_tlm","Test Tangent Linear Model to compute the gradient","",testtlm,&testtlm,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_hessian","Test Hessian symmetry","",testhessian,&testhessian,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsEnd();CHKERRQ(ierr);
+  PetscOptionsEnd();
 
   /* state vectors */
   ierr = VecCreate(PETSC_COMM_SELF,&U);CHKERRQ(ierr);
@@ -550,12 +549,12 @@ int main(int argc, char* argv[])
     ierr = VecDuplicate(M,&X);CHKERRQ(ierr);
     ierr = VecSetRandom(X,NULL);CHKERRQ(ierr);
     ierr = TaoCreate(PETSC_COMM_SELF,&tao);CHKERRQ(ierr);
-    ierr = TaoSetInitialVector(tao,X);CHKERRQ(ierr);
+    ierr = TaoSetSolution(tao,X);CHKERRQ(ierr);
     ierr = TaoSetType(tao,TAOLMVM);CHKERRQ(ierr);
-    ierr = TaoSetObjectiveRoutine(tao,FormFunction,&opt);CHKERRQ(ierr);
-    ierr = TaoSetGradientRoutine(tao,FormGradient,&opt);CHKERRQ(ierr);
+    ierr = TaoSetObjective(tao,FormFunction,&opt);CHKERRQ(ierr);
+    ierr = TaoSetGradient(tao,NULL,FormGradient,&opt);CHKERRQ(ierr);
     ierr = MatCreate(PETSC_COMM_SELF,&H);CHKERRQ(ierr);
-    ierr = TaoSetHessianRoutine(tao,H,H,FormFunctionHessian,&opt);CHKERRQ(ierr);
+    ierr = TaoSetHessian(tao,H,H,FormFunctionHessian,&opt);CHKERRQ(ierr);
     ierr = TaoComputeGradient(tao,X,G);CHKERRQ(ierr);
     ierr = TaoComputeHessian(tao,X,H,H);CHKERRQ(ierr);
     ierr = MatDestroy(&H);CHKERRQ(ierr);
@@ -603,15 +602,18 @@ int main(int argc, char* argv[])
   test:
     requires: !complex !single
     suffix: 1
+    filter: sed -e "s/1 MPI process/1 MPI process/g"
     args: -ts_adapt_type none -ts_type {{theta rk}separate output} -ts_trajectory_type memory -check -test_tao -tsgradient_adjoint_discrete -tao_test_gradient -tshessian_foadjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -test_taylor -tlm_discrete -adjoint_tlm_discrete -test_tlm -test_hessian
 
   test:
     requires: !complex !single
     suffix: 2
+    filter: sed -e "s/1 MPI process/1 MPI process/g"
     args: -ts_adapt_type none -ts_type {{theta rk}separate output} -ts_trajectory_type memory -check -test_tao -tsgradient_adjoint_discrete -tao_test_hessian -tshessian_foadjoint_discrete -tshessian_tlm_discrete -tshessian_soadjoint_discrete -test_taylor -tlm_discrete -adjoint_tlm_discrete -test_tlm -test_hessian
 
   test:
     requires: !complex !single
+    filter: sed -e "s/1 MPI process/1 MPI process/g"
     suffix: cvode
 
 TEST*/

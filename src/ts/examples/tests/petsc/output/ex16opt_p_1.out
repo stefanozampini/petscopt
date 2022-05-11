@@ -23,12 +23,12 @@
  22 TAO,  Function value: 1.2721e-12,  Residual: 2.094e-07 
  23 TAO,  Function value: 5.17188e-13,  Residual: 1.33518e-07 
  24 TAO,  Function value: 2.1027e-13,  Residual: 8.51344e-08 
-Tao Object: 1 MPI processes
+Tao Object: 1 MPI process
   type: cg
     CG Type: prp
     Gradient steps: 0
     Reset steps: 0
-  TaoLineSearch Object: 1 MPI processes
+  TaoLineSearch Object: 1 MPI process
     type: more-thuente
     maximum function evaluations=30
     tolerances: ftol=0.0001, rtol=1e-10, gtol=0.9
@@ -43,6 +43,6 @@ Tao Object: 1 MPI processes
   total number of iterations=24,                          (max: 2000)
   total number of function/gradient evaluations=71,      (max: 4000)
   Solution converged:    ||g(X)||/||g(X0)|| <= gttol
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 1.

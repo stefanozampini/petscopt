@@ -4,10 +4,10 @@ Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.21199;-1.02075], Cost
 Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.21299;-1.01767], Cost function f=4.20056e-07
 Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.21305;-1.01747], Cost function f=1.18094e-11
 Observed value y_ob=[1.21305; -1.01747], ODE solution y=[1.21305;-1.01747], Cost function f=1.17556e-18
-Tao Object: 1 MPI processes
+Tao Object: 1 MPI process
   type: blmvm
   Gradient steps: 0
-  Mat Object: (tao_blmvm_) 1 MPI processes
+  Mat Object: (tao_blmvm_) 1 MPI process
     type: lmvmbfgs
     rows=1, cols=1
       Scale type: NONE
@@ -19,7 +19,7 @@ Tao Object: 1 MPI processes
       Number of updates: 4
       Number of rejects: 0
       Number of resets: 1
-  TaoLineSearch Object: 1 MPI processes
+  TaoLineSearch Object: 1 MPI process
     type: more-thuente
     maximum function evaluations=30
     tolerances: ftol=0.0001, rtol=1e-10, gtol=0.9
@@ -35,6 +35,6 @@ Tao Object: 1 MPI processes
   total number of iterations=5,                          (max: 2000)
   total number of function/gradient evaluations=6,      (max: 4000)
   Solution converged:    ||g(X)|| <= gatol
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 1.

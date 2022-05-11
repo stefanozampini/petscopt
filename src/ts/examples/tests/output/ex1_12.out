@@ -2,7 +2,7 @@ Termination event 0 detected at time 0.4367
 Termination event 0 detected at time 0.4367
 Objective function: time [0.41,0.4367], val 1.6314
 Termination event 0 detected at time 0.4367
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.0641862
 0.0472879

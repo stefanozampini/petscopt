@@ -1,26 +1,26 @@
 Objective function: time [-1.9,-1.1], val 5.92067
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 3.14701
 3.40484
 6.20009
-Mat Object: Phi 1 MPI processes
+Mat Object: Phi 1 MPI process
   type: seqdense
 1.2499885891743558e+00 7.4718629478913154e-02 -6.8034200287545990e-02 
-Mat Object: PhiT 1 MPI processes
+Mat Object: PhiT 1 MPI process
   type: seqdense
 1.2499885891743492e+00 
 7.4718629478913001e-02 
 -6.8034200287545893e-02 
-Mat Object: ||Phi - (Phi^T)^T||/||Phi|| 1 MPI processes
+Mat Object: ||Phi - (Phi^T)^T||/||Phi|| 1 MPI process
   type: seqdense
 -4.7828965644009583e-15 -1.0960804626752196e-16 6.9750574897513971e-17 
-Mat Object: H 1 MPI processes
+Mat Object: H 1 MPI process
   type: seqdense
 9.6471997795208804e+00 4.3395528458624094e-01 -2.5969519386831752e-01 
 4.3395530321689307e-01 4.8264727270042185e+00 -7.7455538949328703e-02 
 -2.5969534291353458e-01 -7.7455520318676571e-02 4.8671779073197845e+00 
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 0.0000000000000000e+00 1.8630652132145542e-08 -1.4904521705716434e-07 
 -1.8630652132145542e-08 0.0000000000000000e+00 1.8630652132145542e-08 

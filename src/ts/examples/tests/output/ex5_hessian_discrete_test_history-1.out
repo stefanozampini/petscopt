@@ -1,6 +1,6 @@
 
 Final state
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 1.
 0.000850079
@@ -22,35 +22,35 @@ Null test: 3.55271e-15 (1.)
 [0] Gradient: -2.04497113687092e-14 1.99999999999799e+00
 
 TLM matrices (Phi, Phi^T and Phi-(Phi^T)^T)
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 8.5007932233725943e-04 9.9999963868123543e-01 
 -9.9999963868177300e-01 8.5007932233525756e-04 
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 8.5007932233748191e-04 -9.9999963868177377e-01 
 9.9999963868123543e-01 8.5007932233548838e-04 
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 2.2247828579402551e-16 0.0000000000000000e+00 
 -7.7715611723760958e-16 2.3082664252216389e-16 
 
 Gradient via TLM (explicit fwd via multtrans)
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -1.93753e-14
 2.
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 1.07437e-15
 -3.77476e-15
 
 Gradient via TLM (explicit adj via mult)
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -1.89317e-14
 2.
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 1.51803e-15
 -3.77476e-15
@@ -60,11 +60,11 @@ Vec Object: 1 MPI processes
   Testing hand-coded Hessian, if (for double precision runs) ||J - Jfd||_F/||J||_F is
     O(1.e-8), the hand-coded Hessian is probably correct.
   ||H - Hfd||_F/||H||_F = 1.99858e-08, ||H - Hfd||_F = 5.65285e-08
-Mat Object: H 1 MPI processes
+Mat Object: H 1 MPI process
   type: seqdense
 1.9999999999999993e+00 -5.3568661279343333e-16 
 -7.0141491137644345e-16 1.9999999999999987e+00 
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 0.0000000000000000e+00 -1.6572829858301012e-16 
 1.6572829858301012e-16 0.0000000000000000e+00 

@@ -93,10 +93,10 @@
   2-norm ||G - Gfd||/||G|| = 3.80732e-08, ||G - Gfd|| = 1.04849e-17
   max-norm ||G - Gfd||/||G|| = 3.80732e-08, ||G - Gfd|| = 1.04849e-17
   2 TAO,  Function value: 2.09541e-31,  Residual: 4.71425e-17 
-Tao Object: 1 MPI processes
+Tao Object: 1 MPI process
   type: tron
   Total PG its: 6,  PG tolerance: 0.001 
-  TaoLineSearch Object: 1 MPI processes
+  TaoLineSearch Object: 1 MPI process
     type: more-thuente
     maximum function evaluations=30
     tolerances: ftol=0.0001, rtol=1e-10, gtol=0.9
@@ -105,16 +105,16 @@ Tao Object: 1 MPI processes
     total number of function/gradient evaluations=1
     using variable bounds
     Termination reason: 1
-  KSP Object: 1 MPI processes
+  KSP Object: 1 MPI process
     type: stcg
     maximum iterations=10000, initial guess is zero
     tolerances:  relative=1e-05, absolute=1e-50, divergence=10000.
     left preconditioning
     using UNPRECONDITIONED norm type for convergence test
-  PC Object: 1 MPI processes
+  PC Object: 1 MPI process
     type: none
     linear system matrix = precond matrix:
-    Mat Object: 1 MPI processes
+    Mat Object: 1 MPI process
       type: submatrix
       rows=1, cols=1
   total KSP iterations: 2
@@ -128,6 +128,6 @@ Tao Object: 1 MPI processes
   total number of function/gradient evaluations=16,      (max: 4000)
   total number of Hessian evaluations=2
   Solution converged:    ||g(X)|| <= gatol
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 1.

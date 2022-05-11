@@ -1,12 +1,12 @@
 
 Initial state
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.5
 0.5
 
 Final state
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.899587
 0.360431
@@ -18,23 +18,23 @@ Vec Object: 1 MPI processes
   4 TAO,  Function value: 1.69048e-25,  Residual: 0. 
 
 Tao solution
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 -0.346574
 0.346574
 -0.693147
 
 Initial state solution
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.5
 0.5
-Mat Object: H 1 MPI processes
+Mat Object: H 1 MPI process
   type: seqdense
 6.8753798889280660e-01 -6.8753798889280660e-01 -1.1632545317028551e+00 
 -6.8753798889280660e-01 6.8753798889280660e-01 1.1632545317028551e+00 
 -1.1632545317028582e+00 1.1632545317028582e+00 2.1210338751187914e+00 
-Mat Object: 1 MPI processes
+Mat Object: 1 MPI process
   type: seqdense
 0.0000000000000000e+00 0.0000000000000000e+00 -3.1086244689504383e-15 
 0.0000000000000000e+00 0.0000000000000000e+00 3.1086244689504383e-15 

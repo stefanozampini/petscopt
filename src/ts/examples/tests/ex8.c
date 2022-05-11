@@ -196,14 +196,14 @@ int main(int argc, char* argv[])
   fatf = 4.e7;
   fstf = 4.e10;
   dt   = 1.0/128.0; /* just a guess for initial time step: we use adaptive time stepping anyway */
-  ierr = PetscOptionsBegin(PETSC_COMM_SELF,NULL,"","");CHKERRQ(ierr);
+  PetscOptionsBegin(PETSC_COMM_SELF,NULL,"","");
   ierr = PetscOptionsReal("-fstf","Final time for forward sensitivity analysis","",fstf,&fstf,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-fatf","Final time for adjoint sensitivity analysis","",fatf,&fatf,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsReal("-dt","Initial time step","",dt,&dt,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-check","Check Hessian DAE terms","",check_dae,&check_dae,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_taylor","Run Taylor test","",testtaylor,&testtaylor,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsBool("-test_tlm","Test Tangent Linear Model to compute the gradient","",testtlm,&testtlm,NULL);CHKERRQ(ierr);
-  ierr = PetscOptionsEnd();CHKERRQ(ierr);
+  PetscOptionsEnd();
 
   /* state vector */
   ierr = VecCreate(PETSC_COMM_SELF,&U);CHKERRQ(ierr);

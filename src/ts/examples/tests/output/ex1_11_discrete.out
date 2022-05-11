@@ -2,21 +2,21 @@ Termination event 0 detected at time 0.4367
 Termination event 0 detected at time 0.4367
 Objective function: time [0.41,0.4367], val 1.53382
 Termination event 0 detected at time 0.4367
-Vec Object: 1 MPI processes
+Vec Object: 1 MPI process
   type: seq
 0.0610825
 0.0461156
 0.369392
 Termination event 0 detected at time 0.4367
-Mat Object: Phi 1 MPI processes
+Mat Object: Phi 1 MPI process
   type: seqdense
 2.5844442783307211e+00 7.7041304238091565e-02 1.0481135219521091e-02 
-Mat Object: PhiT 1 MPI processes
+Mat Object: PhiT 1 MPI process
   type: seqdense
 2.5844442783307215e+00 
 7.7041304238091551e-02 
 1.0481135219521088e-02 
-Mat Object: ||Phi - (Phi^T)^T||/||Phi|| 1 MPI processes
+Mat Object: ||Phi - (Phi^T)^T||/||Phi|| 1 MPI process
   type: seqdense
 1.6620312180297234e-16 -5.1938475563428856e-18 -1.2984618890857214e-18 
 Termination event 0 detected at time 0.4367
